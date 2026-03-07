@@ -40,12 +40,14 @@ const CHART_COLORS = ["#6C8EFF","#d4af37","#34d399","#a78bfa","#06b6d4","#ec4899
 
 // ── CAGR Presets ──────────────────────────────────────────────
 const CAGR_PRESETS = {
-  "aggressive": { label:"\u{1F680} Aggressive Growth", desc:"High-growth stocks (TSLA, MSTR)", cagr:25, d1:1.5, d2:0.7, d3:0.2 },
-  "growth":     { label:"\u{1F4C8} Growth", desc:"Tech/growth stocks (NVDA, AMZN)", cagr:18, d1:0.8, d2:0.4, d3:0.15 },
-  "moderate":   { label:"\u2696\uFE0F Moderate", desc:"Blue chips (AAPL, MSFT)", cagr:12, d1:0.5, d2:0.3, d3:0.1 },
-  "conservative":{ label:"\u{1F6E1}\uFE0F Conservative", desc:"Index funds (SPY, VOO)", cagr:10, d1:0.3, d2:0.2, d3:0.1 },
-  "crypto":     { label:"\u20BF Crypto", desc:"Bitcoin, Ethereum", cagr:28, d1:2.5, d2:0.7, d3:0.12 },
-  "income":     { label:"\u{1F4B0} Income/Dividend", desc:"REITs, dividend ETFs", cagr:7, d1:0.2, d2:0.1, d3:0.05 },
+  "hyper":       { label:"🔥 Hyper Growth",     desc:"Disruptive companies (early TSLA, early NVDA)", cagr:30, d1:2.8, d2:1.0, d3:0.2 },
+  "aggressive":  { label:"🚀 Aggressive Growth", desc:"High-growth stocks (TSLA, MSTR)", cagr:25, d1:1.5, d2:0.7, d3:0.2 },
+  "growth":      { label:"📈 Growth",            desc:"Tech/growth stocks (NVDA, AMZN)", cagr:18, d1:0.8, d2:0.4, d3:0.15 },
+  "moderate":    { label:"⚖️ Moderate",          desc:"Blue chips (AAPL, MSFT)", cagr:12, d1:0.5, d2:0.3, d3:0.1 },
+  "conservative":{ label:"🛡️ Conservative",      desc:"Index funds (SPY, VOO)", cagr:10, d1:0.3, d2:0.2, d3:0.1 },
+  "ultra":       { label:"💴 Ultra Conservative", desc:"Bonds, GICs, T-Bills", cagr:3, d1:0.1, d2:0.0, d3:0.0 },
+  "crypto":      { label:"₿ Crypto",             desc:"Bitcoin, Ethereum", cagr:28, d1:2.5, d2:0.7, d3:0.12 },
+  "income":      { label:"💰 Income/Dividend",    desc:"REITs, dividend ETFs", cagr:7, d1:0.2, d2:0.1, d3:0.05 },
 };
 
 // ── Default Data ──────────────────────────────────────────────
@@ -53,8 +55,8 @@ const mkId = () => Date.now() + Math.random();
 const DEFAULT_PLAN = {
   params: { personName:"", ageAtStart:60, inflationRate:3, startYear:2030, projectionYears:30 },
   divestAssets: [
-    {id:1,name:"Asset 1",note:"",shares:0,pricePerShare:0,cagr:10,cagrDecline1:0.5,cagrDecline2:0.3,cagrDecline3:0.1,autoCalc:true,enabled:false},
-    {id:2,name:"Asset 2",note:"",shares:0,pricePerShare:0,cagr:10,cagrDecline1:0.5,cagrDecline2:0.3,cagrDecline3:0.1,autoCalc:true,enabled:false},
+    {id:1,name:"Asset 1",note:"",shares:0,pricePerShare:0,cagr:10,cagrDecline1:0.5,cagrDecline2:0.3,cagrDecline3:0.1,dividendPercent:0,includeDividend:false,autoCalc:true,enabled:false},
+    {id:2,name:"Asset 2",note:"",shares:0,pricePerShare:0,cagr:10,cagrDecline1:0.5,cagrDecline2:0.3,cagrDecline3:0.1,dividendPercent:0,includeDividend:false,autoCalc:true,enabled:false},
   ],
   fixedIncome: [
     {id:1,name:"Pension",amount:0,startYear:2030,indexing:0,enabled:false},
@@ -84,7 +86,7 @@ function runProjection(plan) {
   const ei = plan.investmentIncome.filter(s=>s.enabled&&s.shares>0&&s.pricePerShare>0);
   const efa = plan.fixedAssets.filter(a=>a.enabled&&a.shares>0&&a.pricePerShare>0);
   const eo = plan.otherIncome.filter(s=>s.enabled&&s.shares>0&&s.pricePerShare>0);
-  if(!ea.length&&!ef.length&&!ei.length&&!eo.length) return [];
+  if(!ea.length&&!ef.length&&!ei.length&&!eo.length&&!efa.length) return [];
 
   // 3-phase CAGR helper — returns array of multipliers starting at 1
   const build3Phase = (baseRate, d1, d2, d3) => {
@@ -161,8 +163,9 @@ function runProjection(plan) {
       let ss=0;if(st.rem>0&&pr>0){const ex=t/pr;ss=Math.min(Math.round(ex*1e6)/1e6,st.rem);}
       const aw2=Math.round(ss*pr);
       ds[idx].rem=Math.max(Math.round((st.rem-ss)*1e6)/1e6,0);
-      yd.assets.push({name:a.name,shares:ds[idx].rem,price:pr,value:Math.round(v),withdrawal:aw2,sharesSold:ss});
-      yd.totalIncome+=aw2;yd.totalValue+=Math.round(v);
+      let adv=0;if(a.includeDividend&&a.dividendPercent>0){adv=Math.round(ds[idx].rem*pr*(a.dividendPercent/100));di+=adv;}
+      yd.assets.push({name:a.name,shares:ds[idx].rem,price:pr,value:Math.round(v),withdrawal:aw2,sharesSold:ss,dividendIncome:adv});
+      yd.totalIncome+=aw2+adv;yd.totalValue+=Math.round(v);
     });
     is2.forEach((st,idx)=>{yd.totalValue+=Math.round(st.rem*ip[idx][y]);});
     efa.forEach((a,idx)=>{const cv=Math.round(a.shares*fap[idx][y]);yd.fixedAssetValues.push({name:a.name,value:cv});yd.totalValue+=cv;});
@@ -363,7 +366,7 @@ function PlanningTab({plan, update, T}) {
         <Field label="Projection Years" value={p.projectionYears} type="number" onChange={v=>up("projectionYears",Math.min(+v||30,60))} T={T}/>
       </div>
     </Card>
-    <Card title="Fixed Sources of Income" badge="Pension \u2022 Social Security" T={T}
+    <Card title="Fixed Sources of Income" badge="Pension, CPP, OAS, Social Security" T={T}
       action={plan.fixedIncome.length<10?()=>update(d=>{d.fixedIncome.push({id:mkId(),name:"New Source",amount:0,startYear:p.startYear,indexing:0,enabled:false});return d;}):null} actionLabel="+ Add">
       <Hint T={T}>Pensions, Social Security, CPP, OAS, annuities. Set start year to defer income.</Hint>
       {plan.fixedIncome.map((s,i)=><ItemRow key={s.id} enabled={s.enabled} T={T} onToggle={()=>update(d=>{d.fixedIncome[i].enabled=!d.fixedIncome[i].enabled;return d;})} onRemove={()=>update(d=>{d.fixedIncome.splice(i,1);return d;})}>
@@ -439,6 +442,8 @@ function DivestTab({plan, update, T}) {
           <MF label="1-5%" value={a.cagrDecline1} type="number" step="0.1" w="0.4fr" onChange={v=>update(d=>{d.divestAssets[i].cagrDecline1=+v||0;return d;})} T={T}/>
           <MF label="6-20%" value={a.cagrDecline2} type="number" step="0.1" w="0.4fr" onChange={v=>update(d=>{d.divestAssets[i].cagrDecline2=+v||0;return d;})} T={T}/>
           <MF label="21+%" value={a.cagrDecline3} type="number" step="0.1" w="0.4fr" onChange={v=>update(d=>{d.divestAssets[i].cagrDecline3=+v||0;return d;})} T={T}/>
+          <MF label="Div%" value={a.dividendPercent||0} type="number" step="0.5" w="0.45fr" onChange={v=>update(d=>{d.divestAssets[i].dividendPercent=+v||0;return d;})} T={T}/>
+          <Chk label="Div" checked={!!a.includeDividend} onChange={()=>update(d=>{d.divestAssets[i].includeDividend=!d.divestAssets[i].includeDividend;return d;})} T={T}/>
           <Chk label="Auto" checked={a.autoCalc} onChange={()=>update(d=>{d.divestAssets[i].autoCalc=!d.divestAssets[i].autoCalc;return d;})} T={T}/>
           <div style={{display:"flex",flexDirection:"column",gap:2,alignSelf:"end",paddingBottom:4}}>
             <YahooLink ticker={a.name} T={T}/>
@@ -472,29 +477,39 @@ function CagrExamplesBox({T}) {
   const [open, setOpen] = useState(false);
   const examples = [
     {
-      label:"\u{1F4C8} Growth Stocks",desc:"e.g., NVDA, AMZN, META",
+      label:"🔥 Hyper Growth Stocks", desc:"e.g., disruptive companies (early TSLA, early NVDA)",
+      cagr:30, d1:2.8, d2:1.0, d3:0.2,
+      explain:"Starts at 30% CAGR. Years 1-5: declines 2.8%/yr to ~16% by year 5. Years 6-20: declines 1.0%/yr to ~1% by year 20. Years 21+: declines 0.2%/yr, settling near 0%."
+    },
+    {
+      label:"📈 Growth Stocks", desc:"e.g., NVDA, AMZN, META",
       cagr:18, d1:0.8, d2:0.4, d3:0.15,
-      explain:"Starts at 18% CAGR. Years 1\u20135: declines 0.8%/yr \u2192 ~14% by year 5. Years 6\u201320: declines 0.4%/yr \u2192 ~8% by year 20. Years 21+: declines 0.15%/yr, settling near 6\u20137%."
+      explain:"Starts at 18% CAGR. Years 1-5: declines 0.8%/yr to ~14% by year 5. Years 6-20: declines 0.4%/yr to ~8% by year 20. Years 21+: declines 0.15%/yr, settling near 6-7%."
     },
     {
-      label:"\u2696\uFE0F Moderate Stocks",desc:"e.g., AAPL, MSFT, JNJ",
+      label:"⚖️ Moderate Stocks", desc:"e.g., AAPL, MSFT, JNJ",
       cagr:12, d1:0.5, d2:0.3, d3:0.1,
-      explain:"Starts at 12% CAGR. Years 1\u20135: declines 0.5%/yr \u2192 ~9.5% by year 5. Years 6\u201320: declines 0.3%/yr \u2192 ~5% by year 20. Years 21+: declines 0.1%/yr, settling near 4%."
+      explain:"Starts at 12% CAGR. Years 1-5: declines 0.5%/yr to ~9.5% by year 5. Years 6-20: declines 0.3%/yr to ~5% by year 20. Years 21+: declines 0.1%/yr, settling near 4%."
     },
     {
-      label:"\u{1F6E1}\uFE0F Conservative / Index",desc:"e.g., SPY, VOO, VTI",
+      label:"🛡️ Conservative / Index", desc:"e.g., SPY, VOO, VTI",
       cagr:10, d1:0.3, d2:0.2, d3:0.1,
-      explain:"Starts at 10% CAGR. Years 1\u20135: declines 0.3%/yr \u2192 ~8.5% by year 5. Years 6\u201320: declines 0.2%/yr \u2192 ~5.5% by year 20. Years 21+: declines 0.1%/yr, settling near 4\u20135%."
+      explain:"Starts at 10% CAGR. Years 1-5: declines 0.3%/yr to ~8.5% by year 5. Years 6-20: declines 0.2%/yr to ~5.5% by year 20. Years 21+: declines 0.1%/yr, settling near 4-5%."
+    },
+    {
+      label:"💴 Ultra Conservative", desc:"e.g., Bonds, GICs, T-Bills",
+      cagr:3, d1:0.1, d2:0.0, d3:0.0,
+      explain:"Starts at 3% CAGR. Years 1-5: slight decline of 0.1%/yr to ~2.5% by year 5. Years 6+: rate holds essentially flat, reflecting stable fixed-income instruments."
     },
   ];
   return <Card title="CAGR Decline Examples" T={T}>
     <div style={{cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}} onClick={()=>setOpen(!open)}>
-      <Hint T={T}>How does the 3-phase CAGR decline work? Click to {open?"hide":"see"} examples for common stock types.</Hint>
-      <span style={{fontSize:16,color:T.accent,transform:open?"rotate(180deg)":"rotate(0deg)",transition:"transform 0.2s",flexShrink:0}}>{"\u25BC"}</span>
+      <Hint T={T}>How does the 3-phase CAGR decline work? Click to {open?"hide":"see"} examples for common asset types.</Hint>
+      <span style={{fontSize:16,color:T.accent,transform:open?"rotate(180deg)":"rotate(0deg)",transition:"transform 0.2s",flexShrink:0}}>{"▼"}</span>
     </div>
     {open&&<div style={{display:"flex",flexDirection:"column",gap:10,marginTop:6}}>
       <div style={{fontSize:12,color:T.textMid,fontFamily:FONT_LABEL,lineHeight:1.6,padding:"0 4px"}}>
-        The 3-phase model assumes high early growth that gradually matures \u2014 mimicking how companies evolve from high-growth to stable phases. The three decline rates (1-5%, 6-20%, 21+%) control how quickly CAGR drops in each period. The CAGR never goes below 0%.
+        The 3-phase model assumes high early growth that gradually matures — mimicking how companies evolve from high-growth to stable phases. The three decline rates (1-5%, 6-20%, 21+%) control how quickly CAGR drops in each period. The CAGR never goes below 0%.
       </div>
       {examples.map((ex,i)=><div key={i} style={{background:T.inputBg,borderRadius:10,padding:"14px 18px",border:`1px solid ${T.border}`}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6,flexWrap:"wrap",gap:6}}>
@@ -503,13 +518,13 @@ function CagrExamplesBox({T}) {
             <span style={{fontSize:11,color:T.textMid,marginLeft:8,fontFamily:FONT_LABEL}}>{ex.desc}</span>
           </div>
           <div style={{fontFamily:FONT_MONO,fontSize:12,color:T.accent,background:`${T.accent}10`,padding:"3px 10px",borderRadius:6}}>
-            {ex.cagr}% \u2192 {ex.d1} / {ex.d2} / {ex.d3}
+            {ex.cagr}% | {ex.d1} / {ex.d2} / {ex.d3}
           </div>
         </div>
         <div style={{fontSize:11.5,color:T.text,fontFamily:FONT_LABEL,lineHeight:1.7,opacity:0.85}}>{ex.explain}</div>
       </div>)}
       <div style={{fontSize:11,color:T.textDim,fontFamily:FONT_LABEL,padding:"4px 4px 0",lineHeight:1.5}}>
-        {"\u{1F4A1}"} <strong>Tip:</strong> Use the Preset button on each asset for quick setup. Conservative declines suit index funds; steeper declines suit individual growth stocks that may mature or face competition over decades.
+        💡 <strong>Tip:</strong> Use the Preset button on each asset for quick setup. Ultra Conservative suits bonds and GICs; steeper declines suit individual growth stocks that may mature over decades.
       </div>
     </div>}
   </Card>;
@@ -633,16 +648,18 @@ const CHART_VIEWS=[
   {id:"income",label:"Annual Income (Stacked)"},
   {id:"appreciation",label:"Growth vs Spending"},
   {id:"withdrawals",label:"Withdrawals by Asset"},
-  {id:"shares",label:"Remaining Shares"},
+  {id:"shares",label:"Remaining Shares (Divest)"},
+  {id:"investmentShares",label:"Registered Investment Value"},
   {id:"fixedAssets",label:"Fixed Assets Value"},
 ];
 
 function ChartsTab({plan, results, T}) {
   const [view,setView]=useState("portfolio");
   const ea=plan.divestAssets.filter(a=>a.enabled&&a.shares>0&&a.pricePerShare>0);
+  const ei=plan.investmentIncome.filter(s=>s.enabled&&s.shares>0&&s.pricePerShare>0);
   const efa=plan.fixedAssets.filter(a=>a.enabled&&a.shares>0&&a.pricePerShare>0);
   if(!results.length) return <div style={{width:"100%"}}><Card title="Charts" T={T}><Empty T={T}/></Card></div>;
-  const desc={portfolio:"Total portfolio value over time.",income:"Stacked income breakdown from all sources.",appreciation:"Portfolio appreciation vs total withdrawals each year.",withdrawals:"Annual withdrawal amount from each divest asset.",shares:"Remaining share count as assets are sold down.",fixedAssets:"Fixed asset appreciation over the projection."};
+  const desc={portfolio:"Total portfolio value over time (all assets).",income:"Stacked income breakdown from all sources.",appreciation:"Portfolio appreciation vs total withdrawals each year.",withdrawals:"Annual withdrawal amount from each divest and registered account.",shares:"Remaining share count as divest assets are sold down.",investmentShares:"Registered investment account values over time.",fixedAssets:"Fixed asset appreciation over the projection."};
   const CTooltip=({active,payload,label})=>{if(!active||!payload?.length)return null;return<div style={{background:"#0d0d1f",border:"1px solid #2a2a4a",borderRadius:8,padding:"10px 14px",fontSize:11,fontFamily:FONT_MONO}}><div style={{color:"#888",marginBottom:4}}>{label}</div>{payload.map((p,i)=><div key={i} style={{color:p.color,marginBottom:2}}>{p.name}: {typeof p.value==="number"&&p.value>100?fmtK(p.value):fmtN(p.value,2)}</div>)}</div>;};
 
   const renderChart=()=>{
@@ -653,10 +670,10 @@ function ChartsTab({plan, results, T}) {
         <Tooltip content={<CTooltip/>}/><Area type="monotone" dataKey="Portfolio" stroke={T.accent} fill="url(#gP)" strokeWidth={2.5}/></AreaChart></ResponsiveContainer>;
     }
     if(view==="income"){
-      const data=results.map(r=>({year:r.year,Fixed:r.fixedIncome,Withdrawals:r.assets?.reduce((t,a)=>t+a.withdrawal,0)||0,Dividends:r.dividendIncome,Other:r.otherIncome}));
+      const data=results.map(r=>({year:r.year,Fixed:r.fixedIncome,Divest_WD:r.assets?.reduce((t,a)=>t+a.withdrawal,0)||0,Reg_WD:(r.investmentIncomeSources||[]).reduce((t,s)=>t+s.withdrawal,0),Dividends:r.dividendIncome,Other:r.otherIncome}));
       return<ResponsiveContainer><ComposedChart data={data}><XAxis dataKey="year" tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={{stroke:T.border}}/><YAxis tickFormatter={fmtK} tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={false}/>
         <Tooltip content={<CTooltip/>}/><Legend wrapperStyle={{fontSize:11,fontFamily:FONT_MONO}}/>
-        <Bar dataKey="Fixed" stackId="a" fill={T.accent}/><Bar dataKey="Withdrawals" stackId="a" fill={T.gold}/><Bar dataKey="Dividends" stackId="a" fill={T.green}/><Bar dataKey="Other" stackId="a" fill={T.purple} radius={[3,3,0,0]}/></ComposedChart></ResponsiveContainer>;
+        <Bar dataKey="Fixed" stackId="a" fill={T.accent}/><Bar dataKey="Divest_WD" stackId="a" fill={T.gold}/><Bar dataKey="Reg_WD" stackId="a" fill={T.cyan}/><Bar dataKey="Dividends" stackId="a" fill={T.green}/><Bar dataKey="Other" stackId="a" fill={T.purple} radius={[3,3,0,0]}/></ComposedChart></ResponsiveContainer>;
     }
     if(view==="appreciation"){
       const data=results.map((r,i)=>{const pv=i>0?results[i-1].totalValue:r.totalValue;return{year:r.year,Appreciation:Math.max(r.totalValue-pv+r.totalIncome,0),Spending:r.totalIncome};});
@@ -665,16 +682,24 @@ function ChartsTab({plan, results, T}) {
         <Bar dataKey="Appreciation" fill={T.accent}/><Line dataKey="Spending" stroke={T.gold} strokeWidth={2} dot={false} strokeDasharray="6 3"/></ComposedChart></ResponsiveContainer>;
     }
     if(view==="withdrawals"){
-      const data=results.map(r=>{const o={year:r.year};r.assets.forEach(a=>{o[a.name]=a.withdrawal;});return o;});
+      const allAssets=[...ea,...ei];
+      const data=results.map(r=>{const o={year:r.year};r.assets.forEach(a=>{o[a.name]=a.withdrawal;});(r.investmentIncomeSources||[]).forEach(s=>{o[s.name]=s.withdrawal;});return o;});
       return<ResponsiveContainer><LineChart data={data}><XAxis dataKey="year" tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={{stroke:T.border}}/><YAxis tickFormatter={fmtK} tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={false}/>
         <Tooltip content={<CTooltip/>}/><Legend wrapperStyle={{fontSize:11,fontFamily:FONT_MONO}}/>
-        {ea.map((a,i)=><Line key={a.id} type="monotone" dataKey={a.name} stroke={CHART_COLORS[i%CHART_COLORS.length]} strokeWidth={2} dot={false}/>)}</LineChart></ResponsiveContainer>;
+        {allAssets.map((a,i)=><Line key={a.id} type="monotone" dataKey={a.name} stroke={CHART_COLORS[i%CHART_COLORS.length]} strokeWidth={2} dot={false}/>)}</LineChart></ResponsiveContainer>;
     }
     if(view==="shares"){
       const data=results.map(r=>{const o={year:r.year};r.assets.forEach(a=>{o[a.name]=a.shares;});return o;});
       return<ResponsiveContainer><LineChart data={data}><XAxis dataKey="year" tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={{stroke:T.border}}/><YAxis tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={false}/>
         <Tooltip content={<CTooltip/>}/><Legend wrapperStyle={{fontSize:11,fontFamily:FONT_MONO}}/>
         {ea.map((a,i)=><Line key={a.id} type="monotone" dataKey={a.name} stroke={CHART_COLORS[i%CHART_COLORS.length]} strokeWidth={2} dot={false}/>)}</LineChart></ResponsiveContainer>;
+    }
+    if(view==="investmentShares"){
+      if(!ei.length) return<div style={{textAlign:"center",padding:60,color:T.textDim}}>No registered investment accounts enabled.</div>;
+      const data=results.map(r=>{const o={year:r.year};(r.investmentIncomeSources||[]).forEach(s=>{o[s.name]=s.value;});return o;});
+      return<ResponsiveContainer><LineChart data={data}><XAxis dataKey="year" tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={{stroke:T.border}}/><YAxis tickFormatter={fmtK} tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={false}/>
+        <Tooltip content={<CTooltip/>}/><Legend wrapperStyle={{fontSize:11,fontFamily:FONT_MONO}}/>
+        {ei.map((s,i)=><Line key={s.id} type="monotone" dataKey={s.name} stroke={CHART_COLORS[i%CHART_COLORS.length]} strokeWidth={2} dot={false}/>)}</LineChart></ResponsiveContainer>;
     }
     if(view==="fixedAssets"){
       if(!efa.length) return<div style={{textAlign:"center",padding:60,color:T.textDim}}>No fixed assets enabled.</div>;
