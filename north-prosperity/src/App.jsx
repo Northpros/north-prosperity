@@ -163,7 +163,7 @@ function runProjection(plan) {
       let ss=0;if(st.rem>0&&pr>0){const ex=t/pr;ss=Math.min(Math.round(ex*1e6)/1e6,st.rem);}
       const aw2=Math.round(ss*pr);
       ds[idx].rem=Math.max(Math.round((st.rem-ss)*1e6)/1e6,0);
-      let adv=0;if(a.includeDividend&&a.dividendPercent>0){adv=Math.round(ds[idx].rem*pr*(a.dividendPercent/100));di+=adv;}
+      let adv=0;if(a.includeDividend&&a.dividendPercent>0){adv=Math.round(ds[idx].rem*pr*(a.dividendPercent/100));di+=adv;yd.dividendIncome+=adv;}
       yd.assets.push({name:a.name,shares:ds[idx].rem,price:pr,value:Math.round(v),withdrawal:aw2,sharesSold:ss,dividendIncome:adv});
       yd.totalIncome+=aw2+adv;yd.totalValue+=Math.round(v);
     });
