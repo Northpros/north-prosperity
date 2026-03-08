@@ -55,15 +55,15 @@ const mkId = () => Date.now() + Math.random();
 const DEFAULT_PLAN = {
   params: { personName:"", ageAtStart:60, inflationRate:3, startYear:2030, projectionYears:30 },
   divestAssets: [
-    {id:1,name:"Asset 1",note:"",shares:0,pricePerShare:0,cagr:10,cagrDecline1:0.5,cagrDecline2:0.3,cagrDecline3:0.1,dividendPercent:0,includeDividend:false,autoCalc:true,amortize:false,enabled:false},
-    {id:2,name:"Asset 2",note:"",shares:0,pricePerShare:0,cagr:10,cagrDecline1:0.5,cagrDecline2:0.3,cagrDecline3:0.1,dividendPercent:0,includeDividend:false,autoCalc:true,amortize:false,enabled:false},
+    {id:1,name:"Asset 1",note:"",shares:0,pricePerShare:0,cagr:10,cagrDecline1:0.5,cagrDecline2:0.3,cagrDecline3:0.1,dividendPercent:0,includeDividend:false,autoCalc:true,enabled:false},
+    {id:2,name:"Asset 2",note:"",shares:0,pricePerShare:0,cagr:10,cagrDecline1:0.5,cagrDecline2:0.3,cagrDecline3:0.1,dividendPercent:0,includeDividend:false,autoCalc:true,enabled:false},
   ],
   fixedIncome: [
     {id:1,name:"Pension",amount:0,startYear:2030,indexing:0,enabled:false},
     {id:2,name:"Social Security",amount:0,startYear:2030,indexing:2,enabled:false},
   ],
   investmentIncome: [
-    {id:1,name:"401k",note:"",shares:0,pricePerShare:0,cagr:7,cagrDecline1:0.3,cagrDecline2:0.2,cagrDecline3:0.1,dividendPercent:0,includeDividend:false,autoCalc:true,amortize:false,enabled:false},
+    {id:1,name:"401k",note:"",shares:0,pricePerShare:0,cagr:7,cagrDecline1:0.3,cagrDecline2:0.2,cagrDecline3:0.1,dividendPercent:0,includeDividend:false,autoCalc:true,enabled:false},
   ],
   otherIncome: [
     {id:1,name:"Business Income",note:"",shares:1,pricePerShare:0,cagr:3,cagrDecline:0.1,annualIncome:0,includeIncome:false,enabled:false},
@@ -76,7 +76,7 @@ const DEFAULT_PLAN = {
   notes: "",
 };
 
-// ── CALCULATION ENGINE (Phase2b — 3-phase CAGR everywhere) ──
+// ── CALCULATION ENGINE ──
 function runProjection(plan) {
   const p = plan.params;
   const inf = p.inflationRate / 100;
@@ -88,7 +88,6 @@ function runProjection(plan) {
   const eo = plan.otherIncome.filter(s=>s.enabled&&((s.shares>0&&s.pricePerShare>0)||(s.includeIncome&&s.annualIncome>0)));
   if(!ea.length&&!ef.length&&!ei.length&&!eo.length&&!efa.length) return [];
 
-  // 3-phase CAGR helper — returns array of multipliers starting at 1
   const build3Phase = (baseRate, d1, d2, d3) => {
     const sc = baseRate/100;
     const dd1=(d1||0)/100, dd2=(d2||0)/100, dd3=(d3||0)/100;
@@ -105,7 +104,6 @@ function runProjection(plan) {
     const mult = build3Phase(a.cagr, a.cagrDecline1, a.cagrDecline2, a.cagrDecline3);
     return mult.map(m=>Math.round(a.pricePerShare*m));
   });
-
   const ip = ei.map(s=>{
     const d1=s.cagrDecline1!==undefined?s.cagrDecline1:(s.cagrDecline||0.3);
     const d2=s.cagrDecline2!==undefined?s.cagrDecline2:((s.cagrDecline||0.3)*0.6);
@@ -113,7 +111,6 @@ function runProjection(plan) {
     const mult = build3Phase(s.cagr, d1, d2, d3);
     return mult.map(m=>Math.round(s.pricePerShare*m));
   });
-
   const fap = efa.map(a=>{
     const d1=a.cagrDecline1!==undefined?a.cagrDecline1:(a.cagrDecline||0.1);
     const d2=a.cagrDecline2!==undefined?a.cagrDecline2:((a.cagrDecline||0.1)*0.5);
@@ -121,26 +118,18 @@ function runProjection(plan) {
     const mult = build3Phase(a.cagr, d1, d2, d3);
     return mult.map(m=>Math.round(a.pricePerShare*m));
   });
-
   const op = eo.map(s=>{
-    const b=s.cagr/100,d=(s.cagrDecline||0)/100,pr=[Math.round(s.pricePerShare)];
+    const b=s.cagr/100,d=(s.cagrDecline||0)/100,pr=[Math.round(s.pricePerShare||0)];
     for(let y=1;y<py;y++){let yc=b-d*y;yc=Math.max(yc,0);pr.push(Math.round(pr[y-1]*(1+yc)));}return pr;
   });
 
-  // Base withdrawal for autoCalc divest assets (inflation-adjusted annuity formula)
   const aw = ea.map((a,i)=>{
-    if(!a.autoCalc&&!a.amortize)return 0;
-    let sr=0;
-    for(let y=0;y<py;y++){sr+=Math.pow(1+inf,y)/dp[i][y];}
-    return a.shares/sr;
+    if(!a.autoCalc)return 0; let sr=0;
+    for(let y=0;y<py;y++){sr+=Math.pow(1+inf,y)/dp[i][y];}return a.shares/sr;
   });
-
-  // Base withdrawal for autoCalc/amortize registered investment accounts
   const iw = ei.map((s,i)=>{
-    if(!s.autoCalc&&!s.amortize)return 0;
-    let sr=0;
-    for(let y=0;y<py;y++){sr+=Math.pow(1+inf,y)/ip[i][y];}
-    return s.shares/sr;
+    if(!s.autoCalc)return 0; let sr=0;
+    for(let y=0;y<py;y++){sr+=Math.pow(1+inf,y)/ip[i][y];}return s.shares/sr;
   });
 
   const ds = ea.map((a,i)=>({rem:a.shares,bw:Math.round(aw[i])}));
@@ -155,29 +144,27 @@ function runProjection(plan) {
       const s=ei[idx],pr=ip[idx][y],cv=st.rem*pr;
       let dv=0;if(s.includeDividend&&s.dividendPercent>0){dv=cv*(s.dividendPercent/100);di+=dv;}
       let ss=0,w=0;
-      const doSell = s.amortize ? true : s.autoCalc;
-      if(doSell&&st.rem>0&&pr>0){const t=Math.round(st.bw*Math.pow(1+inf,y));const ex=t/pr;ss=Math.min(Math.round(ex*1e6)/1e6,st.rem);w=Math.round(ss*pr);ii+=w;}
+      if(s.autoCalc&&st.rem>0&&pr>0){const t=Math.round(st.bw*Math.pow(1+inf,y));const ex=t/pr;ss=Math.min(Math.round(ex*1e6)/1e6,st.rem);w=Math.round(ss*pr);ii+=w;}
       is2[idx].rem=Math.max(Math.round((st.rem-ss)*1e6)/1e6,0);
-      idata.push({name:s.name,shares:is2[idx].rem,price:pr,value:Math.round(is2[idx].rem*pr),withdrawal:w,sharesSold:ss,dividendIncome:Math.round(dv),amortize:!!s.amortize});
+      idata.push({name:s.name,shares:is2[idx].rem,price:pr,value:Math.round(is2[idx].rem*pr),withdrawal:w,sharesSold:ss,dividendIncome:Math.round(dv)});
     });
     const yd={year:sy+y,age:p.ageAtStart+y,fixedIncome:Math.round(fi),investmentIncome:Math.round(ii),dividendIncome:Math.round(di),
       totalIncome:Math.round(fi+ii+di),totalValue:0,assets:[],investmentIncomeSources:idata,fixedAssetValues:[],otherIncome:0,otherIncomeValues:[]};
     ds.forEach((st,idx)=>{
       const a=ea[idx],pr=dp[idx][y],v=st.rem*pr;
-      const doSell = a.amortize ? true : a.autoCalc;
       const t=Math.round(st.bw*Math.pow(1+inf,y));
-      let ss=0;if(doSell&&st.rem>0&&pr>0){const ex=t/pr;ss=Math.min(Math.round(ex*1e6)/1e6,st.rem);}
+      let ss=0;if(st.rem>0&&pr>0){const ex=t/pr;ss=Math.min(Math.round(ex*1e6)/1e6,st.rem);}
       const aw2=Math.round(ss*pr);
       ds[idx].rem=Math.max(Math.round((st.rem-ss)*1e6)/1e6,0);
       let adv=0;if(a.includeDividend&&a.dividendPercent>0){adv=Math.round(ds[idx].rem*pr*(a.dividendPercent/100));di+=adv;yd.dividendIncome+=adv;}
-      yd.assets.push({name:a.name,shares:ds[idx].rem,price:pr,value:Math.round(v),withdrawal:aw2,sharesSold:ss,dividendIncome:adv,amortize:!!a.amortize});
+      yd.assets.push({name:a.name,shares:ds[idx].rem,price:pr,value:Math.round(v),withdrawal:aw2,sharesSold:ss,dividendIncome:adv});
       yd.totalIncome+=aw2+adv;yd.totalValue+=Math.round(v);
     });
     is2.forEach((st,idx)=>{yd.totalValue+=Math.round(st.rem*ip[idx][y]);});
     efa.forEach((a,idx)=>{const cv=Math.round(a.shares*fap[idx][y]);yd.fixedAssetValues.push({name:a.name,value:cv});yd.totalValue+=cv;});
     let oi=0;const odata=[];
     eo.forEach((s,idx)=>{
-      const pr=op[idx][y],cv=Math.round(s.shares*pr);
+      const pr=op[idx][y],cv=Math.round((s.shares||0)*pr);
       let ai=0;if(s.includeIncome&&s.annualIncome>0){ai=s.annualIncome;oi+=ai;}
       odata.push({name:s.name,value:cv,annualIncome:ai});yd.totalValue+=cv;
     });
@@ -246,9 +233,8 @@ export default function RetirementPlanner() {
     const input=document.createElement("input");input.type="file";input.accept=".json";
     input.onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();
     r.onload=ev=>{try{const d=JSON.parse(ev.target.result);if(d.params&&d.divestAssets){
-      // Migrate: backfill any fields added after the file was saved
-      d.divestAssets=d.divestAssets.map(a=>({dividendPercent:0,includeDividend:false,amortize:false,...a}));
-      d.investmentIncome=(d.investmentIncome||[]).map(s=>({dividendPercent:0,includeDividend:false,amortize:false,cagrDecline1:s.cagrDecline1!==undefined?s.cagrDecline1:0.3,cagrDecline2:s.cagrDecline2!==undefined?s.cagrDecline2:0.2,cagrDecline3:s.cagrDecline3!==undefined?s.cagrDecline3:0.1,...s}));
+      d.divestAssets=d.divestAssets.map(a=>({dividendPercent:0,includeDividend:false,...a}));
+      d.investmentIncome=(d.investmentIncome||[]).map(s=>({dividendPercent:0,includeDividend:false,cagrDecline1:s.cagrDecline1!==undefined?s.cagrDecline1:0.3,cagrDecline2:s.cagrDecline2!==undefined?s.cagrDecline2:0.2,cagrDecline3:s.cagrDecline3!==undefined?s.cagrDecline3:0.1,...s}));
       d.fixedAssets=(d.fixedAssets||[]).map(a=>({cagrDecline1:a.cagrDecline1!==undefined?a.cagrDecline1:0.1,cagrDecline2:a.cagrDecline2!==undefined?a.cagrDecline2:0.05,cagrDecline3:a.cagrDecline3!==undefined?a.cagrDecline3:0.02,...a}));
       d.otherIncome=d.otherIncome||[];d.bigTicketStocks=d.bigTicketStocks||[];d.notes=d.notes||"";d.bigTicketItem=d.bigTicketItem||"";
       setPlan(d);save(d);alert(`Loaded: ${d.params.personName||"plan"}`);
@@ -391,8 +377,8 @@ function PlanningTab({plan, update, T}) {
     </Card>
     {/* Registered Investment Income — NOW 3-phase CAGR decline */}
     <Card title="Registered Investment Income" badge="TFSA, RRSP, 401k, IRA" T={T}
-      action={plan.investmentIncome.length<10?()=>update(d=>{d.investmentIncome.push({id:mkId(),name:"New Investment",note:"",shares:0,pricePerShare:0,cagr:7,cagrDecline1:0.3,cagrDecline2:0.2,cagrDecline3:0.1,dividendPercent:0,includeDividend:false,autoCalc:true,amortize:false,enabled:false});return d;}):null} actionLabel="+ Add">
-      <Hint T={T}>Investment accounts: sell (Sell), dividends (Div), or amortize cash accounts to $0 (Amort). Three-phase CAGR decline: Yr 1-5, Yr 6-20, Yr 21+</Hint>
+      action={plan.investmentIncome.length<10?()=>update(d=>{d.investmentIncome.push({id:mkId(),name:"New Investment",note:"",shares:0,pricePerShare:0,cagr:7,cagrDecline1:0.3,cagrDecline2:0.2,cagrDecline3:0.1,dividendPercent:0,includeDividend:false,autoCalc:true,enabled:false});return d;}):null} actionLabel="+ Add">
+      <Hint T={T}>Tax-sheltered accounts. Amort/Sell draws balance to $0 by end of term on an amortization schedule. Div pays dividends from remaining balance. Three-phase CAGR decline: Yr 1-5, Yr 6-20, Yr 21+</Hint>
       {plan.investmentIncome.map((s,i)=><div key={s.id}>
         <ItemRow enabled={s.enabled} T={T} onToggle={()=>update(d=>{d.investmentIncome[i].enabled=!d.investmentIncome[i].enabled;return d;})} onRemove={()=>update(d=>{d.investmentIncome.splice(i,1);return d;})}>
           <MF label="Name" value={s.name} w="1.2fr" onChange={v=>update(d=>{d.investmentIncome[i].name=v;return d;})} T={T}/>
@@ -404,8 +390,7 @@ function PlanningTab({plan, update, T}) {
           <MF label="21+%" value={s.cagrDecline3!==undefined?s.cagrDecline3:((s.cagrDecline||0.3)*0.3)} type="number" step="0.1" w="0.4fr" onChange={v=>update(d=>{d.investmentIncome[i].cagrDecline3=+v||0;return d;})} T={T}/>
           <MF label="Div%" value={s.dividendPercent} type="number" step="0.5" w="0.45fr" onChange={v=>update(d=>{d.investmentIncome[i].dividendPercent=+v||0;return d;})} T={T}/>
           <Chk label="Div" checked={s.includeDividend} onChange={()=>update(d=>{d.investmentIncome[i].includeDividend=!d.investmentIncome[i].includeDividend;return d;})} T={T}/>
-          <Chk label="Sell" checked={!!s.autoCalc&&!s.amortize} onChange={()=>update(d=>{d.investmentIncome[i].autoCalc=true;d.investmentIncome[i].amortize=false;return d;})} T={T}/>
-          <Chk label="Amort" checked={!!s.amortize} onChange={()=>update(d=>{d.investmentIncome[i].amortize=!d.investmentIncome[i].amortize;d.investmentIncome[i].autoCalc=!d.investmentIncome[i].amortize;return d;})} T={T}/>
+          <Chk label="Amort/Sell" checked={s.autoCalc} onChange={()=>update(d=>{d.investmentIncome[i].autoCalc=!d.investmentIncome[i].autoCalc;return d;})} T={T}/>
           <div style={{display:"flex",flexDirection:"column",gap:2,alignSelf:"end",paddingBottom:4}}>
             <YahooLink ticker={s.name} T={T}/>
             <button onClick={()=>setShowInvPresets(showInvPresets===i?null:i)} style={{fontSize:9,color:T.accent,background:"none",border:"none",cursor:"pointer",fontFamily:FONT_LABEL}}>CAGR % Preset</button>
@@ -445,11 +430,11 @@ function DivestTab({plan, update, T}) {
   const applyPreset = (i, key) => {const p=CAGR_PRESETS[key];update(d=>{d.divestAssets[i].cagr=p.cagr;d.divestAssets[i].cagrDecline1=p.d1;d.divestAssets[i].cagrDecline2=p.d2;d.divestAssets[i].cagrDecline3=p.d3;return d;});setShowPresets(null);};
   return <div style={{display:"flex",flexDirection:"column",gap:12,width:"100%"}}>
     <Card title="Investment Assets to Divest" badge="Max 20" T={T}
-      action={plan.divestAssets.length<20?()=>update(d=>{d.divestAssets.push({id:mkId(),name:`Asset ${d.divestAssets.length+1}`,note:"",shares:0,pricePerShare:0,cagr:10,cagrDecline1:0.5,cagrDecline2:0.3,cagrDecline3:0.1,dividendPercent:0,includeDividend:false,autoCalc:true,amortize:false,enabled:false});return d;}):null} actionLabel="+ Add Asset">
-      <Hint T={T}>Assets sold over time. Three-phase CAGR decline: Yr 1-5, Yr 6-20, Yr 21+. Use Amort for cash/savings accounts to draw down to $0 over the projection period.</Hint>
+      action={plan.divestAssets.length<20?()=>update(d=>{d.divestAssets.push({id:mkId(),name:`Asset ${d.divestAssets.length+1}`,note:"",shares:0,pricePerShare:0,cagr:10,cagrDecline1:0.5,cagrDecline2:0.3,cagrDecline3:0.1,dividendPercent:0,includeDividend:false,autoCalc:true,enabled:false});return d;}):null} actionLabel="+ Add Asset">
+      <Hint T={T}>Unregistered assets sold on an amortization schedule to $0 by end of term. Three-phase CAGR decline: Yr 1-5, Yr 6-20, Yr 21+. Cap gains may apply.</Hint>
       {plan.divestAssets.map((a,i)=><div key={a.id}>
         <ItemRow enabled={a.enabled} T={T} onToggle={()=>update(d=>{d.divestAssets[i].enabled=!d.divestAssets[i].enabled;return d;})} onRemove={()=>update(d=>{d.divestAssets.splice(i,1);return d;})}>
-          <MF label="Ticker/Name" value={a.name} w="1fr" onChange={v=>update(d=>{d.divestAssets[i].name=v;return d;})} T={T}/>
+          <MF label="Ticker" value={a.name} w="1fr" onChange={v=>update(d=>{d.divestAssets[i].name=v;return d;})} T={T}/>
           <MF label="Shares" value={a.shares} type="number" w="0.6fr" onChange={v=>update(d=>{d.divestAssets[i].shares=+v||0;return d;})} T={T}/>
           <MF label="Price" value={a.pricePerShare} type="number" w="0.7fr" onChange={v=>update(d=>{d.divestAssets[i].pricePerShare=+v||0;return d;})} T={T}/>
           <MF label="CAGR%" value={a.cagr} type="number" step="1" w="0.45fr" onChange={v=>update(d=>{d.divestAssets[i].cagr=+v||0;return d;})} T={T}/>
@@ -458,13 +443,12 @@ function DivestTab({plan, update, T}) {
           <MF label="21+%" value={a.cagrDecline3} type="number" step="0.1" w="0.4fr" onChange={v=>update(d=>{d.divestAssets[i].cagrDecline3=+v||0;return d;})} T={T}/>
           <MF label="Div%" value={a.dividendPercent||0} type="number" step="0.5" w="0.45fr" onChange={v=>update(d=>{d.divestAssets[i].dividendPercent=+v||0;return d;})} T={T}/>
           <Chk label="Div" checked={!!a.includeDividend} onChange={()=>update(d=>{d.divestAssets[i].includeDividend=!d.divestAssets[i].includeDividend;return d;})} T={T}/>
-          <Chk label="Auto" checked={!!a.autoCalc&&!a.amortize} onChange={()=>update(d=>{d.divestAssets[i].autoCalc=true;d.divestAssets[i].amortize=false;return d;})} T={T}/>
-          <Chk label="Amort" checked={!!a.amortize} onChange={()=>update(d=>{d.divestAssets[i].amortize=!d.divestAssets[i].amortize;d.divestAssets[i].autoCalc=!d.divestAssets[i].amortize;return d;})} T={T}/>
+          <Chk label="Amort/Sell" checked={a.autoCalc} onChange={()=>update(d=>{d.divestAssets[i].autoCalc=!d.divestAssets[i].autoCalc;return d;})} T={T}/>
           <div style={{display:"flex",flexDirection:"column",gap:2,alignSelf:"end",paddingBottom:4}}>
             <YahooLink ticker={a.name} T={T}/>
             <button onClick={()=>setShowPresets(showPresets===i?null:i)} style={{fontSize:9,color:T.accent,background:"none",border:"none",cursor:"pointer",fontFamily:FONT_LABEL}}>CAGR % Preset</button>
           </div>
-          {a.enabled&&a.shares>0&&a.pricePerShare>0&&<div style={{fontSize:11,color:a.amortize?T.cyan:T.gold,fontWeight:600,whiteSpace:"nowrap",alignSelf:"end",paddingBottom:5,fontFamily:FONT_MONO}}>{a.amortize?"Amort: ":""}{fmt(a.shares*a.pricePerShare)}</div>}
+          {a.enabled&&a.shares>0&&a.pricePerShare>0&&<div style={{fontSize:11,color:T.gold,fontWeight:600,whiteSpace:"nowrap",alignSelf:"end",paddingBottom:5,fontFamily:FONT_MONO}}>{fmt(a.shares*a.pricePerShare)}</div>}
         </ItemRow>
         {showPresets===i&&<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(170px,1fr))",gap:6,padding:"6px 28px 10px",background:T.bg,borderRadius:8,margin:"-2px 0 6px"}}>
           {Object.entries(CAGR_PRESETS).map(([k,p])=><button key={k} onClick={()=>applyPreset(i,k)} style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:8,padding:"8px 10px",cursor:"pointer",textAlign:"left"}}>
@@ -539,7 +523,7 @@ function CagrExamplesBox({T}) {
         <div style={{fontSize:11.5,color:T.text,fontFamily:FONT_LABEL,lineHeight:1.7,opacity:0.85}}>{ex.explain}</div>
       </div>)}
       <div style={{fontSize:11,color:T.textDim,fontFamily:FONT_LABEL,padding:"4px 4px 0",lineHeight:1.5}}>
-        💡 <strong>Tip:</strong> Use the CAGR % Preset button on each asset for quick setup. Ultra Conservative suits bonds and GICs; steeper declines suit individual growth stocks that may mature over decades.
+        💡 <strong>Tip:</strong> Use the Preset button on each asset for quick setup. Ultra Conservative suits bonds and GICs; steeper declines suit individual growth stocks that may mature over decades.
       </div>
     </div>}
   </Card>;
