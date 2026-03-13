@@ -81,6 +81,8 @@ function runProjection(plan) {
   const p = plan.params;
   const inf = p.inflationRate / 100;
   const sy = p.startYear, py = p.projectionYears;
+const totalYears = Math.ceil(py);
+const fracYear = py % 1;
   const ea = plan.divestAssets.filter(a=>a.enabled&&a.shares>0&&a.pricePerShare>0);
   const ef = plan.fixedIncome.filter(s=>s.enabled&&s.amount>0);
   const ei = plan.investmentIncome.filter(s=>s.enabled&&s.shares>0&&s.pricePerShare>0);
@@ -93,7 +95,7 @@ function runProjection(plan) {
     const dd1=(d1||0)/100, dd2=(d2||0)/100, dd3=(d3||0)/100;
     const p2s=sc-5*dd1, p3s=p2s-15*dd2;
     const mult = [1];
-    for(let y=1;y<py;y++){
+    for(let y=1;y<totalYears;y++){
       let yc; if(y<=5) yc=sc-y*dd1; else if(y<=20) yc=p2s-(y-5)*dd2; else yc=p3s-(y-20)*dd3;
       yc=Math.max(yc,0); mult.push(mult[y-1]*(1+yc));
     }
@@ -362,7 +364,7 @@ function PlanningTab({plan, update, T}) {
         <Field label="Age at Start" value={p.ageAtStart} type="number" onChange={v=>up("ageAtStart",+v||60)} T={T}/>
         <Field label="Inflation %" value={p.inflationRate} type="number" step="0.5" onChange={v=>up("inflationRate",+v||0)} T={T}/>
         <Field label="Start Year" value={p.startYear} type="number" onChange={v=>up("startYear",+v||2030)} T={T}/>
-        <Field label="Projection Years" value={p.projectionYears} type="number" onChange={v=>up("projectionYears",Math.min(+v||30,60))} T={T}/>
+        <Field label="Projection Years" value={p.projectionYears} type="number" step="0.25" onChange={v=>up("projectionYears",Math.min(parseFloat(v)||30,60))} T={T}/>
       </div>
     </Card>
     <Card title="Fixed Sources of Income" badge="Pension, CPP, OAS, Social Security" T={T}
