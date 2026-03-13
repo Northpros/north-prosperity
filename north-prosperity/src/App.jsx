@@ -139,14 +139,15 @@ function runProjection(plan) {
   const results = [];
 
   for(let y=0;y<totalYears;y++){
+    const yf = (fracYear>0 && y===totalYears-1) ? fracYear : 1;
     let fi=0;
-    ef.forEach(s=>{if(sy+y>=s.startYear){const ya=sy+y-s.startYear;fi+=s.amount*Math.pow(1+s.indexing/100,ya);}});
+    ef.forEach(s=>{if(sy+y>=s.startYear){const ya=sy+y-s.startYear;fi+=s.amount*Math.pow(1+s.indexing/100,ya)*yf;}});
     let ii=0,di=0; const idata=[];
     is2.forEach((st,idx)=>{
       const s=ei[idx],pr=ip[idx][y],cv=st.rem*pr;
-      let dv=0;if(s.includeDividend&&s.dividendPercent>0){dv=cv*(s.dividendPercent/100);di+=dv;}
+      let dv=0;if(s.includeDividend&&s.dividendPercent>0){dv=cv*(s.dividendPercent/100)*yf;di+=dv;}
       let ss=0,w=0;
-      if(s.autoCalc&&st.rem>0&&pr>0){const t=Math.round(st.bw*Math.pow(1+inf,y));const ex=t/pr;ss=Math.min(Math.round(ex*1e6)/1e6,st.rem);w=Math.round(ss*pr);ii+=w;}
+      if(s.autoCalc&&st.rem>0&&pr>0){const t=Math.round(st.bw*Math.pow(1+inf,y)*yf);const ex=t/pr;ss=Math.min(Math.round(ex*1e6)/1e6,st.rem);w=Math.round(ss*pr);ii+=w;}
       is2[idx].rem=Math.max(Math.round((st.rem-ss)*1e6)/1e6,0);
       idata.push({name:s.name,shares:is2[idx].rem,price:pr,value:Math.round(is2[idx].rem*pr),withdrawal:w,sharesSold:ss,dividendIncome:Math.round(dv)});
     });
@@ -154,11 +155,11 @@ function runProjection(plan) {
       totalIncome:Math.round(fi+ii+di),totalValue:0,assets:[],investmentIncomeSources:idata,fixedAssetValues:[],otherIncome:0,otherIncomeValues:[]};
     ds.forEach((st,idx)=>{
       const a=ea[idx],pr=dp[idx][y],v=st.rem*pr;
-      const t=Math.round(st.bw*Math.pow(1+inf,y));
+      const t=Math.round(st.bw*Math.pow(1+inf,y)*yf);
       let ss=0;if(st.rem>0&&pr>0){const ex=t/pr;ss=Math.min(Math.round(ex*1e6)/1e6,st.rem);}
       const aw2=Math.round(ss*pr);
       ds[idx].rem=Math.max(Math.round((st.rem-ss)*1e6)/1e6,0);
-      let adv=0;if(a.includeDividend&&a.dividendPercent>0){adv=Math.round(ds[idx].rem*pr*(a.dividendPercent/100));di+=adv;yd.dividendIncome+=adv;}
+      let adv=0;if(a.includeDividend&&a.dividendPercent>0){adv=Math.round(ds[idx].rem*pr*(a.dividendPercent/100)*yf);di+=adv;yd.dividendIncome+=adv;}
       yd.assets.push({name:a.name,shares:ds[idx].rem,price:pr,value:Math.round(v),withdrawal:aw2,sharesSold:ss,dividendIncome:adv});
       yd.totalIncome+=aw2+adv;yd.totalValue+=Math.round(v);
     });
@@ -167,7 +168,7 @@ function runProjection(plan) {
     let oi=0;const odata=[];
     eo.forEach((s,idx)=>{
       const pr=op[idx][y],cv=Math.round((s.shares||0)*pr);
-      let ai=0;if(s.includeIncome&&s.annualIncome>0){ai=s.annualIncome;oi+=ai;}
+      let ai=0;if(s.includeIncome&&s.annualIncome>0){ai=Math.round(s.annualIncome*yf);oi+=ai;}
       odata.push({name:s.name,value:cv,annualIncome:ai});yd.totalValue+=cv;
     });
     yd.otherIncome=Math.round(oi);yd.otherIncomeValues=odata;yd.totalIncome+=Math.round(oi);
