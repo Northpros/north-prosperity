@@ -1,797 +1,1628 @@
-import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
-  ComposedChart, LineChart, Line, AreaChart, Area, BarChart, Bar,
-  XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, ReferenceLine
+  ComposedChart, Area, Line, XAxis, YAxis, CartesianGrid,
+  Tooltip, ResponsiveContainer, ReferenceLine, ReferenceArea, Legend
 } from "recharts";
 
-// ============================================================
-// NORTH PROSPERITY RETIREMENT PLANNER — v2.1
-// Dark mode, DCA Pro aesthetic, localStorage persistence
-// Exact calculation parity with Phase2b HTML (CAGR fix applied)
-// v2.1: 3-phase CAGR everywhere, modern fonts, layout fixes
-// ============================================================
-
-// ── Formatting ────────────────────────────────────────────────
-const fmt = v => new Intl.NumberFormat("en-US",{style:"currency",currency:"USD",minimumFractionDigits:0,maximumFractionDigits:0}).format(v||0);
-const fmtK = v => { v=v||0; return Math.abs(v)>=1e9?`$${(v/1e9).toFixed(1)}B`:Math.abs(v)>=1e6?`$${(v/1e6).toFixed(1)}M`:Math.abs(v)>=1e3?`$${(v/1e3).toFixed(0)}k`:fmt(v); };
-const fmtN = (v,d=2) => new Intl.NumberFormat("en-US",{minimumFractionDigits:d,maximumFractionDigits:d}).format(v||0);
-const fmtPct = v => `${(v||0).toFixed(1)}%`;
-
-// ── Theme ─────────────────────────────────────────────────────
-const themes = {
-  dark: {
-    bg:"#07071a", card:"#0d0d1f", border:"#1a1a3a", border2:"#2a2a4a",
-    inputBg:"#1a1a2e", text:"#e0e0ff", textMid:"#888", textDim:"#555",
-    accent:"#6C8EFF", gold:"#d4af37", green:"#34d399", red:"#ef4444",
-    purple:"#a78bfa", cyan:"#06b6d4", label:"#888",
-    rowAlt:"#0a0a18", rowHover:"#12122a",
-    headerBg:"#0d0d1f", summaryBg:"#0f0f24",
-  },
-  light: {
-    bg:"#f0f2f8", card:"#ffffff", border:"#d0d4e8", border2:"#c0c8e0",
-    inputBg:"#f8f9ff", text:"#1a1a3a", textMid:"#556", textDim:"#778",
-    accent:"#4a6ef5", gold:"#b8941f", green:"#059669", red:"#dc2626",
-    purple:"#7c3aed", cyan:"#0891b2", label:"#778",
-    rowAlt:"#f8f9ff", rowHover:"#eef1ff",
-    headerBg:"#ffffff", summaryBg:"#f0f4ff",
-  }
-};
-const CHART_COLORS = ["#6C8EFF","#d4af37","#34d399","#a78bfa","#06b6d4","#ec4899","#f59e0b","#ef4444","#84cc16","#f472b6"];
-
-// ── CAGR Presets ──────────────────────────────────────────────
-const CAGR_PRESETS = {
-  "hyper":       { label:"🔥 Hyper Growth",     desc:"Disruptive companies (early TSLA, early NVDA)", cagr:30, d1:2.8, d2:1.0, d3:0.2 },
-  "aggressive":  { label:"🚀 Aggressive Growth", desc:"High-growth stocks (TSLA, MSTR)", cagr:25, d1:1.5, d2:0.7, d3:0.2 },
-  "growth":      { label:"📈 Growth",            desc:"Tech/growth stocks (NVDA, AMZN)", cagr:18, d1:0.8, d2:0.4, d3:0.15 },
-  "moderate":    { label:"⚖️ Moderate",          desc:"Blue chips (AAPL, MSFT)", cagr:12, d1:0.5, d2:0.3, d3:0.1 },
-  "conservative":{ label:"🛡️ Conservative",      desc:"Index funds (SPY, VOO)", cagr:10, d1:0.3, d2:0.2, d3:0.1 },
-  "ultra":       { label:"💴 Ultra Conservative", desc:"Bonds, GICs, T-Bills", cagr:3, d1:0.1, d2:0.0, d3:0.0 },
-  "crypto":      { label:"₿ Crypto",             desc:"Bitcoin, Ethereum", cagr:28, d1:2.5, d2:0.7, d3:0.12 },
-  "income":      { label:"💰 Income/Dividend",    desc:"REITs, dividend ETFs", cagr:7, d1:0.2, d2:0.1, d3:0.05 },
-};
-
-// ── Default Data ──────────────────────────────────────────────
-const mkId = () => Date.now() + Math.random();
-const DEFAULT_PLAN = {
-  params: { personName:"", ageAtStart:60, inflationRate:3, startYear:2030, projectionYears:30 },
-  divestAssets: [
-    {id:1,name:"Asset 1",note:"",shares:0,pricePerShare:0,cagr:10,cagrDecline1:0.5,cagrDecline2:0.3,cagrDecline3:0.1,dividendPercent:0,includeDividend:false,autoCalc:true,enabled:false},
-    {id:2,name:"Asset 2",note:"",shares:0,pricePerShare:0,cagr:10,cagrDecline1:0.5,cagrDecline2:0.3,cagrDecline3:0.1,dividendPercent:0,includeDividend:false,autoCalc:true,enabled:false},
-  ],
-  fixedIncome: [
-    {id:1,name:"Pension",amount:0,startYear:2030,indexing:0,enabled:false},
-    {id:2,name:"Social Security",amount:0,startYear:2030,indexing:2,enabled:false},
-  ],
-  investmentIncome: [
-    {id:1,name:"401k",note:"",shares:0,pricePerShare:0,cagr:7,cagrDecline1:0.3,cagrDecline2:0.2,cagrDecline3:0.1,dividendPercent:0,includeDividend:false,autoCalc:true,enabled:false},
-  ],
-  otherIncome: [
-    {id:1,name:"Business Income",note:"",shares:1,pricePerShare:0,cagr:3,cagrDecline:0.1,annualIncome:0,includeIncome:false,enabled:false},
-  ],
-  fixedAssets: [
-    {id:1,name:"Primary Residence",note:"",shares:1,pricePerShare:0,cagr:3,cagrDecline1:0.1,cagrDecline2:0.05,cagrDecline3:0.02,enabled:false},
-  ],
-  bigTicketStocks: [{id:1,ticker:"",shares:0,price:0,enabled:false}],
-  bigTicketItem: "",
-  notes: "",
-};
-
-// ── CALCULATION ENGINE ──
-function runProjection(plan) {
-  const p = plan.params;
-  const inf = p.inflationRate / 100;
-  const sy = p.startYear, py = p.projectionYears;
-  const ea = plan.divestAssets.filter(a=>a.enabled&&a.shares>0&&a.pricePerShare>0);
-  const ef = plan.fixedIncome.filter(s=>s.enabled&&s.amount>0);
-  const ei = plan.investmentIncome.filter(s=>s.enabled&&s.shares>0&&s.pricePerShare>0);
-  const efa = plan.fixedAssets.filter(a=>a.enabled&&a.shares>0&&a.pricePerShare>0);
-  const eo = plan.otherIncome.filter(s=>s.enabled&&((s.shares>0&&s.pricePerShare>0)||(s.includeIncome&&s.annualIncome>0)));
-  if(!ea.length&&!ef.length&&!ei.length&&!eo.length&&!efa.length) return [];
-
-  const build3Phase = (baseRate, d1, d2, d3) => {
-    const sc = baseRate/100;
-    const dd1=(d1||0)/100, dd2=(d2||0)/100, dd3=(d3||0)/100;
-    const p2s=sc-5*dd1, p3s=p2s-15*dd2;
-    const mult = [1];
-    for(let y=1;y<py;y++){
-      let yc; if(y<=5) yc=sc-y*dd1; else if(y<=20) yc=p2s-(y-5)*dd2; else yc=p3s-(y-20)*dd3;
-      yc=Math.max(yc,0); mult.push(mult[y-1]*(1+yc));
-    }
-    return mult;
-  };
-
-  const dp = ea.map(a=>{
-    const mult = build3Phase(a.cagr, a.cagrDecline1, a.cagrDecline2, a.cagrDecline3);
-    return mult.map(m=>Math.round(a.pricePerShare*m));
-  });
-  const ip = ei.map(s=>{
-    const d1=s.cagrDecline1!==undefined?s.cagrDecline1:(s.cagrDecline||0.3);
-    const d2=s.cagrDecline2!==undefined?s.cagrDecline2:((s.cagrDecline||0.3)*0.6);
-    const d3=s.cagrDecline3!==undefined?s.cagrDecline3:((s.cagrDecline||0.3)*0.3);
-    const mult = build3Phase(s.cagr, d1, d2, d3);
-    return mult.map(m=>Math.round(s.pricePerShare*m));
-  });
-  const fap = efa.map(a=>{
-    const d1=a.cagrDecline1!==undefined?a.cagrDecline1:(a.cagrDecline||0.1);
-    const d2=a.cagrDecline2!==undefined?a.cagrDecline2:((a.cagrDecline||0.1)*0.5);
-    const d3=a.cagrDecline3!==undefined?a.cagrDecline3:((a.cagrDecline||0.1)*0.2);
-    const mult = build3Phase(a.cagr, d1, d2, d3);
-    return mult.map(m=>Math.round(a.pricePerShare*m));
-  });
-  const op = eo.map(s=>{
-    const b=s.cagr/100,d=(s.cagrDecline||0)/100,pr=[Math.round(s.pricePerShare||0)];
-    for(let y=1;y<py;y++){let yc=b-d*y;yc=Math.max(yc,0);pr.push(Math.round(pr[y-1]*(1+yc)));}return pr;
-  });
-
-  const aw = ea.map((a,i)=>{
-    if(!a.autoCalc)return 0; let sr=0;
-    for(let y=0;y<py;y++){sr+=Math.pow(1+inf,y)/dp[i][y];}return a.shares/sr;
-  });
-  const iw = ei.map((s,i)=>{
-    if(!s.autoCalc)return 0; let sr=0;
-    for(let y=0;y<py;y++){sr+=Math.pow(1+inf,y)/ip[i][y];}return s.shares/sr;
-  });
-
-  const ds = ea.map((a,i)=>({rem:a.shares,bw:Math.round(aw[i])}));
-  const is2 = ei.map((s,i)=>({rem:s.shares,bw:Math.round(iw[i])}));
-  const results = [];
-
-  for(let y=0;y<py;y++){
-    let fi=0;
-    ef.forEach(s=>{if(sy+y>=s.startYear){const ya=sy+y-s.startYear;fi+=s.amount*Math.pow(1+s.indexing/100,ya);}});
-    let ii=0,di=0; const idata=[];
-    is2.forEach((st,idx)=>{
-      const s=ei[idx],pr=ip[idx][y],cv=st.rem*pr;
-      let dv=0;if(s.includeDividend&&s.dividendPercent>0){dv=cv*(s.dividendPercent/100);di+=dv;}
-      let ss=0,w=0;
-      if(s.autoCalc&&st.rem>0&&pr>0){const t=Math.round(st.bw*Math.pow(1+inf,y));const ex=t/pr;ss=Math.min(Math.round(ex*1e6)/1e6,st.rem);w=Math.round(ss*pr);ii+=w;}
-      is2[idx].rem=Math.max(Math.round((st.rem-ss)*1e6)/1e6,0);
-      idata.push({name:s.name,shares:is2[idx].rem,price:pr,value:Math.round(is2[idx].rem*pr),withdrawal:w,sharesSold:ss,dividendIncome:Math.round(dv)});
-    });
-    const yd={year:sy+y,age:p.ageAtStart+y,fixedIncome:Math.round(fi),investmentIncome:Math.round(ii),dividendIncome:Math.round(di),
-      totalIncome:Math.round(fi+ii+di),totalValue:0,assets:[],investmentIncomeSources:idata,fixedAssetValues:[],otherIncome:0,otherIncomeValues:[]};
-    ds.forEach((st,idx)=>{
-      const a=ea[idx],pr=dp[idx][y],v=st.rem*pr;
-      const t=Math.round(st.bw*Math.pow(1+inf,y));
-      let ss=0;if(st.rem>0&&pr>0){const ex=t/pr;ss=Math.min(Math.round(ex*1e6)/1e6,st.rem);}
-      const aw2=Math.round(ss*pr);
-      ds[idx].rem=Math.max(Math.round((st.rem-ss)*1e6)/1e6,0);
-      let adv=0;if(a.includeDividend&&a.dividendPercent>0){adv=Math.round(ds[idx].rem*pr*(a.dividendPercent/100));di+=adv;yd.dividendIncome+=adv;}
-      yd.assets.push({name:a.name,shares:ds[idx].rem,price:pr,value:Math.round(v),withdrawal:aw2,sharesSold:ss,dividendIncome:adv});
-      yd.totalIncome+=aw2+adv;yd.totalValue+=Math.round(v);
-    });
-    is2.forEach((st,idx)=>{yd.totalValue+=Math.round(st.rem*ip[idx][y]);});
-    efa.forEach((a,idx)=>{const cv=Math.round(a.shares*fap[idx][y]);yd.fixedAssetValues.push({name:a.name,value:cv});yd.totalValue+=cv;});
-    let oi=0;const odata=[];
-    eo.forEach((s,idx)=>{
-      const pr=op[idx][y],cv=Math.round((s.shares||0)*pr);
-      let ai=0;if(s.includeIncome&&s.annualIncome>0){ai=s.annualIncome;oi+=ai;}
-      odata.push({name:s.name,value:cv,annualIncome:ai});yd.totalValue+=cv;
-    });
-    yd.otherIncome=Math.round(oi);yd.otherIncomeValues=odata;yd.totalIncome+=Math.round(oi);
-    yd.totalIncome=Math.round(yd.totalIncome);yd.totalValue=Math.round(yd.totalValue);
-    results.push(yd);
-  }
-  return results;
+// ── Risk Metric ───────────────────────────────────────────────────────────
+// Uses 365-day rolling geometric mean as trend.
+// risk = (log10(price / MA365) + 0.5431) / 1.285
+// Calibrated so that:
+//   Nov 2022 $16k (MA~$32k) → risk 0.197  (8x zone)
+//   Jun 2022 $22k (MA~$41k) → risk 0.192  (8x zone)
+//   Apr 2023 $30k (MA~$22k) → risk 0.532  (above buy zone)
+//   Feb 2026 $69k (MA~$95k) → risk 0.314  (2x zone)
+function calcRisk(price, ma365) {
+  if (!ma365 || ma365 <= 0) return 0.5;
+  const logRatio = Math.log10(price / ma365);
+  // A=0.4647, B=1.0013 — calibrated so Jun/Jul/Nov 2022 land in 8x zone
+  // Jun 2022 $22k → 0.155 (8x), Jul 2022 $19k → 0.118 (8x), Feb 2026 $69k → 0.324 (2x)
+  return Math.min(1, Math.max(0, (logRatio + 0.4647) / 1.0013));
 }
 
-// ── localStorage ──────────────────────────────────────────────
-const STORAGE_KEY = "north_prosperity_v2";
-const load = () => { try{const s=localStorage.getItem(STORAGE_KEY);return s?JSON.parse(s):null;}catch{return null;} };
-const save = (plan) => { try{localStorage.setItem(STORAGE_KEY,JSON.stringify(plan));}catch(e){console.error(e);} };
+// Compute 365-day rolling geometric mean and attach risk to each data point
+function addMovingAverage(data) {
+  const WINDOW = 500; // 500-day geometric MA — sticky enough to stay high through 2022 bear
+  let logSum = 0;
+  return data.map((d, i) => {
+    logSum += Math.log10(Math.max(d.price, 1));
+    if (i >= WINDOW) logSum -= Math.log10(Math.max(data[i - WINDOW].price, 1));
+    const ma = Math.pow(10, logSum / Math.min(i + 1, WINDOW));
+    return { ...d, ma365: ma, risk: parseFloat(calcRisk(d.price, ma).toFixed(4)) };
+  });
+}
 
-// ── Yahoo Finance link ────────────────────────────────────────
-const yahooUrl = (ticker) => `https://finance.yahoo.com/quote/${encodeURIComponent(ticker?.replace(/\s/g,""))}`;
-const YahooLink = ({ticker, T}) => ticker ? (
-  <a href={yahooUrl(ticker)} target="_blank" rel="noopener noreferrer"
-    style={{fontSize:10,color:T.accent,textDecoration:"none",opacity:0.7,whiteSpace:"nowrap",alignSelf:"end",paddingBottom:5}}
-    title={`View ${ticker} on Yahoo Finance`}>{"\u{1F4CA}"} Yahoo</a>
-) : null;
+const RISK_BANDS = [
+  { label: "0.0 – 0.099", min: 0,   max: 0.1 },
+  { label: "0.1 – 0.199", min: 0.1, max: 0.2 },
+  { label: "0.2 – 0.299", min: 0.2, max: 0.3 },
+  { label: "0.3 – 0.399", min: 0.3, max: 0.4 },
+  { label: "0.4 – 0.499", min: 0.4, max: 0.5 },
+  { label: "0.5 – 0.599", min: 0.5, max: 0.6 },
+  { label: "0.6 – 0.699", min: 0.6, max: 0.7 },
+];
 
-// ── Font constants ───────────────────────────────────────────
-const FONT_DISPLAY = "'Playfair Display',Georgia,serif";
-const FONT_BODY = "'Lato','Helvetica Neue',sans-serif";
-const FONT_MONO = "'JetBrains Mono','SF Mono','Fira Code',monospace";
-const FONT_LABEL = "'Inter','Segoe UI',sans-serif";
+function fmt$(v, sym="$") {
+  if (v == null || isNaN(v)) return sym + "0.00";
+  if (v >= 1e6) return sym + (v / 1e6).toFixed(2) + "M";
+  if (v >= 1e3) return sym + Math.round(v).toLocaleString();
+  return sym + v.toFixed(2);
+}
+function fmtDate(d) {
+  return d.toLocaleDateString("en-US", { month: "short", year: "2-digit" });
+}
 
-// ── Content width lock ───────────────────────────────────────
-const CONTENT_MAX = 1440;
+// ── Fallback data if API fails ────────────────────────────────────────────
+function buildFallbackData() {
+  const monthly = [
+    ["2020-01-01",7200],["2020-04-01",8600],["2020-07-01",11100],["2020-10-01",13800],
+    ["2021-01-01",33100],["2021-04-01",57700],["2021-07-01",41500],["2021-10-01",61300],
+    ["2022-01-01",38500],["2022-04-01",38400],["2022-07-01",23400],["2022-10-01",20500],
+    ["2023-01-01",23100],["2023-04-01",29200],["2023-07-01",29200],["2023-10-01",34700],
+    ["2024-01-01",43000],["2024-04-01",60600],["2024-07-01",65900],["2024-10-01",72200],
+    ["2025-01-01",105000],["2025-04-01",78000],["2025-07-01",88000],["2025-10-01",72000],
+    ["2026-01-01",102000],["2026-02-01",68000],
+  ];
+  const out = [];
+  for (let i = 0; i < monthly.length - 1; i++) {
+    const t0 = new Date(monthly[i][0]).getTime();
+    const t1 = new Date(monthly[i+1][0]).getTime();
+    const p0 = monthly[i][1], p1 = monthly[i+1][1];
+    const days = Math.round((t1 - t0) / 86400000);
+    for (let j = 0; j < days; j++) {
+      const frac = j / days;
+      const ts = t0 + j * 86400000;
+      const price = Math.exp(Math.log(p0) + (Math.log(p1) - Math.log(p0)) * frac);
+      out.push({ ts, date: new Date(ts), price });
+    }
+  }
+  return addMovingAverage(out);
+}
 
-// ============================================================
-// MAIN APP
-// ============================================================
-export default function RetirementPlanner() {
-  const [plan, setPlan] = useState(()=>load()||JSON.parse(JSON.stringify(DEFAULT_PLAN)));
-  const [tab, setTab] = useState("planning");
+// ── Main Component ────────────────────────────────────────────────────────
+const KNOWN_NAMES = {
+    BTC: "Bitcoin", ETH: "Ethereum", SOL: "Solana",
+    TSLA: "Tesla", NVDA: "Nvidia", MSTR: "MicroStrategy", AMD: "Advanced Micro Devices",
+    AMZN: "Amazon", AVGO: "Broadcom", BMNR: "Bitmine Immersion Technologies",
+    "BRK-B": "Berkshire Hathaway", CDNS: "Cadence Design Systems", CEG: "Constellation Energy",
+    COIN: "Coinbase", CRWD: "CrowdStrike", DDOG: "Datadog", GOOG: "Alphabet (Google)",
+    HOOD: "Robinhood", IREN: "Iris Energy", META: "Meta Platforms", MSFT: "Microsoft",
+    MU: "Micron Technology", NFLX: "Netflix", OKLO: "Oklo", PLTR: "Palantir",
+    QCOM: "Qualcomm", SMCI: "Super Micro Computer", ASST: "Asset Entities",
+    TSM: "TSMC", TTD: "The Trade Desk", VRT: "Vertiv",
+    GDX: "VanEck Gold Miners ETF", GLD: "SPDR Gold Shares",
+    IBIT: "iShares Bitcoin Trust", MAGS: "Roundhill Magnificent Seven ETF",
+    QQQ: "Invesco QQQ (Nasdaq 100)", SCHD: "Schwab US Dividend Equity ETF",
+    SLV: "iShares Silver Trust", SMH: "VanEck Semiconductor ETF",
+    SPY: "SPDR S&P 500 ETF", USO: "United States Oil Fund", VOO: "Vanguard S&P 500 ETF",
+    XLK: "Technology Select Sector SPDR",
+  };
+export default function DCASimulator() {
+  const [tab, setTab] = useState("dynamic");
   const [darkMode, setDarkMode] = useState(true);
-  const [saveStatus, setSaveStatus] = useState("saved");
-  const saveTimer = useRef(null);
-  const T = darkMode ? themes.dark : themes.light;
-
-  const triggerSave = useCallback((np)=>{
-    setSaveStatus("saving");
-    if(saveTimer.current)clearTimeout(saveTimer.current);
-    saveTimer.current=setTimeout(()=>{save(np);setSaveStatus("saved");},600);
-  },[]);
-
-  const update = useCallback((fn)=>{
-    setPlan(prev=>{const next=fn(JSON.parse(JSON.stringify(prev)));triggerSave(next);return next;});
-  },[triggerSave]);
-
-  const results = useMemo(()=>runProjection(plan),[plan]);
-  const y1=results[0]||{}, yL=results[results.length-1]||{};
-  const peakIncome=results.length?Math.max(...results.map(r=>r.totalIncome)):0;
-  const peakValue=results.length?Math.max(...results.map(r=>r.totalValue)):0;
-
-  const exportPlan = () => {
-    const blob=new Blob([JSON.stringify(plan,null,2)],{type:"application/json"});
-    const a=document.createElement("a");a.href=URL.createObjectURL(blob);
-    a.download=`${plan.params.personName||"retirement-plan"}.json`.replace(/[^a-zA-Z0-9.-]/g,"_");
-    a.click();URL.revokeObjectURL(a.href);
-  };
-  const importPlan = () => {
-    const input=document.createElement("input");input.type="file";input.accept=".json";
-    input.onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();
-    r.onload=ev=>{try{const d=JSON.parse(ev.target.result);if(d.params&&d.divestAssets){
-      d.divestAssets=d.divestAssets.map(a=>({dividendPercent:0,includeDividend:false,...a}));
-      d.investmentIncome=(d.investmentIncome||[]).map(s=>({dividendPercent:0,includeDividend:false,cagrDecline1:s.cagrDecline1!==undefined?s.cagrDecline1:0.3,cagrDecline2:s.cagrDecline2!==undefined?s.cagrDecline2:0.2,cagrDecline3:s.cagrDecline3!==undefined?s.cagrDecline3:0.1,...s}));
-      d.fixedAssets=(d.fixedAssets||[]).map(a=>({cagrDecline1:a.cagrDecline1!==undefined?a.cagrDecline1:0.1,cagrDecline2:a.cagrDecline2!==undefined?a.cagrDecline2:0.05,cagrDecline3:a.cagrDecline3!==undefined?a.cagrDecline3:0.02,...a}));
-      d.otherIncome=d.otherIncome||[];d.bigTicketStocks=d.bigTicketStocks||[];d.notes=d.notes||"";d.bigTicketItem=d.bigTicketItem||"";
-      setPlan(d);save(d);alert(`Loaded: ${d.params.personName||"plan"}`);
-    }else alert("Invalid file.");}catch{alert("Could not read file.");}};r.readAsText(f);};
-    input.click();
-  };
-  const resetPlan = () => {if(window.confirm("Reset all data? This cannot be undone.")){const f=JSON.parse(JSON.stringify(DEFAULT_PLAN));setPlan(f);save(f);}};
-
-  const tabs = [
-    {id:"planning",label:"Planning & Income",icon:"\u2699\uFE0F"},
-    {id:"divest",label:"Assets to Divest",icon:"\u{1F4B8}"},
-    {id:"fixed",label:"Fixed Assets",icon:"\u{1F3E0}"},
-    {id:"projections",label:"Projections",icon:"\u{1F4CA}"},
-    {id:"withdrawals",label:"Withdrawal Plan",icon:"\u{1F4CB}"},
-    {id:"charts",label:"Charts",icon:"\u{1F4C8}"},
-    {id:"additional",label:"Additional",icon:"\u{1F3AF}"},
+  const [currency, setCurrency] = useState("USD");
+  const [cadRate, setCadRate] = useState(1.36); // fallback USD→CAD rate
+  const [baseAmount, setBaseAmount] = useState(1000);
+  // ── Asset catalogue ───────────────────────────────────────────────────────
+  const ASSETS = [
+    // Crypto — Binance
+    { id: "BTC",  label: "BTC (Bitcoin)", type: "binance", cgId: null, ticker: "BTCUSDT", csvUrl: null },
+    { id: "ETH",  label: "ETH (Ethereum)", type: "binance", cgId: null, ticker: "ETHUSDT", csvUrl: null },
+    { id: "SOL",  label: "SOL (Solana)",  type: "binance", cgId: null, ticker: "SOLUSDT", csvUrl: null },
+    // Stocks — Yahoo Finance (alphabetical)
+    { id: "AMD",   label: "AMD (Advanced Micro Devices)", type: "stock", cgId: null, ticker: "AMD"   },
+    { id: "AMZN",  label: "AMZN (Amazon)",                type: "stock", cgId: null, ticker: "AMZN"  },
+    { id: "ASST",  label: "ASST (Asset Entities)",         type: "stock", cgId: null, ticker: "ASST"  },
+    { id: "AVGO",  label: "AVGO (Broadcom)",              type: "stock", cgId: null, ticker: "AVGO"  },
+    { id: "BMNR",  label: "BMNR (Bitmine)",               type: "stock", cgId: null, ticker: "BMNR"  },
+    { id: "BRK-B", label: "BRK.B (Berkshire Hathaway)",  type: "stock", cgId: null, ticker: "BRK-B" },
+    { id: "CDNS",  label: "CDNS (Cadence Design)",        type: "stock", cgId: null, ticker: "CDNS"  },
+    { id: "CEG",   label: "CEG (Constellation Energy)",   type: "stock", cgId: null, ticker: "CEG"   },
+    { id: "COIN",  label: "COIN (Coinbase)",              type: "stock", cgId: null, ticker: "COIN"  },
+    { id: "CRWD",  label: "CRWD (CrowdStrike)",           type: "stock", cgId: null, ticker: "CRWD"  },
+    { id: "DDOG",  label: "DDOG (Datadog)",               type: "stock", cgId: null, ticker: "DDOG"  },
+    { id: "GOOG",  label: "GOOG (Alphabet)",              type: "stock", cgId: null, ticker: "GOOG"  },
+    { id: "HOOD",  label: "HOOD (Robinhood)",             type: "stock", cgId: null, ticker: "HOOD"  },
+    { id: "IREN",  label: "IREN (Iris Energy)",           type: "stock", cgId: null, ticker: "IREN"  },
+    { id: "META",  label: "META (Meta)",                  type: "stock", cgId: null, ticker: "META"  },
+    { id: "MSFT",  label: "MSFT (Microsoft)",             type: "stock", cgId: null, ticker: "MSFT"  },
+    { id: "MSTR",  label: "MSTR (MicroStrategy)",         type: "stock", cgId: null, ticker: "MSTR"  },
+    { id: "MU",    label: "MU (Micron)",                  type: "stock", cgId: null, ticker: "MU"    },
+    { id: "NFLX",  label: "NFLX (Netflix)",               type: "stock", cgId: null, ticker: "NFLX"  },
+    { id: "NVDA",  label: "NVDA (Nvidia)",                type: "stock", cgId: null, ticker: "NVDA"  },
+    { id: "OKLO",  label: "OKLO (Oklo)",                  type: "stock", cgId: null, ticker: "OKLO"  },
+    { id: "PLTR",  label: "PLTR (Palantir)",              type: "stock", cgId: null, ticker: "PLTR"  },
+    { id: "QCOM",  label: "QCOM (Qualcomm)",              type: "stock", cgId: null, ticker: "QCOM"  },
+    { id: "SMCI",  label: "SMCI (Super Micro Computer)",  type: "stock", cgId: null, ticker: "SMCI"  },
+    { id: "TSLA",  label: "TSLA (Tesla)",                 type: "stock", cgId: null, ticker: "TSLA"  },
+    { id: "TSM",   label: "TSM (TSMC)",                   type: "stock", cgId: null, ticker: "TSM"   },
+    { id: "TTD",   label: "TTD (The Trade Desk)",         type: "stock", cgId: null, ticker: "TTD"   },
+    { id: "VRT",   label: "VRT (Vertiv)",                 type: "stock", cgId: null, ticker: "VRT"   },
+    // ETFs — Yahoo Finance (alphabetical)
+    { id: "GDX",   label: "GDX (Gold Miners ETF)",        type: "etf", cgId: null, ticker: "GDX"   },
+    { id: "GLD",   label: "GLD (Gold ETF)",               type: "etf", cgId: null, ticker: "GLD"   },
+    { id: "IBIT",  label: "IBIT (Bitcoin ETF)",           type: "etf", cgId: null, ticker: "IBIT"  },
+    { id: "MAGS",  label: "MAGS (Magnificent 7 ETF)",     type: "etf", cgId: null, ticker: "MAGS"  },
+    { id: "QQQ",   label: "QQQ (Nasdaq 100 ETF)",          type: "etf", cgId: null, ticker: "QQQ"   },
+    { id: "SCHD",  label: "SCHD (Schwab Dividend ETF)",   type: "etf", cgId: null, ticker: "SCHD"  },
+    { id: "SLV",   label: "SLV (Silver ETF)",              type: "etf", cgId: null, ticker: "SLV"   },
+    { id: "SMH",   label: "SMH (Semiconductors ETF)",     type: "etf", cgId: null, ticker: "SMH"   },
+    { id: "SPY",   label: "SPY (S&P 500 ETF)",            type: "etf", cgId: null, ticker: "SPY"   },
+    { id: "USO",   label: "USO (US Oil ETF)",              type: "etf", cgId: null, ticker: "USO"   },
+    { id: "VOO",   label: "VOO (S&P 500 ETF)",            type: "etf", cgId: null, ticker: "VOO"   },
+    { id: "XLK",   label: "XLK (Tech Sector ETF)",        type: "etf", cgId: null, ticker: "XLK"   },
   ];
 
+  const [assetId, setAssetId] = useState("SPY");
+  const asset = ASSETS.find(a => a.id === assetId) ?? ASSETS[0];
+  const [tickerInput, setTickerInput] = useState("SPY");
+  const [customTicker, setCustomTicker] = useState(null); // null = use dropdown ASSETS
+  const [companyName, setCompanyName] = useState("SPDR S&P 500 ETF");
+
+  const [frequency, setFrequency] = useState("Monthly");
+  const [dayOfMonth, setDayOfMonth] = useState(13);
+  const [startDate, setStartDate] = useState("2022-02-02");
+  const [endDate, setEndDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [riskBandIdx, setRiskBandIdx] = useState(5);
+  const [strategy, setStrategy] = useState("Linear");
+  const [scaleY, setScaleY] = useState("Lin");
+  const [riskOffset, setRiskOffset] = useState(-0.05);
+  const [sellEnabled, setSellEnabled] = useState(false);
+  const [initEnabled, setInitEnabled] = useState(false);
+  const [initDate, setInitDate] = useState("2022-01-01");
+  const [initShares, setInitShares] = useState("");
+  const [initAvgPrice, setInitAvgPrice] = useState("");
+  const [sell90, setSell90] = useState(true);
+  const [leapEnabled, setLeapEnabled] = useState(false);
+  const [ccEnabled, setCcEnabled] = useState(false);
+  const [ccPremiumPct, setCcPremiumPct] = useState(0.5); // 0.5% of share value per month
+  const [leap09, setLeap09] = useState(true);   // 0.0 – 0.099 risk zone
+  const [leapCostPct, setLeapCostPct] = useState(0.35);  // LEAP costs 35% of stock price
+  const [leapDelta, setLeapDelta] = useState(0.75);       // 0.75 delta
+
+  const [dailyData, setDailyData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [lastUpdated, setLastUpdated] = useState(null);
+
+  // Fetch live USD→CAD rate once on mount
+  useEffect(() => {
+    fetch("https://api.frankfurter.app/latest?from=USD&to=CAD")
+      .then(r => r.json())
+      .then(j => { if (j.rates?.CAD) setCadRate(j.rates.CAD); })
+      .catch(() => {}); // silently keep fallback rate
+  }, []);
+
+  useEffect(() => {
+    async function fetchAssetData() {
+      try {
+        setLoading(true);
+        setError(null);
+        setDailyData([]);
+        let raw = [];
+
+        // Determine what to fetch
+        const ticker = customTicker ?? asset.ticker ?? asset.id;
+        const isBinanceAsset = !customTicker && asset.type === "binance";
+
+        // For custom tickers: try Binance first, then Yahoo Finance
+        if (customTicker) {
+          // Try Binance (crypto) first
+          try {
+            const binanceUrl = `https://api.binance.com/api/v3/klines?symbol=${ticker.toUpperCase()}USDT&interval=1d&limit=1000`;
+            const res = await fetch(binanceUrl);
+            if (res.ok) {
+              const candles = await res.json();
+              if (Array.isArray(candles) && candles.length > 10) {
+                raw = candles.map(c => ({ ts: c[0], date: new Date(c[0]), price: parseFloat(c[4]) }))
+                  .filter(d => d.price > 0);
+                // Fetch more history if needed
+                if (candles.length === 1000) {
+                  let endTime = candles[0][0] - 1;
+                  let safety = 8;
+                  while (safety-- > 0) {
+                    const r2 = await fetch(`https://api.binance.com/api/v3/klines?symbol=${ticker.toUpperCase()}USDT&interval=1d&limit=1000&endTime=${endTime}`);
+                    if (!r2.ok) break;
+                    const more = await r2.json();
+                    if (!more.length) break;
+                    const older = more.map(c => ({ ts: c[0], date: new Date(c[0]), price: parseFloat(c[4]) })).filter(d => d.price > 0);
+                    raw = [...older, ...raw];
+                    endTime = more[0][0] - 1;
+                    if (more.length < 1000) break;
+                  }
+                }
+                raw.sort((a, b) => a.ts - b.ts);
+              }
+            }
+          } catch(e) { /* fall through to Yahoo */ }
+
+          // If Binance didn't work, try Yahoo Finance
+          if (raw.length === 0) {
+            const res = await fetch(`/api/yahoo/${ticker.toUpperCase()}?_=${Date.now()}`);
+            if (!res.ok) throw new Error(`Could not find data for "${ticker.toUpperCase()}" — check the ticker and try again`);
+            const contentType = res.headers.get("content-type") ?? "";
+            if (!contentType.includes("json")) throw new Error("Proxy returned non-JSON — check vercel.json is deployed");
+            const json = await res.json();
+            const result = json.chart?.result?.[0];
+            if (!result) throw new Error(`No data found for "${ticker.toUpperCase()}"`);
+            const timestamps = result.timestamp;
+            const closes = result.indicators.adjclose?.[0]?.adjclose ?? result.indicators.quote?.[0]?.close;
+            if (!timestamps || !closes) throw new Error("Unexpected data format");
+            raw = timestamps.map((ts, i) => ({ ts: ts * 1000, date: new Date(ts * 1000), price: closes[i] }))
+              .filter(d => d.price != null && d.price > 0 && isFinite(d.price));
+          }
+
+          if (raw.length === 0) throw new Error(`No price data found for "${ticker.toUpperCase()}"`);
+
+        } else if (isBinanceAsset || asset.type === "binance") {
+          // Binance public API — CORS-friendly, no key needed, full daily history
+          // BTC and ETH both have data from 2017 on Binance
+          const startTime = ["BTC","ETH"].includes(asset.id)
+            ? new Date("2017-07-01").getTime()
+            : new Date("2020-01-01").getTime();
+          let batches = [];
+          let endTime = Date.now();
+          let safetyLimit = 10; // max 10 requests = 10,000 days ≈ 27 years
+          while (endTime > startTime && safetyLimit-- > 0) {
+            const url = `https://api.binance.com/api/v3/klines?symbol=${asset.ticker}&interval=1d&limit=1000&endTime=${endTime}`;
+            const res = await fetch(url);
+            if (!res.ok) throw new Error(`Binance HTTP ${res.status}`);
+            const candles = await res.json();
+            if (!Array.isArray(candles) || candles.length === 0) break;
+            batches.unshift(candles); // prepend batch
+            endTime = candles[0][0] - 1; // step back before oldest
+            if (candles.length < 1000) break; // reached the beginning
+          }
+          const allCandles = batches.flat();
+          // Deduplicate by timestamp
+          const seen = new Set();
+          raw = allCandles
+            .filter(c => { if (seen.has(c[0])) return false; seen.add(c[0]); return true; })
+            .map(c => ({ ts: c[0], date: new Date(c[0]), price: parseFloat(c[4]) }))
+            .filter(d => d.price > 0 && isFinite(d.price) && d.ts >= startTime)
+            .sort((a, b) => a.ts - b.ts);
+          if (raw.length === 0) throw new Error("No data from Binance");
+        } else if (asset.type === "crypto") {
+          // CoinGecko for crypto
+          const res = await fetch(
+            `https://api.coingecko.com/api/v3/coins/${asset.cgId}/market_chart?vs_currency=usd&days=max&interval=daily`
+          );
+          if (!res.ok) throw new Error(`CoinGecko HTTP ${res.status}`);
+          const json = await res.json();
+          raw = json.prices
+            .filter(([ts]) => ts >= new Date("2012-01-01").getTime())
+            .map(([ts, price]) => ({ ts, date: new Date(ts), price }));
+        } else {
+          // Yahoo Finance via Vercel proxy rewrite (vercel.json) — no CORS issues
+          const res = await fetch(`/api/yahoo/${asset.ticker}?_=${Date.now()}`);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const contentType = res.headers.get("content-type") ?? "";
+          if (!contentType.includes("json")) throw new Error("Proxy returned non-JSON — check vercel.json is deployed");
+          const json = await res.json();
+          const result = json.chart?.result?.[0];
+          if (!result) throw new Error("No data returned from Yahoo Finance");
+          const timestamps = result.timestamp;
+          const closes = result.indicators.adjclose?.[0]?.adjclose
+                      ?? result.indicators.quote?.[0]?.close;
+          if (!timestamps || !closes) throw new Error("Unexpected data format");
+          raw = timestamps.map((ts, i) => ({
+            ts: ts * 1000,
+            date: new Date(ts * 1000),
+            price: closes[i],
+          })).filter(d => d.price != null && d.price > 0 && isFinite(d.price));
+          if (raw.length === 0) throw new Error("No valid price data");
+        }
+
+        const parsed = addMovingAverage(raw);
+        setDailyData(parsed);
+        setLastUpdated(new Date());
+        // Set company name from lookup or Yahoo metadata
+        const t = customTicker ?? asset.id;
+        if (KNOWN_NAMES[t]) {
+          setCompanyName(KNOWN_NAMES[t]);
+        } else {
+          // Try to get name from Yahoo quote endpoint
+          try {
+            const qRes = await fetch(`/api/yahoo/${t}?_=${Date.now()}`);
+            if (qRes.ok) {
+              const qJson = await qRes.json();
+              const name = qJson.chart?.result?.[0]?.meta?.longName
+                        ?? qJson.chart?.result?.[0]?.meta?.shortName
+                        ?? t;
+              setCompanyName(name);
+            }
+          } catch(e) { setCompanyName(t); }
+        }
+      } catch (e) {
+        console.error("Fetch failed:", e);
+        const hint = (asset.type === "stock" || asset.type === "etf")
+          ? " Make sure vercel.json is in your project root."
+          : " Try refreshing.";
+        setError(`Live data unavailable for ${displayTicker} — ${e.message}.${hint}`);
+        // Always ensure dailyData is set so render doesn't crash
+        if (asset.id === "BTC") {
+          setDailyData(buildFallbackData());
+        } else {
+          setDailyData([]);
+        }
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchAssetData();
+  }, [assetId, customTicker]);
+
+  // When switching assets, only clamp startDate if it's before the available data
+  useEffect(() => {
+    if (dailyData.length === 0) return;
+    const earliest = dailyData[0].date.toISOString().slice(0, 10);
+    if (startDate < earliest) setStartDate(earliest);
+  }, [assetId, customTicker, dailyData]);
+
+  // Auto-adjust risk defaults + reset sell/init on asset change
+  useEffect(() => {
+    const isCrypto = customTicker
+      ? false
+      : (asset.type === "binance" || asset.type === "crypto");
+    if (isCrypto) {
+      setRiskBandIdx(4);
+      setRiskOffset(-0.02);
+    } else {
+      setRiskBandIdx(5);
+      setRiskOffset(-0.05);
+    }
+    // Reset sell strategy, initial position and LEAP
+    setSellEnabled(false);
+    setInitEnabled(false);
+    setInitShares("");
+    setInitAvgPrice("");
+    setLeapEnabled(false);
+    setCcEnabled(false);
+  }, [assetId, customTicker]);
+
+  // When switching to lump sum, extend end date to today so full growth is shown
+  useEffect(() => {
+    if (tab === "lump") {
+      setEndDate(new Date().toISOString().slice(0, 10));
+    }
+  }, [tab]);
+
+  const riskBand = RISK_BANDS[riskBandIdx];
+  const displayTicker = customTicker ?? asset.id;
+  const displayLabel = customTicker ?? asset.label;
+  const minDate = dailyData[0]?.date.toISOString().slice(0, 10) ?? "2012-01-01";
+  const maxDate = dailyData[dailyData.length - 1]?.date.toISOString().slice(0, 10) ?? new Date().toISOString().slice(0, 10);
+
+  // Apply offset to all risk values in rangeData
+  const rangeData = useMemo(() => {
+    const s = new Date(startDate).getTime();
+    const e = new Date(endDate).getTime();
+    return dailyData
+      .filter(d => d.ts >= s && d.ts <= e)
+      .map(d => ({ ...d, risk: parseFloat(Math.min(1, Math.max(0, d.risk + riskOffset)).toFixed(4)) }));
+  }, [dailyData, startDate, endDate, riskOffset]);
+
+  // isPurchaseDay: returns true on the scheduled day OR the next available
+  // trading day if the target falls on a weekend/holiday.
+  // Uses a simple external tracker object to ensure exactly ONE fire per period.
+  function buildPurchaseDaySet(data, freq, dom) {
+    const fired = new Set();
+    data.forEach((d, i) => {
+      const date = d.date;
+      if (freq === "Daily") { fired.add(i); return; }
+      if (freq === "Weekly") { if (date.getDay() === 1) fired.add(i); return; }
+      if (freq === "Monthly") {
+        const key = `${date.getFullYear()}-${date.getMonth()}`;
+        if (!fired.has(key) && date.getDate() >= dom) {
+          fired.add(key);
+          fired.add(i); // mark this index as the purchase day
+        }
+      }
+    });
+    return fired;
+  }
+
+  // Build exponential tiers: 1x, 2x, 4x, 8x, 16x...
+  // e.g. band 0.4–0.5 → [0.4,0.5]=1x [0.3,0.4]=2x [0.2,0.3]=4x [0.1,0.2]=8x [0,0.1]=16x
+  function buildExpTiers(band) {
+    const tiers = [];
+    const step = 0.1;
+    let top = parseFloat(band.max.toFixed(3));
+    let bot = parseFloat(band.min.toFixed(3));
+    let mult = 1;
+    tiers.push({ y1: bot, y2: top, mult });
+    while (bot > 0.001) {
+      const newBot = parseFloat(Math.max(0, bot - step).toFixed(3));
+      mult *= 2;
+      tiers.push({ y1: newBot, y2: bot, mult });
+      bot = newBot;
+    }
+    return tiers;
+  }
+
+  // Build linear tiers: 1x, 2x, 3x, 4x, 5x...
+  // Same tier boundaries as exponential but multiplier increments by 1 each step down
+  function buildLinearTiers(band) {
+    const tiers = [];
+    const step = 0.1;
+    let top = parseFloat(band.max.toFixed(3));
+    let bot = parseFloat(band.min.toFixed(3));
+    let mult = 1;
+    tiers.push({ y1: bot, y2: top, mult });
+    while (bot > 0.001) {
+      const newBot = parseFloat(Math.max(0, bot - step).toFixed(3));
+      mult += 1;
+      tiers.push({ y1: newBot, y2: bot, mult });
+      bot = newBot;
+    }
+    return tiers;
+  }
+
+  const expTiers = buildExpTiers(riskBand);
+  const linearTiers = buildLinearTiers(riskBand);
+
+  function getMultiplier(risk, band, strat) {
+    if (risk >= band.max) return 0; // above band = no buy for both modes
+    if (strat === "Linear") {
+      for (const tier of linearTiers) {
+        if (risk >= tier.y1 && risk < tier.y2) return tier.mult;
+      }
+      return 0;
+    }
+    // Exponential
+    for (const tier of expTiers) {
+      if (risk >= tier.y1 && risk < tier.y2) return tier.mult;
+    }
+    return 0;
+  }
+
+  const simulation = useMemo(() => {
+    if (!rangeData.length) return { chartData: [], riskData: [], tradeLog: [], stats: null };
+
+    // Initial position values — added to totals only when initDate is reached in loop
+    const initSh = parseFloat(initShares) || 0;
+    const initPx = parseFloat(initAvgPrice) || 0;
+    const initCost = initSh * initPx;
+    let totalInvested = 0;
+    let totalAsset = 0;
+    let totalAssetNoSell = 0;
+    let buyCount = 0, sellCount = 0, totalSellProceeds = 0, totalSellAsset = 0, totalSellCostBasis = 0;
+    let leapCount = 0, totalLeapInvested = 0;
+    let leapRealizedPnl = 0; // P&L from expired/closed LEAP positions
+    let leapClosedCount = 0;
+    let ccCount = 0, totalCcIncome = 0;
+    const leapPositions = []; // open positions: { entryPrice, notionalShares, cost, delta, entryTs, termMonths, expiryTs }
+    const leapClosed = [];    // closed positions with realized P&L
+    const tradeLog = [];
+    const chartData = [];
+    const riskData = [];
+
+    // Initial position injection setup
+    // If initDate is before simulation start, we still show it first in the log
+    const initTs = initEnabled && initSh > 0 && initPx > 0
+      ? new Date(initDate).getTime() : null;
+    let initInjected = false;
+    // If purchase was before our data range, inject immediately as first entry
+    if (initTs && rangeData.length > 0 && initTs < rangeData[0].ts) {
+      initInjected = true;
+      // Add to totals immediately since purchase is before simulation range
+      totalAsset += initSh;
+      totalAssetNoSell += initSh;
+      totalInvested += initCost;
+      tradeLog.push({
+        date: new Date(initDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+        action: "Initial Position",
+        risk: null,
+        price: initPx,
+        purchaseAmt: initCost,
+        accumulated: initSh,
+        invested: initCost,
+        portfolioValue: initSh * rangeData[0].price,
+        isInitial: true,
+      });
+    }
+    const lumpPrice = rangeData[0]?.price ?? 1;
+    const lumpEquiv = tab === "lump" ? baseAmount : baseAmount * Math.max(rangeData.length / 30, 1);
+    const lumpAsset = lumpEquiv / lumpPrice;
+
+    // Build the set of scheduled day indices ONCE — exactly one per period
+    const scheduledDays = buildPurchaseDaySet(rangeData, frequency, dayOfMonth);
+    const totalPeriods = [...scheduledDays].filter(v => typeof v === "number").length;
+
+    for (let i = 0; i < rangeData.length; i++) {
+      const d = rangeData[i];
+      let purchase = 0;
+      const isLastDay = i === rangeData.length - 1;
+      const isBuyDay = scheduledDays.has(i);
+
+      // Inject initial position at the correct point in time
+      if (initTs && !initInjected && d.ts >= initTs) {
+        initInjected = true;
+        // NOW add the shares and cost to running totals
+        totalAsset += initSh;
+        totalAssetNoSell += initSh;
+        totalInvested += initCost;
+        tradeLog.push({
+          date: new Date(initDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+          action: "Initial Position",
+          risk: d.risk,
+          price: initPx,
+          purchaseAmt: initCost,
+          accumulated: totalAsset,
+          invested: totalInvested,
+          portfolioValue: totalAsset * d.price,
+          isInitial: true,
+        });
+      }
+
+      if (tab === "equal") {
+        if (isBuyDay && !isLastDay) { purchase = baseAmount; buyCount++; }
+      } else if (tab === "lump") {
+        if (i === 0) { purchase = lumpEquiv; buyCount++; }
+      } else {
+        if (isBuyDay && !isLastDay) {
+          const mult = getMultiplier(d.risk, riskBand, strategy);
+          if (mult > 0) { purchase = baseAmount * mult; buyCount++; }
+        }
+      }
+
+      // isBuyDay already set above from scheduledDays
+
+      // Close expired LEAP positions at today's price
+      for (let li = leapPositions.length - 1; li >= 0; li--) {
+        const lp = leapPositions[li];
+        if (d.ts >= lp.expiryTs) {
+          const strike = lp.entryPrice * 0.92;
+          const intrinsicAtExpiry = Math.max(0, d.price - strike) * lp.notionalShares;
+          const pnl = intrinsicAtExpiry - lp.cost; // net P&L after cost
+          leapRealizedPnl += pnl;
+          leapClosedCount++;
+          leapClosed.push({ ...lp, expiryPrice: d.price, intrinsicAtExpiry, pnl });
+          leapPositions.splice(li, 1); // remove from open positions
+          // Add expiry event to trade log
+          tradeLog.push({
+            date: d.date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+            action: pnl >= 0 ? "LEAP Expired ✓" : "LEAP Expired ✗",
+            risk: d.risk,
+            price: d.price,
+            purchaseAmt: null,
+            sellProceeds: intrinsicAtExpiry > 0 ? intrinsicAtExpiry : null,
+            ccIncome: null,
+            isLeap: false,
+            leapExpiry: true,
+            leapPnl: pnl,
+            leapContracts: lp.contracts ?? null,
+          });
+        }
+      }
+
+      // LEAP logic — replaces regular buy at risk zones 0-0.099 and 0.1-0.199
+      let isLeapDay = false;
+      let leapCost = 0;
+      let leapNotional = 0;
+      if (leapEnabled && isBuyDay && !isLastDay && purchase > 0) {
+        const inLeap09Zone = leap09 && d.risk < 0.10;
+        if (inLeap09Zone) {
+          // Real contract math: 1 contract = 100 shares, cost = premium/share × 100
+          const premiumPerShare = d.price * leapCostPct;
+          const costPerContract = premiumPerShare * 100;
+          const contracts = Math.floor(purchase / costPerContract);
+
+          if (contracts === 0) {
+            // Can't afford even 1 contract — buy shares instead (no LEAP this period)
+            // purchase stays as-is, isLeapDay stays false
+          } else {
+            isLeapDay = true;
+            leapCost = contracts * costPerContract; // actual spend (may be less than purchase)
+            leapNotional = contracts * 100;          // always a multiple of 100
+            const leftover = purchase - leapCost;    // unspent cash — buy shares with remainder
+            const termMonths = 18;
+            const expiryTs = d.ts + termMonths * 30.44 * 24 * 60 * 60 * 1000;
+            leapPositions.push({ entryPrice: d.price, notionalShares: leapNotional, contracts, cost: leapCost, delta: leapDelta, entryTs: d.ts, termMonths, expiryTs });
+            totalLeapInvested += leapCost;
+            totalInvested += leapCost;
+            leapCount++;
+            // Buy shares with any leftover (e.g. $2500 budget, $1800 spent on 1 contract → $700 buys shares)
+            if (leftover > 0) {
+              totalAsset += leftover / d.price;
+              totalAssetNoSell += leftover / d.price;
+              totalInvested += leftover;
+              buyCount++;
+            }
+            purchase = 0; // handled above
+          }
+        }
+      }
+
+      // Sell logic — only triggers on scheduled days, same as buys
+      let sellPct = 0;
+      let sellProceeds = 0;
+      if (sellEnabled && isBuyDay && totalAsset > 0 && !isLastDay) {
+        if (sell90 && d.risk >= 0.90) sellPct = 0.10;
+        if (sellPct > 0) {
+          const assetSold = totalAsset * sellPct;
+          sellProceeds = assetSold * d.price;
+          // Cost basis of sold shares = units sold × average cost per unit
+          const avgCostPerUnit = totalAsset > 0 ? totalInvested / totalAsset : 0;
+          totalSellCostBasis += assetSold * avgCostPerUnit;
+          totalAsset -= assetSold;
+          totalSellProceeds += sellProceeds;
+          totalSellAsset += assetSold;
+          sellCount++;
+        }
+      }
+
+      const isSellDay = sellPct > 0;
+
+      // Covered call — only triggers on scheduled buy days, same as everything else
+      let ccIncome = 0;
+      let ccShares = 0;
+      if (ccEnabled && isBuyDay && d.risk >= 0.90 && totalAsset > 0 && !isLastDay) {
+        // Use half the position (simulation — no 100-share lot constraint)
+        ccShares = totalAsset / 2;
+        if (ccShares > 0) {
+          ccIncome = ccShares * d.price * (ccPremiumPct / 100);
+          totalCcIncome += ccIncome;
+          ccCount++;
+        }
+      }
+      const isCcDay = ccIncome > 0;
+
+      if (isBuyDay || isSellDay || isLastDay || isCcDay) {
+        const mult = tab === "dynamic" && !isLastDay ? getMultiplier(d.risk, riskBand, strategy) : 0;
+        let action = "None";
+        if (isCcDay && !isSellDay) {
+          action = `Covered Call`;
+        } else if (isSellDay) {
+          action = `Sell ${(sellPct * 100).toFixed(0)}%`;
+        } else if (isLeapDay) {
+          action = `LEAP 0.${Math.round(leapDelta*100)}Δ`;
+        } else if (!isLastDay && purchase > 0) {
+          if (tab === "equal") action = "Buy 1x";
+          else if (tab === "lump") action = "Lump Sum";
+          else if (strategy === "Linear") action = `Buy ${mult}x`;
+          else action = `Buy ${mult}x`;
+        }
+        tradeLog.push({
+          date: d.date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+          action,
+          risk: d.risk,
+          price: d.price,
+          purchaseAmt: isLeapDay ? leapCost : purchase,
+          sellProceeds: sellProceeds > 0 ? sellProceeds : null,
+          ccIncome: ccIncome > 0 ? ccIncome : null,
+          ccShares: ccIncome > 0 ? ccShares : null,
+          isLeap: isLeapDay,
+          leapNotional: isLeapDay ? leapNotional : null,
+          leapContracts: isLeapDay ? (leapPositions[leapPositions.length - 1]?.contracts ?? null) : null,
+        });
+      }
+
+      if (purchase > 0 && !isSellDay) { totalInvested += purchase; totalAsset += purchase / d.price; }
+      if (purchase > 0) totalAssetNoSell += purchase / d.price; // always accumulate for comparison
+
+      // Update tradeLog entry with running totals (after purchase)
+      if (tradeLog.length > 0 && (isBuyDay || isLastDay)) {
+        const last = tradeLog[tradeLog.length - 1];
+        last.accumulated = totalAsset;
+        last.invested = totalInvested;
+        last.portfolioValue = totalAsset * d.price;
+      }
+
+      // Portfolio chart: sample every 3 days (performance)
+      if (i % 3 === 0 || isLastDay) {
+        // Current LEAP value: open positions only (expired ones already booked as realized P&L)
+        const leapPortVal = leapPositions.reduce((sum, lp) => {
+          const strike = lp.entryPrice * 0.92;
+          const intrinsicAtEntry = Math.max(0, lp.entryPrice - strike) * lp.notionalShares;
+          const extrinsicAtEntry = Math.max(0, lp.cost - intrinsicAtEntry);
+          const monthsHeld = (d.ts - lp.entryTs) / (1000 * 60 * 60 * 24 * 30.44);
+          const extrinsicLeft = extrinsicAtEntry * Math.max(0, 1 - monthsHeld / lp.termMonths);
+          const intrinsicNow = Math.max(0, d.price - strike) * lp.notionalShares;
+          return sum + intrinsicNow + extrinsicLeft;
+        }, 0);
+        // Add realized P&L from expired LEAPs (cash already received/lost)
+        const totalLeapValue = leapPortVal + Math.max(0, leapRealizedPnl);
+        chartData.push({
+          ts: d.ts, label: fmtDate(d.date),
+          price: Math.round(d.price),
+          portfolio: (totalAsset > 0 || leapPositions.length > 0 || leapClosedCount > 0)
+            ? Math.max(1, Math.round(totalAsset * d.price + totalLeapValue)) : null,
+          invested: totalInvested > 0 ? Math.max(1, Math.round(totalInvested)) : null,
+          lumpSum: Math.round(lumpAsset * d.price),
+        });
+      }
+      // Risk chart: every day for full resolution
+      riskData.push({
+        label: fmtDate(d.date),
+        risk: d.risk,
+      });
+    }
+
+    const lastPrice = rangeData[rangeData.length - 1]?.price ?? 0;
+    const currentPortfolio = totalAsset * lastPrice;
+    const gain = currentPortfolio - totalInvested;
+    const gainPct = totalInvested > 0 ? ((currentPortfolio / totalInvested - 1) * 100).toFixed(2) : 0;
+    return {
+      chartData,
+      riskData,
+      tradeLog,
+      stats: {
+        totalInvested, totalAsset, avgPrice: totalAsset > 0 ? totalInvested / totalAsset : 0,
+        lastPrice, currentPortfolio, gain, gainPct,
+        totalPeriods, totalMonths: Math.round(rangeData.length / 30), buyCount, sellCount, totalSellProceeds, totalSellAsset, totalSellCostBasis,
+        leapCount, totalLeapInvested,
+        ccCount, totalCcIncome,
+        // Open positions: current mark-to-market value
+        leapPortfolioValue: (() => {
+          const lastPx = rangeData[rangeData.length - 1]?.price ?? 0;
+          const lastTs = rangeData[rangeData.length - 1]?.ts ?? 0;
+          const openVal = leapPositions.reduce((sum, lp) => {
+            const strike = lp.entryPrice * 0.92;
+            const intrinsicAtEntry = Math.max(0, lp.entryPrice - strike) * lp.notionalShares;
+            const extrinsicAtEntry = Math.max(0, lp.cost - intrinsicAtEntry);
+            const monthsHeld = (lastTs - lp.entryTs) / (1000 * 60 * 60 * 24 * 30.44);
+            const extrinsicLeft = extrinsicAtEntry * Math.max(0, 1 - monthsHeld / lp.termMonths);
+            const intrinsicNow = Math.max(0, lastPx - strike) * lp.notionalShares;
+            return sum + intrinsicNow + extrinsicLeft;
+          }, 0);
+          // Add back net cash from expired positions (positive = profit, negative = loss)
+          return openVal + leapRealizedPnl;
+        })(),
+        leapExpiryValue: (() => {
+          // What open positions would be worth if expired today at last price
+          const lastPx = rangeData[rangeData.length - 1]?.price ?? 0;
+          return leapPositions.reduce((sum, lp) => {
+            const strike = lp.entryPrice * 0.92;
+            return sum + Math.max(0, lastPx - strike) * lp.notionalShares;
+          }, 0);
+        })(),
+        leapRealizedPnl, leapClosedCount, openLeapCount: leapPositions.length,
+        avgLeapEntry: leapCount > 0
+          ? leapPositions.reduce((s, lp) => s + lp.entryPrice * lp.cost, 0) / totalLeapInvested
+          : 0,
+        sellPnl: (currentPortfolio + totalSellProceeds) - totalInvested,
+        noSellPortfolio: totalAssetNoSell * lastPrice,
+        sellPnlPct: totalInvested > 0 ? (((currentPortfolio + totalSellProceeds) / totalInvested - 1) * 100).toFixed(2) : 0,
+      },
+    };
+  }, [rangeData, tab, baseAmount, frequency, dayOfMonth, riskBand, strategy, sellEnabled, sell90, initEnabled, initShares, initAvgPrice, initDate, leapEnabled, leap09, leapCostPct, leapDelta, ccEnabled, ccPremiumPct]);
+
+  const { chartData, riskData, tradeLog, stats } = simulation;
+
+  const T = darkMode ? {
+    bg:        "#07071a",
+    card:      "#0d0d1f",
+    border:    "#1a1a3a",
+    border2:   "#2a2a4a",
+    inputBg:   "#1a1a2e",
+    text:      "#e0e0ff",
+    textMid:   "#888",
+    textDim:   "#555",
+    textFaint: "#333",
+    accent:    "#6C8EFF",
+    label:     "#666",
+  } : {
+    bg:        "#f0f2f8",
+    card:      "#ffffff",
+    border:    "#d0d4e8",
+    border2:   "#c0c8e0",
+    inputBg:   "#f8f9ff",
+    text:      "#1a1a3a",
+    textMid:   "#445",
+    textDim:   "#667",
+    textFaint: "#aaa",
+    accent:    "#4a6ef5",
+    label:     "#778",
+  };
+
+  // Currency helpers
+  const currSym = currency === "CAD" ? "CA$" : "$";
+  const toDisplay = (usdVal) => currency === "CAD" ? usdVal * cadRate : usdVal;
+  const fmtC = (usdVal) => fmt$(toDisplay(usdVal), currSym);
+
+  const inputStyle = {
+    background: T.inputBg, border: `1px solid ${T.border2}`, borderRadius: 6,
+    color: T.text, padding: "7px 10px", fontSize: 13, height: 36,
+    fontFamily: "'DM Mono', monospace", outline: "none", boxSizing: "border-box",
+  };
+  const tabStyle = (t) => ({
+    padding: "8px 18px", border: "none",
+    borderBottom: tab === t ? `2px solid ${T.accent}` : "2px solid transparent",
+    color: tab === t ? T.accent : T.textMid,
+    cursor: "pointer", fontSize: 13, fontFamily: "'DM Mono', monospace",
+    background: "transparent", transition: "all 0.2s",
+  });
+  const pillBtn = (active, onClick, label) => (
+    <button onClick={onClick} style={{
+      padding: "5px 14px", borderRadius: 4, border: `1px solid ${T.border2}`,
+      background: active ? T.accent : T.inputBg,
+      color: active ? "#fff" : T.textMid,
+      cursor: "pointer", fontSize: 12, fontFamily: "'DM Mono', monospace",
+    }}>{label}</button>
+  );
+
+  const CustomTooltip = ({ active, payload, label }) => {
+    if (!active || !payload?.length) return null;
+    return (
+      <div style={{ background: T.card, border: `1px solid ${T.border2}`, borderRadius: 8, padding: "10px 14px", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>
+        <div style={{ color: T.textMid, marginBottom: 4 }}>{label}</div>
+        {payload.map((p, i) => (
+          <div key={i} style={{ color: p.color || T.text }}>
+            {p.name}: {p.name === "Risk" ? p.value?.toFixed(3) : fmtC(p.value)}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   return (
-    <div style={{fontFamily:FONT_BODY,background:T.bg,minHeight:"100vh",padding:"12px 16px",color:T.text,transition:"background 0.3s,color 0.3s"}}>
+    <div style={{ background: T.bg, minHeight: "100vh", color: T.text, fontFamily: "'DM Mono', monospace", padding: "24px 28px" }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Lato:wght@300;400;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap');
-        *{box-sizing:border-box;margin:0;padding:0;}
-        ::selection{background:#6C8EFF40;}
-        ::-webkit-scrollbar{width:5px;height:5px;}
-        ::-webkit-scrollbar-track{background:${T.bg};}
-        ::-webkit-scrollbar-thumb{background:${T.border2};border-radius:3px;}
-        input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0;}
-        input[type=number]{-moz-appearance:textfield;}
-        input:focus,select:focus{outline:none;border-color:${T.accent}!important;}
-        .np-outer{max-width:${CONTENT_MAX}px;width:100%;margin:0 auto;display:flex;flex-direction:column;}
-        .np-outer>*{width:100%!important;max-width:100%!important;min-width:0!important;}
+        @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Space+Grotesk:wght@400;600;700&display=swap');
+        * { box-sizing: border-box; }
+        input[type=date]::-webkit-calendar-picker-indicator { filter: invert(0.7); cursor: pointer; }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: #0d0d1f; }
+        ::-webkit-scrollbar-thumb { background: #2a2a4a; border-radius: 2px; }
       `}</style>
 
-      <div className="np-outer">
-        {/* HEADER — taller, larger fonts */}
-        <div style={{background:T.card,borderRadius:14,border:`1px solid ${T.border}`,padding:"32px 34px",marginBottom:14,display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:14,position:"relative",overflow:"hidden"}}>
-          {/* Subtle gold accent line at top */}
-          <div style={{position:"absolute",top:0,left:0,right:0,height:3,background:`linear-gradient(90deg,transparent,${T.gold},transparent)`}}/>
-          <div style={{display:"flex",alignItems:"center",gap:20}}>
-            <svg viewBox="0 0 200 200" width="64" height="64" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="100" cy="100" r="95" fill="none" stroke={T.gold} strokeWidth="2" opacity="0.5"/>
-              <circle cx="100" cy="100" r="85" fill="none" stroke={T.gold} strokeWidth="0.5" opacity="0.3"/>
-              <polygon points="100,12 108,82 100,78 92,82" fill={T.gold} stroke={T.gold} strokeWidth="0.5"/>
-              <polygon points="100,188 92,118 100,122 108,118" fill={T.accent} stroke={T.accent} strokeWidth="0.5" opacity="0.4"/>
-              <polygon points="12,100 82,92 78,100 82,108" fill={T.accent} stroke={T.accent} strokeWidth="0.5" opacity="0.4"/>
-              <polygon points="188,100 118,108 122,100 118,92" fill={T.accent} stroke={T.accent} strokeWidth="0.5" opacity="0.4"/>
-              <circle cx="100" cy="100" r="28" fill={darkMode?"#0d0d1f":"#fff"} stroke={T.gold} strokeWidth="2.5"/>
-              <circle cx="100" cy="100" r="24" fill={darkMode?"#07071a":"#f8f9fa"} stroke={T.gold} strokeWidth="0.5" opacity="0.5"/>
-              <text x="100" y="102" fontFamily={FONT_DISPLAY} fontSize="36" fontWeight="900" fill={T.gold} textAnchor="middle" dominantBaseline="central">N</text>
-              <text x="100" y="8" fontFamily={FONT_MONO} fontSize="9" fontWeight="700" fill={T.gold} textAnchor="middle" opacity="0.6">N</text>
-              <text x="194" y="104" fontFamily={FONT_MONO} fontSize="9" fontWeight="400" fill={T.textDim} textAnchor="middle">E</text>
-              <text x="100" y="198" fontFamily={FONT_MONO} fontSize="9" fontWeight="400" fill={T.textDim} textAnchor="middle">S</text>
-              <text x="6" y="104" fontFamily={FONT_MONO} fontSize="9" fontWeight="400" fill={T.textDim} textAnchor="middle">W</text>
-            </svg>
-            <div>
-              <div style={{display:"flex",alignItems:"baseline",gap:12,flexWrap:"wrap"}}>
-                <span style={{fontFamily:FONT_DISPLAY,fontSize:36,fontWeight:900,color:T.gold,lineHeight:1.1}}>North Prosperity</span>
-                <span style={{fontFamily:FONT_LABEL,fontSize:18,fontWeight:500,color:T.textMid,letterSpacing:0.5}}>Retirement Planner</span>
-              </div>
-              {plan.params.personName && <span style={{fontFamily:FONT_LABEL,fontSize:14,fontWeight:500,color:T.accent,marginTop:4,display:"block"}}>{plan.params.personName}</span>}
-            </div>
+      {/* Header */}
+      <div style={{ marginBottom: 20, display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
+        <div>
+          <div>
+            <h1 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 26, fontWeight: 700, margin: 0, color: darkMode ? "#fff" : T.text, letterSpacing: -0.5 }}>
+              Investor DCA Simulation
+            </h1>
           </div>
-          <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
-            <SaveDot status={saveStatus} T={T}/>
-            <SmBtn onClick={()=>setDarkMode(!darkMode)} label={darkMode?"\u2600\uFE0F Light":"\u{1F319} Dark"} T={T}/>
-            <SmBtn onClick={importPlan} label={"\u{1F4C2} Import"} T={T}/>
-            <SmBtn onClick={exportPlan} label={"\u{1F4BE} Export"} T={T}/>
-            <SmBtn onClick={resetPlan} label={"\u{1F504} Reset"} T={T} danger/>
+          <p style={{ color: T.label, fontSize: 12, margin: "6px 0 0" }}>
+            Enter your DCA amount and parameters to simulate different accumulation strategies based on your risk tolerance.
+          </p>
+        </div>
+        <div style={{ textAlign: "right", fontSize: 11, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
+          <button onClick={() => setDarkMode(m => !m)} style={{
+            background: T.inputBg, border: `1px solid ${T.border2}`,
+            borderRadius: 20, padding: "4px 12px", cursor: "pointer",
+            fontSize: 12, color: T.textMid, fontFamily: "'DM Mono', monospace",
+            marginBottom: 4,
+          }}>{darkMode ? "☀ Day" : "🌙 Night"}</button>
+          {loading && <span style={{ color: T.accent }}>{`⟳ Fetching live ${displayLabel} price history...`}</span>}
+          {!loading && error && <span style={{ color: "#f59e0b" }}>⚠ {error}</span>}
+          {!loading && !error && lastUpdated && (
+            <span style={{ color: "#22c55e" }}>✓ Live data · {lastUpdated.toLocaleTimeString()}</span>
+          )}
+          {!loading && <div style={{ color: T.textFaint, fontSize: 10 }}>{dailyData.length.toLocaleString()} daily data points</div>}
+        </div>
+      </div>
+
+      {/* Card */}
+      <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
+
+        {/* Tabs */}
+        <div style={{ borderBottom: `1px solid ${T.border}`, display: "flex", padding: "0 16px" }}>
+          <button style={tabStyle("equal")} onClick={() => setTab("equal")}>DCA Equal Amount</button>
+          <button style={tabStyle("lump")} onClick={() => setTab("lump")}>Lump Sum</button>
+          <button style={tabStyle("dynamic")} onClick={() => setTab("dynamic")}>Precision DCA</button>
+        </div>
+
+        {/* Company Name Banner */}
+        <div style={{ padding: "10px 20px 0", borderBottom: "none" }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
+            <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 22, fontWeight: 700, color: T.accent, letterSpacing: -0.5 }}>
+              {displayTicker}
+            </span>
+            <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 16, fontWeight: 400, color: T.textMid }}>
+              {companyName}
+            </span>
+            {stats && (
+              <span style={{ marginLeft: "auto", fontFamily: "'DM Mono', monospace", fontSize: 13, color: T.text }}>
+                {fmtC(stats.lastPrice)}
+                <span style={{ fontSize: 11, marginLeft: 6, color: stats.gain >= 0 ? "#22c55e" : "#ef4444" }}>
+                  {stats.gain >= 0 ? "▲" : "▼"} {Math.abs(stats.gainPct)}%
+                </span>
+              </span>
+            )}
           </div>
         </div>
 
-        {/* SUMMARY — taller cards, bigger text */}
-        {results.length>0 && (
-          <div style={{display:"grid",gridTemplateColumns:"repeat(6,1fr)",gap:10,marginBottom:14}}>
-            <SumCard label="Year 1 Income" value={fmt(y1.totalIncome)} color={T.accent} T={T}/>
-            <SumCard label="Peak Income" value={fmt(peakIncome)} color={T.gold} T={T}/>
-            <SumCard label="Year 1 Portfolio" value={fmtK(y1.totalValue)} color={T.green} T={T}/>
-            <SumCard label="Peak Portfolio" value={fmtK(peakValue)} color={T.purple} T={T}/>
-            <SumCard label="Final Income" value={fmt(yL.totalIncome)} color={T.cyan} T={T}/>
-            <SumCard label="Final Portfolio" value={fmtK(yL.totalValue)} color={T.accent} T={T}/>
+        {/* Controls */}
+        <div style={{ padding: "12px 20px 16px", borderBottom: `1px solid ${T.border}` }}>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-start", rowGap: 10 }}>
+            <div>
+              <div style={{ fontSize: 10, color: T.label, marginBottom: 4 }}>Asset Ticker</div>
+              <div style={{ display: "flex", gap: 4 }}>
+                <input
+                  type="text"
+                  style={{ ...inputStyle, width: 90, textTransform: "uppercase" }}
+                  value={tickerInput}
+                  onChange={e => setTickerInput(e.target.value.toUpperCase())}
+                  onKeyDown={e => {
+                    if (e.key === "Enter") {
+                      const t = tickerInput.trim().toUpperCase();
+                      if (!t) return;
+                      const known = ASSETS.find(a => a.id === t);
+                      if (known) { setAssetId(t); setCustomTicker(null); }
+                      else setCustomTicker(t);
+                    }
+                  }}
+                  placeholder="BTC"
+                  maxLength={10}
+                />
+                <button
+                  onClick={() => {
+                    const t = tickerInput.trim().toUpperCase();
+                    if (!t) return;
+                    const known = ASSETS.find(a => a.id === t);
+                    if (known) { setAssetId(t); setCustomTicker(null); }
+                    else setCustomTicker(t);
+                  }}
+                  style={{ ...inputStyle, cursor: "pointer", padding: "0 12px", background: T.border, color: T.accent, border: "1px solid #6C8EFF", flexShrink: 0 }}
+                >Go</button>
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: 10, color: T.label, marginBottom: 4, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span>{tab === "lump" ? `${currency} Amount` : `${currency} Amount *x`}</span>
+              </div>
+              <input type="number" style={inputStyle} value={baseAmount || ""}
+                onChange={e => {
+                  const val = e.target.value;
+                  if (val === "" || val === "0") { setBaseAmount(""); return; }
+                  const n = Number(val);
+                  if (!isNaN(n) && n >= 0) setBaseAmount(n);
+                }}
+                onBlur={e => {
+                  // When user leaves the field, default to 100 if empty
+                  if (!baseAmount || baseAmount === "") setBaseAmount(100);
+                }}
+                inputMode="numeric" placeholder="1000" />
+            </div>
+            <div>
+              <div style={{ fontSize: 10, color: T.label, marginBottom: 4 }}>Currency</div>
+              <div style={{ display: "flex", gap: 4 }}>
+                {pillBtn(currency === "USD", () => setCurrency("USD"), "USD")}
+                {pillBtn(currency === "CAD", () => setCurrency("CAD"), "CAD")}
+              </div>
+              {currency === "CAD" && (
+                <div style={{ fontSize: 9, color: T.textDim, marginTop: 3 }}>
+                  Rate: 1 USD = {cadRate.toFixed(4)} CAD
+                </div>
+              )}
+            </div>
+            {tab !== "lump" && (
+              <div>
+                <div style={{ fontSize: 10, color: T.label, marginBottom: 4 }}>Repeat Purchase</div>
+                <select style={{ ...inputStyle, cursor: "pointer" }} value={frequency} onChange={e => setFrequency(e.target.value)}>
+                  <option>Daily</option><option>Weekly</option><option>Monthly</option>
+                </select>
+              </div>
+            )}
+            {tab !== "lump" && frequency === "Monthly" && (
+              <div>
+                <div style={{ fontSize: 10, color: T.label, marginBottom: 4 }}>Day of month</div>
+                <select style={{ ...inputStyle, cursor: "pointer" }} value={dayOfMonth} onChange={e => setDayOfMonth(Number(e.target.value))}>
+                  {Array.from({ length: 28 }, (_, i) => i + 1).map(d => <option key={d}>{d}</option>)}
+                </select>
+              </div>
+            )}
+            <div>
+              <div style={{ fontSize: 10, color: T.label, marginBottom: 4 }}>{tab === "lump" ? "Purchase Date" : "Starting Date"}</div>
+              <input type="date" style={inputStyle} value={startDate}
+                min={minDate} max={endDate}
+                onChange={e => setStartDate(e.target.value)} />
+            </div>
+            {tab !== "lump" && (
+              <div>
+                <div style={{ fontSize: 10, color: T.label, marginBottom: 4 }}>Ending Date</div>
+                <input type="date" style={inputStyle} value={endDate}
+                  min={startDate} max={maxDate}
+                  onChange={e => setEndDate(e.target.value)} />
+              </div>
+            )}
+          </div>
+
+          {tab === "dynamic" && (
+            <div style={{ display: "flex", gap: 12, marginTop: 12, flexWrap: "wrap", alignItems: "flex-start" }}>
+              <div>
+                <div style={{ fontSize: 10, color: T.label, marginBottom: 4 }}>Accumulate up to risk...</div>
+                <select style={{ ...inputStyle, cursor: "pointer" }} value={riskBandIdx} onChange={e => setRiskBandIdx(Number(e.target.value))}>
+                  {RISK_BANDS.map((b, i) => <option key={i} value={i}>{b.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <div style={{ fontSize: 10, color: T.label, marginBottom: 4 }}>Buying strategy</div>
+                <div style={{ display: "flex", gap: 4 }}>
+                  {pillBtn(strategy === "Linear", () => setStrategy("Linear"), "Linear")}
+                  {pillBtn(strategy === "Exponential", () => setStrategy("Exponential"), "Exponential")}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: 10, color: T.label, marginBottom: 4 }}>Scale</div>
+                <div style={{ display: "flex", gap: 4 }}>
+                  {pillBtn(scaleY === "Lin", () => setScaleY("Lin"), "Lin")}
+                  {pillBtn(scaleY === "Log", () => setScaleY("Log"), "Log")}
+                </div>
+              </div>
+              {strategy === "Exponential" && (
+                <div style={{ fontSize: 11, color: T.textDim, alignSelf: "flex-end", paddingBottom: 2 }}>
+                  Exponentially increasing amounts: x, 2x, 4x, 8x...
+                </div>
+              )}
+              {strategy === "Linear" && (
+                <div style={{ fontSize: 11, color: T.textDim, alignSelf: "flex-end", paddingBottom: 2 }}>
+                  {`$${baseAmount.toLocaleString()} × 1x, 2x, 3x... stepping up every 0.1 below ${riskBand.label}`}
+                </div>
+              )}
+              <div>
+                <div style={{ fontSize: 10, color: T.label, marginBottom: 4 }}>
+                  Risk offset <span style={{ color: "#aabbff" }}>{riskOffset >= 0 ? "+" : ""}{riskOffset.toFixed(2)}</span>
+                </div>
+                <input
+                  type="range" min="-0.20" max="0.20" step="0.01"
+                  value={riskOffset}
+                  onChange={e => setRiskOffset(parseFloat(e.target.value))}
+                  style={{ width: 120, accentColor: "#6C8EFF", cursor: "pointer" }}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Sell Strategy — always visible */}
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginTop: 12, flexWrap: "wrap" }}>
+            <div>
+              <div style={{ fontSize: 10, color: T.label, marginBottom: 4 }}>Sell Strategy</div>
+              <div style={{ display: "flex", gap: 4 }}>
+                {pillBtn(!sellEnabled, () => setSellEnabled(false), "Off")}
+                {pillBtn(sellEnabled, () => setSellEnabled(true), "On")}
+              </div>
+            </div>
+            {sellEnabled && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingBottom: 2 }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 11 }}>
+                  <input type="checkbox" checked={sell90} onChange={e => setSell90(e.target.checked)}
+                    style={{ accentColor: "#f59e0b", width: 14, height: 14, cursor: "pointer" }} />
+                  <span style={{ color: sell90 ? "#f59e0b" : "#555" }}>Sell <strong>10%</strong> at risk &gt; 0.90</span>
+                </label>
+              </div>
+            )}
+          </div>
+
+          {/* LEAP Strategy */}
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginTop: 12, flexWrap: "wrap", paddingTop: 12, borderTop: `1px solid ${T.border}` }}>
+            <div>
+              <div style={{ fontSize: 10, color: T.label, marginBottom: 4 }}>LEAP Options</div>
+              <div style={{ display: "flex", gap: 4 }}>
+                {pillBtn(!leapEnabled, () => setLeapEnabled(false), "Off")}
+                {pillBtn(leapEnabled, () => setLeapEnabled(true), "On")}
+              </div>
+            </div>
+            {leapEnabled && (<>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingTop: 2 }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 11 }}>
+                  <input type="checkbox" checked={leap09} onChange={e => setLeap09(e.target.checked)}
+                    style={{ accentColor: "#a78bfa", width: 14, height: 14, cursor: "pointer" }} />
+                  <span style={{ color: leap09 ? "#a78bfa" : T.textDim }}>Buy LEAP at risk 0.00 – 0.099</span>
+                </label>
+              </div>
+              <div>
+                <div style={{ fontSize: 10, color: T.label, marginBottom: 4 }}>
+                  LEAP Cost <span style={{ color: "#a78bfa" }}>{(leapCostPct * 100).toFixed(0)}% of price</span>
+                </div>
+                <input type="range" min="0.20" max="0.60" step="0.01"
+                  value={leapCostPct}
+                  onChange={e => setLeapCostPct(parseFloat(e.target.value))}
+                  style={{ width: 100, accentColor: "#a78bfa", cursor: "pointer" }} />
+              </div>
+              <div>
+                <div style={{ fontSize: 10, color: T.label, marginBottom: 4 }}>
+                  Delta <span style={{ color: "#a78bfa" }}>{leapDelta.toFixed(2)}</span>
+                </div>
+                <input type="range" min="0.60" max="0.90" step="0.01"
+                  value={leapDelta}
+                  onChange={e => setLeapDelta(parseFloat(e.target.value))}
+                  style={{ width: 100, accentColor: "#a78bfa", cursor: "pointer" }} />
+              </div>
+              <div style={{ alignSelf: "flex-end", fontSize: 10, color: T.textDim, paddingBottom: 2, lineHeight: 1.6 }}>
+                Replaces share buy at<br/>selected risk zones.<br/>
+                <span style={{ color: "#a78bfa" }}>Approx. {(1 / leapCostPct).toFixed(1)}x leverage</span>
+              </div>
+            </>)}
+          </div>
+
+          {/* Covered Call */}
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginTop: 12, flexWrap: "wrap", paddingTop: 12, borderTop: `1px solid ${T.border}` }}>
+            <div>
+              <div style={{ fontSize: 10, color: T.label, marginBottom: 4 }}>Covered Call</div>
+              <div style={{ display: "flex", gap: 4 }}>
+                {pillBtn(!ccEnabled, () => setCcEnabled(false), "Off")}
+                {pillBtn(ccEnabled, () => setCcEnabled(true), "On")}
+              </div>
+            </div>
+            {ccEnabled && (<>
+              <div>
+                <div style={{ fontSize: 10, color: T.label, marginBottom: 4 }}>
+                  Monthly Premium <span style={{ color: "#06b6d4" }}>{ccPremiumPct.toFixed(2)}% of value</span>
+                </div>
+                <input type="range" min="0.10" max="2.00" step="0.05"
+                  value={ccPremiumPct}
+                  onChange={e => setCcPremiumPct(parseFloat(e.target.value))}
+                  style={{ width: 120, accentColor: "#06b6d4", cursor: "pointer" }} />
+              </div>
+              <div style={{ alignSelf: "flex-end", fontSize: 10, color: T.textDim, paddingBottom: 2, lineHeight: 1.7 }}>
+                Triggers at risk &gt; 0.90<br/>
+                ~0.10 delta · 30 days out<br/>
+                <span style={{ color: "#06b6d4" }}>Est. {ccPremiumPct.toFixed(2)}%/mo on holdings</span>
+              </div>
+            </>)}
+          </div>
+
+          {/* Initial Investment */}
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginTop: 12, flexWrap: "wrap", paddingTop: 12, borderTop: `1px solid ${T.border}` }}>
+            <div>
+              <div style={{ fontSize: 10, color: T.label, marginBottom: 4 }}>Initial Position</div>
+              <div style={{ display: "flex", gap: 4 }}>
+                {pillBtn(!initEnabled, () => setInitEnabled(false), "Off")}
+                {pillBtn(initEnabled, () => setInitEnabled(true), "On")}
+              </div>
+            </div>
+            {initEnabled && (<>
+              <div>
+                <div style={{ fontSize: 10, color: T.label, marginBottom: 4 }}>Purchase Date</div>
+                <input type="date" style={inputStyle} value={initDate}
+                  min={minDate} max={maxDate}
+                  onChange={e => setInitDate(e.target.value)} />
+              </div>
+              <div>
+                <div style={{ fontSize: 10, color: T.label, marginBottom: 4 }}>Shares / Units</div>
+                <input type="number" style={{ ...inputStyle, width: 110 }}
+                  value={initShares} onChange={e => setInitShares(e.target.value)}
+                  placeholder="e.g. 10" inputMode="numeric" />
+              </div>
+              <div>
+                <div style={{ fontSize: 10, color: T.label, marginBottom: 4 }}>Avg Price Paid</div>
+                <input type="number" style={{ ...inputStyle, width: 120 }}
+                  value={initAvgPrice} onChange={e => setInitAvgPrice(e.target.value)}
+                  placeholder="e.g. 45000" inputMode="numeric" />
+              </div>
+              {initShares && initAvgPrice && (
+                <div style={{ alignSelf: "flex-end", paddingBottom: 2 }}>
+                  <div style={{ fontSize: 10, color: T.textDim }}>Total Cost</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: T.accent, fontFamily: "'Space Grotesk', sans-serif" }}>
+                    {fmtC((parseFloat(initShares) || 0) * (parseFloat(initAvgPrice) || 0))}
+                  </div>
+                </div>
+              )}
+            </>)}
+          </div>
+        </div>
+
+        {/* Loading */}
+        {loading && (
+          <div style={{ padding: 60, textAlign: "center", color: T.accent, fontSize: 13 }}>
+            {`⟳ Fetching live ${displayLabel} price history...`}
           </div>
         )}
 
-        {/* TABS */}
-        <div style={{display:"flex",gap:2,marginBottom:14,flexWrap:"wrap",borderBottom:`1px solid ${T.border}`}}>
-          {tabs.map(t=>(
-            <button key={t.id} onClick={()=>setTab(t.id)} style={{
-              padding:"11px 16px",border:"none",cursor:"pointer",fontSize:12,fontWeight:tab===t.id?600:500,
-              fontFamily:FONT_LABEL,background:"transparent",
-              color:tab===t.id?T.accent:T.textMid,
-              borderBottom:tab===t.id?`2px solid ${T.accent}`:"2px solid transparent",
-              transition:"all 0.15s",whiteSpace:"nowrap",letterSpacing:0.2,
-            }}>{t.icon} {t.label}</button>
-          ))}
-        </div>
+        {/* Main Content */}
+        {!loading && (
+          <div style={{ display: "flex" }}>
+            <div style={{ flex: 1, minWidth: 0, padding: "20px" }}>
 
-        {/* CONTENT */}
-        <div style={{width:"100%",overflow:"hidden"}}>
-        {tab==="planning" && <PlanningTab plan={plan} update={update} T={T}/>}
-        {tab==="divest" && <DivestTab plan={plan} update={update} T={T}/>}
-        {tab==="fixed" && <FixedAssetsTab plan={plan} update={update} T={T}/>}
-        {tab==="projections" && <ProjectionsTab plan={plan} results={results} T={T}/>}
-        {tab==="withdrawals" && <WithdrawalTab plan={plan} results={results} T={T}/>}
-        {tab==="charts" && <ChartsTab plan={plan} results={results} T={T}/>}
-        {tab==="additional" && <AdditionalTab plan={plan} update={update} T={T}/>}
-        </div>
+              {/* Portfolio Chart */}
+              <div style={{ marginBottom: 32 }}>
+                <h3 style={{ margin: "0 0 16px", fontSize: 14, fontWeight: 500, color: T.text, fontFamily: "'Space Grotesk', sans-serif" }}>
+                  {`${displayTicker} — Simulated Portfolio Value Over Time`}
+                </h3>
+                <ResponsiveContainer width="100%" height={260}>
+                  <ComposedChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                    <defs>
+                      <linearGradient id="portfolioGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#6C8EFF" stopOpacity={0.25} />
+                        <stop offset="95%" stopColor="#6C8EFF" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#151530" />
+                    <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#555" }} interval={Math.floor(chartData.length / 8)} />
+                    <YAxis
+                      scale={scaleY === "Log" ? "log" : "linear"}
+                      domain={scaleY === "Log" ? ["auto", "auto"] : [0, "auto"]}
+                      tick={{ fontSize: 10, fill: "#555" }}
+                      tickFormatter={v => v >= 1e6 ? `${(v/1e6).toFixed(1)}M` : v >= 1000 ? `${(v/1000).toFixed(0)}K` : v}
+                      width={55}
+                    />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Legend wrapperStyle={{ fontSize: 11, color: T.textMid }} />
+                    <Area type="monotone" dataKey="portfolio" name="Portfolio" stroke="#6C8EFF" fill="url(#portfolioGrad)" strokeWidth={2} dot={false} />
+                    <Line type="monotone" dataKey="invested" name="Invested" stroke="#888" strokeWidth={1.5} dot={false} strokeDasharray="4 3" />
+                    {tab !== "lump" && (
+                      <Line type="monotone" dataKey="lumpSum" name="Lump Sum" stroke="#444" strokeWidth={1} dot={false} strokeDasharray="2 4" />
+                    )}
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Risk / Strategy Chart */}
+              <div>
+                <h3 style={{ margin: "0 0 16px", fontSize: 14, fontWeight: 500, color: T.text, fontFamily: "'Space Grotesk', sans-serif" }}>
+                  {tab === "dynamic" ? "Simulated Strategy Over Time" : "Risk Metric Over Time"}
+                </h3>
+                <ResponsiveContainer width="100%" height={220}>
+                  <ComposedChart data={riskData} margin={{ top: 5, right: 130, left: 0, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#151530" />
+                    <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#555" }} interval={Math.floor(riskData.length / 8)} />
+                    <YAxis
+                      domain={[0, 1]} width={35}
+                      tick={{ fontSize: 10, fill: "#555" }}
+                      tickFormatter={v => v.toFixed(1)}
+                      ticks={[0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]}
+                    />
+                    <Tooltip content={<CustomTooltip />} />
+
+                    {/* Exponential buy tiers — dynamic from selected risk band */}
+                    {tab === "dynamic" && strategy === "Exponential" && expTiers.map(({ y1, y2, mult }, idx) => {
+                      // Lightest at top tier, darkest at bottom
+                      const alpha = 0.13 + (idx / Math.max(expTiers.length - 1, 1)) * 0.33;
+                      return (
+                        <ReferenceArea
+                          key={mult} y1={y1} y2={y2}
+                          fill="#22c55e" fillOpacity={alpha}
+                          stroke="#22c55e" strokeOpacity={0.35} strokeWidth={0.5}
+                          label={{
+                            value: `Buy $${(baseAmount * mult).toLocaleString()} (${mult}x)`,
+                            fill: "#4ade80", fontSize: 9,
+                            fontFamily: "'DM Mono', monospace",
+                            position: "insideRight",
+                          }}
+                        />
+                      );
+                    })}
+
+                    {/* Linear mode — show each tier like exponential */}
+                    {tab === "dynamic" && strategy === "Linear" && linearTiers.map(({ y1, y2, mult }, idx) => {
+                      const alpha = 0.13 + (idx / Math.max(linearTiers.length - 1, 1)) * 0.33;
+                      return (
+                        <ReferenceArea
+                          key={mult} y1={y1} y2={y2}
+                          fill="#22c55e" fillOpacity={alpha}
+                          stroke="#22c55e" strokeOpacity={0.35} strokeWidth={0.5}
+                          label={{
+                            value: `Buy $${(baseAmount * mult).toLocaleString()} (${mult}x)`,
+                            fill: "#4ade80", fontSize: 9,
+                            fontFamily: "'DM Mono', monospace",
+                            position: "insideRight",
+                          }}
+                        />
+                      );
+                    })}
+
+                    <Line type="monotone" dataKey="risk" name="Risk" stroke="#aabbff" strokeWidth={1.5} dot={false} />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Stats Panel */}
+            {stats && (
+              <div style={{ width: 210, borderLeft: "1px solid #1a1a3a", padding: "24px 20px", display: "flex", flexDirection: "column", gap: 24 }}>
+                <div>
+                  <div style={{ fontSize: 10, color: T.textDim, marginBottom: 4 }}>Total Invested</div>
+                  <div style={{ fontSize: 24, fontWeight: 600, color: "#fff", fontFamily: "'Space Grotesk', sans-serif" }}>
+                    {fmtC(stats.totalInvested)}
+                  </div>
+                  <div style={{ fontSize: 10, color: T.label, marginTop: 2 }}>
+                    {tab === "dynamic"
+                      ? `${stats.buyCount} of ${stats.totalPeriods} scheduled ${frequency.toLowerCase()} periods`
+                      : `Over ${stats.totalPeriods} scheduled periods`}
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ fontSize: 10, color: T.textDim, marginBottom: 4 }}>Accumulated Asset</div>
+                  <div style={{ fontSize: 20, fontWeight: 600, color: "#fff", fontFamily: "'Space Grotesk', sans-serif" }}>
+                    {stats.totalAsset.toFixed(5)} <span style={{ fontSize: 12, color: T.textMid }}>{displayTicker}</span>
+                  </div>
+                  <div style={{ fontSize: 10, color: T.label, marginTop: 4 }}>Average: {fmtC(stats.avgPrice)}</div>
+                  <div style={{ fontSize: 10, color: T.label }}>Last: {fmtC(stats.lastPrice)}</div>
+                </div>
+
+                <div>
+                  <div style={{ fontSize: 10, color: T.textDim, marginBottom: 4 }}>Current Portfolio Value</div>
+                  <div style={{ fontSize: 20, fontWeight: 600, color: "#fff", fontFamily: "'Space Grotesk', sans-serif" }}>
+                    {fmtC(stats.currentPortfolio)}
+                  </div>
+                  <div style={{ fontSize: 11, marginTop: 4, color: stats.gain >= 0 ? "#22c55e" : "#ef4444" }}>
+                    {stats.gain >= 0 ? "+" : ""}{fmtC(stats.gain)} ({stats.gainPct}%)
+                  </div>
+                  {leapEnabled && stats.leapCount > 0 && (
+                    <div style={{ marginTop: 6, paddingTop: 6, borderTop: `1px dashed ${T.border}` }}>
+                      <div style={{ fontSize: 10, color: T.textDim }}>+ LEAP Value (Δ-adj)</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "#a78bfa", marginTop: 2 }}>
+                        {fmtC(Math.max(0, stats.leapPortfolioValue))}
+                      </div>
+                      <div style={{ fontSize: 10, color: T.textDim, marginTop: 4 }}>At Expiry (intrinsic)</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "#c4b5fd", marginTop: 2 }}>
+                        {fmtC(stats.leapExpiryValue)}
+                      </div>
+                      <div style={{ fontSize: 10, color: T.textDim, marginTop: 8 }}>Combined Total</div>
+                      {(() => {
+                        const combined = stats.currentPortfolio + Math.max(0, stats.leapPortfolioValue);
+                        const combinedGain = combined - stats.totalInvested;
+                        const combinedGainPct = stats.totalInvested > 0 ? ((combined / stats.totalInvested - 1) * 100).toFixed(2) : 0;
+                        return (<>
+                          <div style={{ fontSize: 20, fontWeight: 600, color: "#fff", marginTop: 2, fontFamily: "'Space Grotesk', sans-serif" }}>
+                            {fmtC(combined)}
+                          </div>
+                          <div style={{ fontSize: 11, marginTop: 4, color: combinedGain >= 0 ? "#22c55e" : "#ef4444" }}>
+                            {combinedGain >= 0 ? "+" : ""}{fmtC(combinedGain)} ({combinedGainPct}%)
+                          </div>
+                        </>);
+                      })()}
+                    </div>
+                  )}
+                </div>
+
+                {ccEnabled && stats.ccCount > 0 && (
+                  <div>
+                    <div style={{ fontSize: 10, color: T.textDim, marginBottom: 4 }}>Covered Call Income</div>
+                    <div style={{ fontSize: 16, fontWeight: 600, color: "#06b6d4", fontFamily: "'Space Grotesk', sans-serif" }}>
+                      {fmtC(stats.totalCcIncome)}
+                    </div>
+                    <div style={{ fontSize: 10, color: T.label, marginTop: 2 }}>
+                      {stats.ccCount} call{stats.ccCount !== 1 ? "s" : ""} written at risk &gt; 0.90
+                    </div>
+                    <div style={{ fontSize: 10, color: T.textDim, marginTop: 2 }}>
+                      Avg premium: {fmtC(stats.totalCcIncome / stats.ccCount)}
+                    </div>
+                  </div>
+                )}
+
+                {leapEnabled && stats.leapCount > 0 && (
+                  <div>
+                    <div style={{ fontSize: 10, color: T.textDim, marginBottom: 4 }}>LEAP Summary</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "#a78bfa", fontFamily: "'Space Grotesk', sans-serif" }}>
+                      {stats.leapCount} purchase{stats.leapCount !== 1 ? "s" : ""}
+                    </div>
+                    <div style={{ fontSize: 10, color: T.label, marginTop: 3 }}>
+                      Invested: {fmtC(stats.totalLeapInvested)}
+                    </div>
+                    <div style={{ fontSize: 10, color: T.label, marginTop: 2 }}>
+                      Avg entry: {fmtC(stats.avgLeapEntry)}
+                    </div>
+                    {stats.leapClosedCount > 0 && (
+                      <div style={{ fontSize: 10, marginTop: 4, color: stats.leapRealizedPnl >= 0 ? "#22c55e" : "#ef4444" }}>
+                        {stats.leapClosedCount} expired · Realized: {stats.leapRealizedPnl >= 0 ? "+" : ""}{fmtC(stats.leapRealizedPnl)}
+                      </div>
+                    )}
+                    {stats.openLeapCount > 0 && (
+                      <div style={{ fontSize: 10, color: T.textDim, marginTop: 2 }}>
+                        {stats.openLeapCount} still open
+                      </div>
+                    )}
+                    {(() => {
+                      const leapPnl = stats.leapPortfolioValue - stats.totalLeapInvested;
+                      const leapPnlExpiry = stats.leapExpiryValue - stats.totalLeapInvested;
+                      return (<>
+                        <div style={{ fontSize: 11, marginTop: 6, color: leapPnl >= 0 ? "#22c55e" : "#ef4444", fontWeight: 600 }}>
+                          Δ-adj P&L: {leapPnl >= 0 ? "+" : ""}{fmtC(leapPnl)}
+                        </div>
+                        <div style={{ fontSize: 11, marginTop: 2, color: leapPnlExpiry >= 0 ? "#22c55e" : "#ef4444", fontWeight: 600 }}>
+                          Expiry P&L: {leapPnlExpiry >= 0 ? "+" : ""}{fmtC(leapPnlExpiry)}
+                        </div>
+                        <div style={{ fontSize: 9, color: T.textDim, marginTop: 4, lineHeight: 1.5 }}>
+                          Strike = 92% of entry.<br/>Expiry = intrinsic value.<br/>Δ-adj = intrinsic + decayed extrinsic.
+                        </div>
+                      </>);
+                    })()}
+                  </div>
+                )}
+
+                {sellEnabled && stats.totalSellProceeds > 0 && (
+                  <div>
+                    <div style={{ fontSize: 10, color: T.textDim, marginBottom: 4 }}>Sell Proceeds</div>
+                    <div style={{ fontSize: 16, fontWeight: 600, color: "#f59e0b", fontFamily: "'Space Grotesk', sans-serif" }}>
+                      {fmtC(stats.totalSellProceeds)}
+                    </div>
+                    <div style={{ fontSize: 10, color: T.label, marginTop: 2 }}>
+                      {stats.sellCount} sell event{stats.sellCount !== 1 ? "s" : ""}
+                    </div>
+                    {stats.totalSellAsset > 0 && (
+                      <div style={{ fontSize: 10, color: T.textDim, marginTop: 4 }}>
+                        Avg sell price
+                        <span style={{ color: "#f59e0b", fontWeight: 600, marginLeft: 6 }}>
+                          {fmtC(stats.totalSellProceeds / stats.totalSellAsset)}
+                        </span>
+                      </div>
+                    )}
+                    <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${T.border}` }}>
+                      <div style={{ fontSize: 10, color: T.textDim, marginBottom: 4 }}>Net P&amp;L (with sells)</div>
+                      <div style={{ fontSize: 16, fontWeight: 600, color: stats.sellPnl >= 0 ? "#22c55e" : "#ef4444", fontFamily: "'Space Grotesk', sans-serif" }}>
+                        {stats.sellPnl >= 0 ? "+" : ""}{fmtC(stats.sellPnl)}
+                      </div>
+                      <div style={{ fontSize: 11, marginTop: 2, color: stats.sellPnl >= 0 ? "#22c55e" : "#ef4444" }}>
+                        {stats.sellPnl >= 0 ? "+" : ""}{stats.sellPnlPct}% vs invested
+                      </div>
+                      <div style={{ fontSize: 10, color: T.textDim, marginTop: 6 }}>
+                        Portfolio + Proceeds − Invested
+                      </div>
+                      {(() => {
+                        const diff = (stats.currentPortfolio + stats.totalSellProceeds) - stats.noSellPortfolio;
+                        const isAhead = diff >= 0;
+                        return (
+                          <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px dashed #1a1a3a" }}>
+                            <div style={{ fontSize: 10, color: T.textDim, marginBottom: 2 }}>vs Holding (no sells)</div>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: isAhead ? "#22c55e" : "#ef4444" }}>
+                              {isAhead ? "+" : ""}{fmtC(diff)}
+                            </div>
+                            <div style={{ fontSize: 10, color: isAhead ? "#22c55e" : "#ef4444" }}>
+                              {isAhead ? "▲ Sell strategy helped" : "▼ Sell strategy hurt"}
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                )}
+
+                {/* Combined Strategy Summary — shows when 2+ features active */}
+                {(() => {
+                  const activeFeatures = [
+                    true,
+                    sellEnabled && stats.totalSellProceeds > 0,
+                    leapEnabled && stats.leapCount > 0,
+                    ccEnabled && stats.ccCount > 0,
+                  ].filter(Boolean).length;
+
+                  if (activeFeatures < 2) return null;
+
+                  const shareValue   = stats.currentPortfolio;
+                  const sellProceeds = (sellEnabled && stats.totalSellProceeds > 0) ? stats.totalSellProceeds : 0;
+                  const leapValue    = (leapEnabled && stats.leapCount > 0) ? Math.max(0, stats.leapPortfolioValue) : 0;
+                  const ccIncomeTot  = (ccEnabled && stats.ccCount > 0) ? stats.totalCcIncome : 0;
+                  const totalValue   = shareValue + sellProceeds + leapValue + ccIncomeTot;
+                  const totalGain    = totalValue - stats.totalInvested;
+                  const totalPct     = stats.totalInvested > 0 ? ((totalValue / stats.totalInvested - 1) * 100).toFixed(2) : 0;
+                  const isPos        = totalGain >= 0;
+
+                  return (
+                    <div style={{ marginTop: 4, paddingTop: 16, borderTop: `2px solid ${T.accent}` }}>
+                      <div style={{ fontSize: 10, color: T.accent, marginBottom: 8, letterSpacing: 1, textTransform: "uppercase" }}>
+                        Combined Strategy
+                      </div>
+
+                      {/* Simple additive breakdown */}
+                      <div style={{ fontSize: 10, color: T.textDim, marginBottom: 3 }}>
+                        Shares value:
+                        <span style={{ color: T.text, float: "right" }}>{fmtC(shareValue)}</span>
+                      </div>
+                      {sellEnabled && sellProceeds > 0 && (
+                        <div style={{ fontSize: 10, color: T.textDim, marginBottom: 3 }}>
+                          + Sell proceeds:
+                          <span style={{ color: "#f59e0b", float: "right" }}>{fmtC(sellProceeds)}</span>
+                        </div>
+                      )}
+                      {leapEnabled && leapValue > 0 && (
+                        <div style={{ fontSize: 10, color: T.textDim, marginBottom: 3 }}>
+                          + LEAP value:
+                          <span style={{ color: "#a78bfa", float: "right" }}>{fmtC(leapValue)}</span>
+                        </div>
+                      )}
+                      {ccEnabled && ccIncomeTot > 0 && (
+                        <div style={{ fontSize: 10, color: T.textDim, marginBottom: 3 }}>
+                          + CC income:
+                          <span style={{ color: "#06b6d4", float: "right" }}>{fmtC(ccIncomeTot)}</span>
+                        </div>
+                      )}
+
+                      {/* Divider */}
+                      <div style={{ borderTop: `1px solid ${T.border}`, margin: "8px 0" }} />
+
+                      {/* Total Value */}
+                      <div style={{ fontSize: 10, color: T.textDim, marginBottom: 2 }}>Total Value</div>
+                      <div style={{ fontSize: 22, fontWeight: 700, color: "#fff", fontFamily: "'Space Grotesk', sans-serif" }}>
+                        {fmtC(totalValue)}
+                      </div>
+                      {/* Net Profit = Total Value − Total Invested */}
+                      <div style={{ fontSize: 11, marginTop: 6, color: isPos ? "#22c55e" : "#ef4444", fontWeight: 600 }}>
+                        {isPos ? "+" : ""}{fmtC(totalGain)}
+                      </div>
+                      <div style={{ fontSize: 18, fontWeight: 700, marginTop: 2, color: isPos ? "#22c55e" : "#ef4444", fontFamily: "'Space Grotesk', sans-serif" }}>
+                        {isPos ? "+" : ""}{totalPct}%
+                      </div>
+                      <div style={{ fontSize: 9, color: T.textDim, marginTop: 4 }}>
+                        vs {fmtC(stats.totalInvested)} total invested
+                      </div>
+                    </div>
+                  );
+                })()}
+
+
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Trade History Table */}
+        {tradeLog && tradeLog.length > 0 && (
+          <div style={{ borderTop: `1px solid ${T.border}`, padding: "20px" }}>
+            <h3 style={{ margin: "0 0 6px", fontSize: 14, fontWeight: 500, color: T.text, fontFamily: "'Space Grotesk', sans-serif" }}>
+              Simulated Trade History
+            </h3>
+            <p style={{ margin: "0 0 14px", fontSize: 11, color: T.textDim }}>
+              {`Purchase $${baseAmount.toLocaleString()} multiplied by a factor based on ${displayTicker} risk level, every ${frequency.toLowerCase()} on the ${dayOfMonth} — from ${startDate} to ${endDate}`}
+            </p>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11, fontFamily: "'DM Mono', monospace" }}>
+                <thead>
+                  <tr style={{ borderBottom: `1px solid ${T.border}` }}>
+                    {["Date","Action","Risk","Asset Price","Accumulated","Invested Amount","Portfolio Value"].map(h => (
+                      <th key={h} style={{ padding: "6px 10px", textAlign: "left", color: T.textDim, fontWeight: 400, whiteSpace: "nowrap" }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {tradeLog.map((row, i) => {
+                    const isBuy = row.action.startsWith("Buy") || row.action === "Lump Sum";
+                    const isSell = row.action.startsWith("Sell");
+                    const isInit = row.action === "Initial Position";
+                    const isLeapRow = row.action?.startsWith("LEAP");
+                    const isLeapExpiry = row.leapExpiry === true;
+                    const isCcRow = row.action === "Covered Call";
+                    const riskColor = row.risk > 0.9 ? "#dc2626" : row.risk > 0.8 ? "#ea580c" : row.risk > 0.6 ? "#ef4444" : row.risk > 0.4 ? "#ca8a04" : row.risk > 0.2 ? "#22c55e" : "#15803d";
+                    return (
+                      <tr key={i} style={{ borderBottom: "1px solid #0f0f25", background: "transparent" }}>
+                        <td style={{ padding: "5px 10px", color: T.textMid, whiteSpace: "nowrap" }}>{row.date}</td>
+                        <td style={{ padding: "5px 10px", color: isCcRow ? "#06b6d4" : isLeapExpiry ? (row.leapPnl >= 0 ? "#22c55e" : "#ef4444") : isLeapRow ? "#a78bfa" : isInit ? "#a78bfa" : isSell ? "#f59e0b" : isBuy ? T.accent : T.textDim, fontWeight: 500 }}>
+                          {row.action}
+                          {isLeapRow && row.leapContracts && <span style={{ color: "#7c6ad6", fontSize: 10, display: "block" }}>{row.leapContracts} contract{row.leapContracts !== 1 ? "s" : ""} × 100 shares</span>}
+                        </td>
+                        <td style={{ padding: "5px 10px" }}>
+                          <span style={{ color: riskColor, background: riskColor + "22", padding: "1px 6px", borderRadius: 3 }}>{row.risk?.toFixed(3)}</span>
+                        </td>
+                        <td style={{ padding: "5px 10px", color: T.text }}>{fmtC(row.price)}</td>
+                        <td style={{ padding: "5px 10px", color: T.text }}>
+                          {isLeapExpiry
+                            ? <span style={{ color: T.textDim }}>—</span>
+                            : <>{row.accumulated?.toFixed(4)} {displayTicker}</>
+                          }
+                        </td>
+                        <td style={{ padding: "5px 10px", color: T.textMid }}>
+                          {isLeapExpiry
+                            ? <span style={{ color: T.textDim, fontSize: 10 }}>—</span>
+                            : fmtC(row.invested ?? 0)
+                          }
+                        </td>
+                        <td style={{ padding: "5px 10px", color: isLeapExpiry ? (row.leapPnl >= 0 ? "#22c55e" : "#ef4444") : isCcRow ? "#06b6d4" : isSell ? "#f59e0b" : isBuy ? "#22c55e" : T.textMid, fontWeight: (isBuy || isSell || isLeapExpiry) ? 500 : 400 }}>
+                          {isLeapExpiry
+                            ? (<>
+                                <span style={{ fontSize: 10, color: T.textDim, display: "block" }}>Intrinsic: {fmtC(row.sellProceeds ?? 0)}</span>
+                                <span style={{ fontWeight: 700 }}>{row.leapPnl >= 0 ? "+" : ""}{fmtC(row.leapPnl ?? 0)} P&L</span>
+                              </>)
+                            : isCcRow
+                            ? (<>
+                                <span style={{ fontSize: 10, color: T.textDim, display: "block" }}>{row.ccShares ? `${row.ccShares.toFixed(4)} units (half position)` : ""}</span>
+                                <span>+{fmtC(row.ccIncome ?? 0)} premium</span>
+                              </>)
+                            : (<>
+                                {fmtC(row.portfolioValue ?? 0)}
+                                {isSell && row.sellProceeds && <span style={{ color: "#f59e0b", fontSize: 10, display: "block" }}>+{fmtC(row.sellProceeds)} cashed</span>}
+                              </>)
+                          }
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+
       </div>
+
+      <p style={{ fontSize: 10, color: T.border2, marginTop: 12, textAlign: "center" }}>
+        {`${asset.type === "crypto" ? "Data: Binance API" : "Data: Yahoo Finance (via corsproxy.io)"} · Risk: 500-day geometric MA model · Not financial advice`}
+      </p>
     </div>
   );
 }
-
-// ============================================================
-// TAB: PLANNING
-// ============================================================
-function PlanningTab({plan, update, T}) {
-  const p = plan.params;
-  const up = (k,v)=>update(d=>{d.params[k]=v;return d;});
-  const [showInvPresets, setShowInvPresets] = useState(null);
-  const applyInvPreset = (i,key)=>{const pr=CAGR_PRESETS[key];update(d=>{d.investmentIncome[i].cagr=pr.cagr;d.investmentIncome[i].cagrDecline1=pr.d1;d.investmentIncome[i].cagrDecline2=pr.d2;d.investmentIncome[i].cagrDecline3=pr.d3;return d;});setShowInvPresets(null);};
-  return <div style={{display:"flex",flexDirection:"column",gap:12,width:"100%"}}>
-    <Card title="Planning Parameters" T={T}>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(170px,1fr))",gap:10}}>
-        <Field label="Person / Couple" value={p.personName} onChange={v=>up("personName",v)} T={T}/>
-        <Field label="Age at Start" value={p.ageAtStart} type="number" onChange={v=>up("ageAtStart",+v||60)} T={T}/>
-        <Field label="Inflation %" value={p.inflationRate} type="number" step="0.5" onChange={v=>up("inflationRate",+v||0)} T={T}/>
-        <Field label="Start Year" value={p.startYear} type="number" onChange={v=>up("startYear",+v||2030)} T={T}/>
-        <Field label="Projection Years" value={p.projectionYears} type="number" onChange={v=>up("projectionYears",Math.min(+v||30,60))} T={T}/>
-      </div>
-    </Card>
-    <Card title="Fixed Sources of Income" badge="Pension, CPP, OAS, Social Security" T={T}
-      action={plan.fixedIncome.length<10?()=>update(d=>{d.fixedIncome.push({id:mkId(),name:"New Source",amount:0,startYear:p.startYear,indexing:0,enabled:false});return d;}):null} actionLabel="+ Add">
-      <Hint T={T}>Pensions, Social Security, CPP, OAS, annuities. Set start year to defer income.</Hint>
-      {plan.fixedIncome.map((s,i)=><ItemRow key={s.id} enabled={s.enabled} T={T} onToggle={()=>update(d=>{d.fixedIncome[i].enabled=!d.fixedIncome[i].enabled;return d;})} onRemove={()=>update(d=>{d.fixedIncome.splice(i,1);return d;})}>
-        <MF label="Name" value={s.name} w="1.5fr" onChange={v=>update(d=>{d.fixedIncome[i].name=v;return d;})} T={T}/>
-        <MF label="Annual $" value={s.amount} type="number" w="1fr" onChange={v=>update(d=>{d.fixedIncome[i].amount=+v||0;return d;})} T={T}/>
-        <MF label="Start Year" value={s.startYear} type="number" w="0.7fr" onChange={v=>update(d=>{d.fixedIncome[i].startYear=+v||2030;return d;})} T={T}/>
-        <MF label="Index%" value={s.indexing} type="number" step="0.5" w="0.5fr" onChange={v=>update(d=>{d.fixedIncome[i].indexing=+v||0;return d;})} T={T}/>
-      </ItemRow>)}
-    </Card>
-    {/* Registered Investment Income — NOW 3-phase CAGR decline */}
-    <Card title="Registered Investment Income" badge="TFSA, RRSP, 401k, IRA" T={T}
-      action={plan.investmentIncome.length<10?()=>update(d=>{d.investmentIncome.push({id:mkId(),name:"New Investment",note:"",shares:0,pricePerShare:0,cagr:7,cagrDecline1:0.3,cagrDecline2:0.2,cagrDecline3:0.1,dividendPercent:0,includeDividend:false,autoCalc:true,enabled:false});return d;}):null} actionLabel="+ Add">
-      <Hint T={T}>Tax-sheltered accounts. Amort/Sell draws balance to $0 by end of term on an amortization schedule. Div pays dividends from remaining balance. Three-phase CAGR decline: Yr 1-5, Yr 6-20, Yr 21+</Hint>
-      {plan.investmentIncome.map((s,i)=><div key={s.id}>
-        <ItemRow enabled={s.enabled} T={T} onToggle={()=>update(d=>{d.investmentIncome[i].enabled=!d.investmentIncome[i].enabled;return d;})} onRemove={()=>update(d=>{d.investmentIncome.splice(i,1);return d;})}>
-          <MF label="Name" value={s.name} w="1.2fr" onChange={v=>update(d=>{d.investmentIncome[i].name=v;return d;})} T={T}/>
-          <MF label="Shares" value={s.shares} type="number" w="0.6fr" onChange={v=>update(d=>{d.investmentIncome[i].shares=+v||0;return d;})} T={T}/>
-          <MF label="Price" value={s.pricePerShare} type="number" w="0.7fr" onChange={v=>update(d=>{d.investmentIncome[i].pricePerShare=+v||0;return d;})} T={T}/>
-          <MF label="CAGR%" value={s.cagr} type="number" step="0.5" w="0.45fr" onChange={v=>update(d=>{d.investmentIncome[i].cagr=+v||0;return d;})} T={T}/>
-          <MF label="1-5%" value={s.cagrDecline1!==undefined?s.cagrDecline1:(s.cagrDecline||0.3)} type="number" step="0.1" w="0.4fr" onChange={v=>update(d=>{d.investmentIncome[i].cagrDecline1=+v||0;return d;})} T={T}/>
-          <MF label="6-20%" value={s.cagrDecline2!==undefined?s.cagrDecline2:((s.cagrDecline||0.3)*0.6)} type="number" step="0.1" w="0.4fr" onChange={v=>update(d=>{d.investmentIncome[i].cagrDecline2=+v||0;return d;})} T={T}/>
-          <MF label="21+%" value={s.cagrDecline3!==undefined?s.cagrDecline3:((s.cagrDecline||0.3)*0.3)} type="number" step="0.1" w="0.4fr" onChange={v=>update(d=>{d.investmentIncome[i].cagrDecline3=+v||0;return d;})} T={T}/>
-          <MF label="Div%" value={s.dividendPercent} type="number" step="0.5" w="0.45fr" onChange={v=>update(d=>{d.investmentIncome[i].dividendPercent=+v||0;return d;})} T={T}/>
-          <Chk label="Div" checked={s.includeDividend} onChange={()=>update(d=>{d.investmentIncome[i].includeDividend=!d.investmentIncome[i].includeDividend;return d;})} T={T}/>
-          <Chk label="Amort/Sell" checked={s.autoCalc} onChange={()=>update(d=>{d.investmentIncome[i].autoCalc=!d.investmentIncome[i].autoCalc;return d;})} T={T}/>
-          <div style={{display:"flex",flexDirection:"column",gap:2,alignSelf:"end",paddingBottom:4}}>
-            <YahooLink ticker={s.name} T={T}/>
-            <button onClick={()=>setShowInvPresets(showInvPresets===i?null:i)} style={{fontSize:9,color:T.accent,background:"none",border:"none",cursor:"pointer",fontFamily:FONT_LABEL}}>CAGR % Preset</button>
-          </div>
-        </ItemRow>
-        {showInvPresets===i&&<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(170px,1fr))",gap:6,padding:"6px 28px 10px",background:T.bg,borderRadius:8,margin:"-2px 0 6px"}}>
-          {Object.entries(CAGR_PRESETS).map(([k,pr])=><button key={k} onClick={()=>applyInvPreset(i,k)} style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:8,padding:"8px 10px",cursor:"pointer",textAlign:"left"}}>
-            <div style={{fontSize:11,fontWeight:600,color:T.text,fontFamily:FONT_LABEL}}>{pr.label}</div>
-            <div style={{fontSize:9,color:T.textMid,fontFamily:FONT_LABEL}}>{pr.desc}</div>
-            <div style={{fontSize:9,color:T.accent,fontFamily:FONT_MONO}}>{pr.cagr}% | {pr.d1}/{pr.d2}/{pr.d3}</div>
-          </button>)}
-        </div>}
-      </div>)}
-    </Card>
-    <Card title="Other Sources of Income" badge="Business, Rental" T={T}
-      action={plan.otherIncome.length<10?()=>update(d=>{d.otherIncome.push({id:mkId(),name:"New Source",note:"",shares:1,pricePerShare:0,cagr:3,cagrDecline:0.1,annualIncome:0,includeIncome:false,enabled:false});return d;}):null} actionLabel="+ Add">
-      <Hint T={T}>Business income, rental properties, royalties. Appreciate in value + optional annual income.</Hint>
-      {plan.otherIncome.map((s,i)=><ItemRow key={s.id} enabled={s.enabled} T={T} onToggle={()=>update(d=>{d.otherIncome[i].enabled=!d.otherIncome[i].enabled;return d;})} onRemove={()=>update(d=>{d.otherIncome.splice(i,1);return d;})}>
-        <MF label="Name" value={s.name} w="1.2fr" onChange={v=>update(d=>{d.otherIncome[i].name=v;return d;})} T={T}/>
-        <MF label="Units" value={s.shares} type="number" w="0.5fr" onChange={v=>update(d=>{d.otherIncome[i].shares=+v||0;return d;})} T={T}/>
-        <MF label="Price" value={s.pricePerShare} type="number" w="0.7fr" onChange={v=>update(d=>{d.otherIncome[i].pricePerShare=+v||0;return d;})} T={T}/>
-        <MF label="CAGR%" value={s.cagr} type="number" step="0.5" w="0.45fr" onChange={v=>update(d=>{d.otherIncome[i].cagr=+v||0;return d;})} T={T}/>
-        <MF label="Decl%" value={s.cagrDecline} type="number" step="0.1" w="0.45fr" onChange={v=>update(d=>{d.otherIncome[i].cagrDecline=+v||0;return d;})} T={T}/>
-        <MF label="Annual$" value={s.annualIncome} type="number" w="0.7fr" onChange={v=>update(d=>{d.otherIncome[i].annualIncome=+v||0;return d;})} T={T}/>
-        <Chk label="Inc" checked={s.includeIncome} onChange={()=>update(d=>{d.otherIncome[i].includeIncome=!d.otherIncome[i].includeIncome;return d;})} T={T}/>
-      </ItemRow>)}
-    </Card>
-    <CagrExamplesBox T={T}/>
-  </div>;
-}
-
-// ============================================================
-// TAB: DIVEST
-// ============================================================
-function DivestTab({plan, update, T}) {
-  const [showPresets, setShowPresets] = useState(null);
-  const applyPreset = (i, key) => {const p=CAGR_PRESETS[key];update(d=>{d.divestAssets[i].cagr=p.cagr;d.divestAssets[i].cagrDecline1=p.d1;d.divestAssets[i].cagrDecline2=p.d2;d.divestAssets[i].cagrDecline3=p.d3;return d;});setShowPresets(null);};
-  return <div style={{display:"flex",flexDirection:"column",gap:12,width:"100%"}}>
-    <Card title="Investment Assets to Divest" badge="Max 20" T={T}
-      action={plan.divestAssets.length<20?()=>update(d=>{d.divestAssets.push({id:mkId(),name:`Asset ${d.divestAssets.length+1}`,note:"",shares:0,pricePerShare:0,cagr:10,cagrDecline1:0.5,cagrDecline2:0.3,cagrDecline3:0.1,dividendPercent:0,includeDividend:false,autoCalc:true,enabled:false});return d;}):null} actionLabel="+ Add Asset">
-      <Hint T={T}>Unregistered assets sold on an amortization schedule to $0 by end of term. Three-phase CAGR decline: Yr 1-5, Yr 6-20, Yr 21+. Cap gains may apply.</Hint>
-      {plan.divestAssets.map((a,i)=><div key={a.id}>
-        <ItemRow enabled={a.enabled} T={T} onToggle={()=>update(d=>{d.divestAssets[i].enabled=!d.divestAssets[i].enabled;return d;})} onRemove={()=>update(d=>{d.divestAssets.splice(i,1);return d;})}>
-          <MF label="Ticker" value={a.name} w="1fr" onChange={v=>update(d=>{d.divestAssets[i].name=v;return d;})} T={T}/>
-          <MF label="Shares" value={a.shares} type="number" w="0.6fr" onChange={v=>update(d=>{d.divestAssets[i].shares=+v||0;return d;})} T={T}/>
-          <MF label="Price" value={a.pricePerShare} type="number" w="0.7fr" onChange={v=>update(d=>{d.divestAssets[i].pricePerShare=+v||0;return d;})} T={T}/>
-          <MF label="CAGR%" value={a.cagr} type="number" step="1" w="0.45fr" onChange={v=>update(d=>{d.divestAssets[i].cagr=+v||0;return d;})} T={T}/>
-          <MF label="1-5%" value={a.cagrDecline1} type="number" step="0.1" w="0.4fr" onChange={v=>update(d=>{d.divestAssets[i].cagrDecline1=+v||0;return d;})} T={T}/>
-          <MF label="6-20%" value={a.cagrDecline2} type="number" step="0.1" w="0.4fr" onChange={v=>update(d=>{d.divestAssets[i].cagrDecline2=+v||0;return d;})} T={T}/>
-          <MF label="21+%" value={a.cagrDecline3} type="number" step="0.1" w="0.4fr" onChange={v=>update(d=>{d.divestAssets[i].cagrDecline3=+v||0;return d;})} T={T}/>
-          <MF label="Div%" value={a.dividendPercent||0} type="number" step="0.5" w="0.45fr" onChange={v=>update(d=>{d.divestAssets[i].dividendPercent=+v||0;return d;})} T={T}/>
-          <Chk label="Div" checked={!!a.includeDividend} onChange={()=>update(d=>{d.divestAssets[i].includeDividend=!d.divestAssets[i].includeDividend;return d;})} T={T}/>
-          <Chk label="Amort/Sell" checked={a.autoCalc} onChange={()=>update(d=>{d.divestAssets[i].autoCalc=!d.divestAssets[i].autoCalc;return d;})} T={T}/>
-          <div style={{display:"flex",flexDirection:"column",gap:2,alignSelf:"end",paddingBottom:4}}>
-            <YahooLink ticker={a.name} T={T}/>
-            <button onClick={()=>setShowPresets(showPresets===i?null:i)} style={{fontSize:9,color:T.accent,background:"none",border:"none",cursor:"pointer",fontFamily:FONT_LABEL}}>CAGR % Preset</button>
-          </div>
-          {a.enabled&&a.shares>0&&a.pricePerShare>0&&<div style={{fontSize:11,color:T.gold,fontWeight:600,whiteSpace:"nowrap",alignSelf:"end",paddingBottom:5,fontFamily:FONT_MONO}}>{fmt(a.shares*a.pricePerShare)}</div>}
-        </ItemRow>
-        {showPresets===i&&<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(170px,1fr))",gap:6,padding:"6px 28px 10px",background:T.bg,borderRadius:8,margin:"-2px 0 6px"}}>
-          {Object.entries(CAGR_PRESETS).map(([k,p])=><button key={k} onClick={()=>applyPreset(i,k)} style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:8,padding:"8px 10px",cursor:"pointer",textAlign:"left"}}>
-            <div style={{fontSize:11,fontWeight:600,color:T.text,fontFamily:FONT_LABEL}}>{p.label}</div>
-            <div style={{fontSize:9,color:T.textMid,fontFamily:FONT_LABEL}}>{p.desc}</div>
-            <div style={{fontSize:9,color:T.accent,fontFamily:FONT_MONO}}>{p.cagr}% | {p.d1}/{p.d2}/{p.d3}</div>
-          </button>)}
-        </div>}
-      </div>)}
-      {plan.divestAssets.filter(a=>a.enabled&&a.shares>0).length>0&&<div style={{background:T.summaryBg,borderRadius:10,padding:"12px 18px",marginTop:8,display:"flex",justifyContent:"space-between",alignItems:"center",border:`1px solid ${T.border}`}}>
-        <span style={{fontWeight:600,color:T.text,fontSize:13,fontFamily:FONT_LABEL}}>Total Divest Portfolio</span>
-        <span style={{fontFamily:FONT_DISPLAY,fontSize:20,fontWeight:700,color:T.gold}}>{fmt(plan.divestAssets.filter(a=>a.enabled).reduce((t,a)=>t+a.shares*a.pricePerShare,0))}</span>
-      </div>}
-    </Card>
-
-    {/* CAGR DECLINE EXAMPLES */}
-    <CagrExamplesBox T={T}/>
-  </div>;
-}
-
-// ============================================================
-// CAGR DECLINE EXAMPLES BOX
-// ============================================================
-function CagrExamplesBox({T}) {
-  const [open, setOpen] = useState(false);
-  const examples = [
-    {
-      label:"🔥 Hyper Growth Stocks", desc:"e.g., disruptive companies (early TSLA, early NVDA)",
-      cagr:30, d1:2.8, d2:1.0, d3:0.2,
-      explain:"Starts at 30% CAGR. Years 1-5: declines 2.8%/yr to ~16% by year 5. Years 6-20: declines 1.0%/yr to ~1% by year 20. Years 21+: declines 0.2%/yr, settling near 0%."
-    },
-    {
-      label:"📈 Growth Stocks", desc:"e.g., NVDA, AMZN, META",
-      cagr:18, d1:0.8, d2:0.4, d3:0.15,
-      explain:"Starts at 18% CAGR. Years 1-5: declines 0.8%/yr to ~14% by year 5. Years 6-20: declines 0.4%/yr to ~8% by year 20. Years 21+: declines 0.15%/yr, settling near 6-7%."
-    },
-    {
-      label:"⚖️ Moderate Stocks", desc:"e.g., AAPL, MSFT, JNJ",
-      cagr:12, d1:0.5, d2:0.3, d3:0.1,
-      explain:"Starts at 12% CAGR. Years 1-5: declines 0.5%/yr to ~9.5% by year 5. Years 6-20: declines 0.3%/yr to ~5% by year 20. Years 21+: declines 0.1%/yr, settling near 4%."
-    },
-    {
-      label:"🛡️ Conservative / Index", desc:"e.g., SPY, VOO, VTI",
-      cagr:10, d1:0.3, d2:0.2, d3:0.1,
-      explain:"Starts at 10% CAGR. Years 1-5: declines 0.3%/yr to ~8.5% by year 5. Years 6-20: declines 0.2%/yr to ~5.5% by year 20. Years 21+: declines 0.1%/yr, settling near 4-5%."
-    },
-    {
-      label:"💴 Ultra Conservative", desc:"e.g., Bonds, GICs, T-Bills",
-      cagr:3, d1:0.1, d2:0.0, d3:0.0,
-      explain:"Starts at 3% CAGR. Years 1-5: slight decline of 0.1%/yr to ~2.5% by year 5. Years 6+: rate holds essentially flat, reflecting stable fixed-income instruments."
-    },
-  ];
-  return <Card title="CAGR Decline Examples" T={T}>
-    <div style={{cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}} onClick={()=>setOpen(!open)}>
-      <Hint T={T}>How does the 3-phase CAGR decline work? Click to {open?"hide":"see"} examples for common asset types.</Hint>
-      <span style={{fontSize:16,color:T.accent,transform:open?"rotate(180deg)":"rotate(0deg)",transition:"transform 0.2s",flexShrink:0}}>{"▼"}</span>
-    </div>
-    {open&&<div style={{display:"flex",flexDirection:"column",gap:10,marginTop:6}}>
-      <div style={{fontSize:12,color:T.textMid,fontFamily:FONT_LABEL,lineHeight:1.6,padding:"0 4px"}}>
-        The 3-phase model assumes high early growth that gradually matures — mimicking how companies evolve from high-growth to stable phases. The three decline rates (1-5%, 6-20%, 21+%) control how quickly CAGR drops in each period. The CAGR never goes below 0%.
-      </div>
-      {examples.map((ex,i)=><div key={i} style={{background:T.inputBg,borderRadius:10,padding:"14px 18px",border:`1px solid ${T.border}`}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6,flexWrap:"wrap",gap:6}}>
-          <div>
-            <span style={{fontSize:14,fontWeight:600,color:T.text,fontFamily:FONT_LABEL}}>{ex.label}</span>
-            <span style={{fontSize:11,color:T.textMid,marginLeft:8,fontFamily:FONT_LABEL}}>{ex.desc}</span>
-          </div>
-          <div style={{fontFamily:FONT_MONO,fontSize:12,color:T.accent,background:`${T.accent}10`,padding:"3px 10px",borderRadius:6}}>
-            {ex.cagr}% | {ex.d1} / {ex.d2} / {ex.d3}
-          </div>
-        </div>
-        <div style={{fontSize:11.5,color:T.text,fontFamily:FONT_LABEL,lineHeight:1.7,opacity:0.85}}>{ex.explain}</div>
-      </div>)}
-      <div style={{fontSize:11,color:T.textDim,fontFamily:FONT_LABEL,padding:"4px 4px 0",lineHeight:1.5}}>
-        💡 <strong>Tip:</strong> Use the Preset button on each asset for quick setup. Ultra Conservative suits bonds and GICs; steeper declines suit individual growth stocks that may mature over decades.
-      </div>
-    </div>}
-  </Card>;
-}
-
-// ============================================================
-// TAB: FIXED ASSETS — NOW 3-phase CAGR decline
-// ============================================================
-function FixedAssetsTab({plan, update, T}) {
-  const [showPresets, setShowPresets] = useState(null);
-  const applyPreset = (i,key)=>{const p=CAGR_PRESETS[key];update(d=>{d.fixedAssets[i].cagr=p.cagr;d.fixedAssets[i].cagrDecline1=p.d1;d.fixedAssets[i].cagrDecline2=p.d2;d.fixedAssets[i].cagrDecline3=p.d3;return d;});setShowPresets(null);};
-  return <div style={{display:"flex",flexDirection:"column",gap:12,width:"100%"}}>
-    <Card title="Fixed Assets (Non-Income)" badge="Real Estate, Precious Metals, Collectibles, Hard Assets" T={T}
-      action={plan.fixedAssets.length<10?()=>update(d=>{d.fixedAssets.push({id:mkId(),name:"New Asset",note:"",shares:1,pricePerShare:0,cagr:3,cagrDecline1:0.1,cagrDecline2:0.05,cagrDecline3:0.02,enabled:false});return d;}):null} actionLabel="+ Add">
-      <Hint T={T}>Assets that grow in value but don't generate income. Three-phase CAGR decline: Yr 1-5, Yr 6-20, Yr 21+</Hint>
-      {plan.fixedAssets.map((a,i)=><div key={a.id}>
-        <ItemRow enabled={a.enabled} T={T} onToggle={()=>update(d=>{d.fixedAssets[i].enabled=!d.fixedAssets[i].enabled;return d;})} onRemove={()=>update(d=>{d.fixedAssets.splice(i,1);return d;})}>
-          <MF label="Name" value={a.name} w="1.5fr" onChange={v=>update(d=>{d.fixedAssets[i].name=v;return d;})} T={T}/>
-          <MF label="Units" value={a.shares} type="number" w="0.5fr" onChange={v=>update(d=>{d.fixedAssets[i].shares=+v||0;return d;})} T={T}/>
-          <MF label="Price" value={a.pricePerShare} type="number" w="1fr" onChange={v=>update(d=>{d.fixedAssets[i].pricePerShare=+v||0;return d;})} T={T}/>
-          <MF label="CAGR%" value={a.cagr} type="number" step="0.5" w="0.45fr" onChange={v=>update(d=>{d.fixedAssets[i].cagr=+v||0;return d;})} T={T}/>
-          <MF label="1-5%" value={a.cagrDecline1!==undefined?a.cagrDecline1:(a.cagrDecline||0.1)} type="number" step="0.1" w="0.4fr" onChange={v=>update(d=>{d.fixedAssets[i].cagrDecline1=+v||0;return d;})} T={T}/>
-          <MF label="6-20%" value={a.cagrDecline2!==undefined?a.cagrDecline2:((a.cagrDecline||0.1)*0.5)} type="number" step="0.1" w="0.4fr" onChange={v=>update(d=>{d.fixedAssets[i].cagrDecline2=+v||0;return d;})} T={T}/>
-          <MF label="21+%" value={a.cagrDecline3!==undefined?a.cagrDecline3:((a.cagrDecline||0.1)*0.2)} type="number" step="0.1" w="0.4fr" onChange={v=>update(d=>{d.fixedAssets[i].cagrDecline3=+v||0;return d;})} T={T}/>
-          {a.enabled&&a.pricePerShare>0&&<div style={{fontSize:11,color:T.green,fontWeight:600,whiteSpace:"nowrap",alignSelf:"end",paddingBottom:5,fontFamily:FONT_MONO}}>{fmt(a.shares*a.pricePerShare)}</div>}
-          <div style={{display:"flex",flexDirection:"column",gap:2,alignSelf:"end",paddingBottom:4}}>
-            <button onClick={()=>setShowPresets(showPresets===i?null:i)} style={{fontSize:9,color:T.accent,background:"none",border:"none",cursor:"pointer",fontFamily:FONT_LABEL}}>CAGR % Preset</button>
-          </div>
-        </ItemRow>
-        {showPresets===i&&<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(170px,1fr))",gap:6,padding:"6px 28px 10px",background:T.bg,borderRadius:8,margin:"-2px 0 6px"}}>
-          {Object.entries(CAGR_PRESETS).map(([k,p])=><button key={k} onClick={()=>applyPreset(i,k)} style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:8,padding:"8px 10px",cursor:"pointer",textAlign:"left"}}>
-            <div style={{fontSize:11,fontWeight:600,color:T.text,fontFamily:FONT_LABEL}}>{p.label}</div>
-            <div style={{fontSize:9,color:T.textMid,fontFamily:FONT_LABEL}}>{p.desc}</div>
-            <div style={{fontSize:9,color:T.accent,fontFamily:FONT_MONO}}>{p.cagr}% | {p.d1}/{p.d2}/{p.d3}</div>
-          </button>)}
-        </div>}
-      </div>)}
-    </Card>
-    <CagrExamplesBox T={T}/>
-  </div>;
-}
-
-// ============================================================
-// TAB: PROJECTIONS (frozen year column)
-// ============================================================
-function ProjectionsTab({plan, results, T}) {
-  const ea=plan.divestAssets.filter(a=>a.enabled&&a.shares>0&&a.pricePerShare>0);
-  const ei=plan.investmentIncome.filter(s=>s.enabled&&s.shares>0&&s.pricePerShare>0);
-  if(!results.length) return <div style={{width:"100%"}}><Card title="Projections" T={T}><Empty T={T}/></Card></div>;
-  const th={padding:"7px 6px",textAlign:"right",fontSize:10,fontWeight:600,color:"#ccc",whiteSpace:"nowrap",fontFamily:FONT_MONO};
-  const td={padding:"5px 6px",textAlign:"right",fontSize:11,whiteSpace:"nowrap",fontFamily:FONT_MONO,color:T.text};
-  return <div style={{width:"100%"}}><Card title="Year-by-Year Projections" T={T}>
-    <div style={{overflowX:"auto",overflowY:"auto",maxHeight:"75vh",width:"100%"}}>
-      <table style={{width:"100%",borderCollapse:"collapse",minWidth:600}}>
-        <thead style={{position:"sticky",top:0,zIndex:2}}>
-          <tr style={{background:"#1a1a3a"}}>
-            <th style={{...th,position:"sticky",left:0,zIndex:3,background:"#1a1a3a",textAlign:"left"}}>Year</th>
-            <th style={th}>Age</th><th style={{...th,color:T.gold}}>Total Income</th><th style={{...th,color:T.green}}>Portfolio</th>
-            <th style={th}>Fixed</th><th style={th}>Inv.Inc</th><th style={th}>Div</th><th style={th}>Other</th>
-            {ea.map(a=><th key={a.id} colSpan={3} style={{...th,background:"#222244"}}>{a.name}</th>)}
-            {ei.map(s=><th key={s.id} colSpan={2} style={{...th,background:"#1a2a3a"}}>{s.name}</th>)}
-          </tr>
-          {(ea.length>0||ei.length>0)&&<tr style={{background:T.card}}>
-            <th style={{...th,position:"sticky",left:0,zIndex:3,background:T.card,fontSize:8,color:T.textDim}}/><th style={{...th,fontSize:8,color:T.textDim}}/><th style={{...th,fontSize:8,color:T.textDim}}/><th style={{...th,fontSize:8,color:T.textDim}}/>
-            <th style={{...th,fontSize:8,color:T.textDim}}/><th style={{...th,fontSize:8,color:T.textDim}}/><th style={{...th,fontSize:8,color:T.textDim}}/><th style={{...th,fontSize:8,color:T.textDim}}/>
-            {ea.map(a=><React.Fragment key={a.id}><th style={{...th,fontSize:8,color:T.textDim}}>W/D</th><th style={{...th,fontSize:8,color:T.textDim}}>Shrs</th><th style={{...th,fontSize:8,color:T.textDim}}>Px</th></React.Fragment>)}
-            {ei.map(s=><React.Fragment key={s.id}><th style={{...th,fontSize:8,color:T.textDim}}>W/D</th><th style={{...th,fontSize:8,color:T.textDim}}>Div</th></React.Fragment>)}
-          </tr>}
-        </thead>
-        <tbody>{results.map((r,i)=><tr key={i} style={{background:i%2?T.rowAlt:"transparent",borderBottom:`1px solid ${T.border}`}}>
-          <td style={{...td,position:"sticky",left:0,zIndex:1,background:i%2?T.rowAlt:T.card,fontWeight:600,textAlign:"left"}}>{r.year}</td>
-          <td style={td}>{r.age}</td><td style={{...td,fontWeight:700,color:T.gold}}>{fmt(r.totalIncome)}</td><td style={{...td,fontWeight:700,color:T.green}}>{fmtK(r.totalValue)}</td>
-          <td style={td}>{fmt(r.fixedIncome)}</td><td style={td}>{fmt(r.investmentIncome)}</td><td style={td}>{fmt(r.dividendIncome)}</td><td style={td}>{fmt(r.otherIncome)}</td>
-          {r.assets.map((a,j)=><React.Fragment key={j}><td style={td}>{fmt(a.withdrawal)}</td><td style={{...td,color:T.textDim}}>{fmtN(a.shares,1)}</td><td style={{...td,color:T.textDim}}>{fmt(a.price)}</td></React.Fragment>)}
-          {(r.investmentIncomeSources||[]).map((s,j)=><React.Fragment key={j}><td style={td}>{fmt(s.withdrawal)}</td><td style={{...td,color:T.green}}>{fmt(s.dividendIncome)}</td></React.Fragment>)}
-        </tr>)}</tbody>
-      </table>
-    </div>
-  </Card></div>;
-}
-
-// ============================================================
-// TAB: WITHDRAWAL PLAN
-// ============================================================
-function WithdrawalTab({plan, results, T}) {
-  const ea=plan.divestAssets.filter(a=>a.enabled&&a.shares>0&&a.pricePerShare>0);
-  const ei=plan.investmentIncome.filter(s=>s.enabled&&s.shares>0&&s.pricePerShare>0);
-  if(!results.length||(!ea.length&&!ei.length)) return <div style={{width:"100%"}}><Card title="Withdrawal Plan" T={T}><Empty T={T} msg="Enable divest assets or registered investment income to see withdrawal schedule."/></Card></div>;
-  const th={padding:"8px 8px",textAlign:"right",fontSize:11,fontWeight:600,color:"#ccc",whiteSpace:"nowrap",fontFamily:FONT_MONO};
-  const td={padding:"6px 8px",textAlign:"right",fontSize:12,whiteSpace:"nowrap",fontFamily:FONT_MONO,color:T.text};
-  return <div style={{width:"100%"}}><Card title="Annual Withdrawal Plan" T={T}>
-    <Hint T={T}>Shares to sell each year and income generated from each asset and registered investment account.</Hint>
-    <div style={{overflowX:"auto",overflowY:"auto",maxHeight:"75vh",width:"100%"}}>
-      <table style={{width:"100%",borderCollapse:"collapse"}}>
-        <thead style={{position:"sticky",top:0,zIndex:2}}>
-          <tr style={{background:"#1a1a3a"}}>
-            <th style={{...th,position:"sticky",left:0,zIndex:3,background:"#1a1a3a",textAlign:"left"}}>Year</th>
-            <th style={th}>Age</th><th style={{...th,color:T.gold}}>Total W/D</th>
-            {ea.map(a=><React.Fragment key={a.id}><th style={{...th,background:"#222244"}}>{a.name} Sell</th><th style={{...th,background:"#222244"}}>{a.name} Inc</th><th style={{...th,background:"#1a1a3a"}}>{a.name} Left</th></React.Fragment>)}
-            {ei.map(s=><React.Fragment key={s.id}><th style={{...th,background:"#1a2a3a"}}>{s.name} Sell</th><th style={{...th,background:"#1a2a3a"}}>{s.name} Div</th><th style={{...th,background:"#1a2a3a"}}>{s.name} Left</th></React.Fragment>)}
-          </tr>
-        </thead>
-        <tbody>{results.map((r,i)=>{
-          const tw=(r.assets.reduce((t,a)=>t+a.withdrawal,0))+(r.investmentIncomeSources||[]).reduce((t,s)=>t+s.withdrawal+s.dividendIncome,0);
-          return<tr key={i} style={{background:i%2?T.rowAlt:"transparent",borderBottom:`1px solid ${T.border}`}}>
-            <td style={{...td,position:"sticky",left:0,zIndex:1,background:i%2?T.rowAlt:T.card,fontWeight:600,textAlign:"left"}}>{r.year}</td>
-            <td style={td}>{r.age}</td><td style={{...td,fontWeight:700,color:T.gold}}>{fmt(tw)}</td>
-            {r.assets.map((a,j)=><React.Fragment key={j}><td style={{...td,color:T.accent}}>{fmtN(a.sharesSold,4)}</td><td style={{...td,color:T.green}}>{fmt(a.withdrawal)}</td><td style={{...td,color:T.textDim}}>{fmtN(a.shares,2)}</td></React.Fragment>)}
-            {(r.investmentIncomeSources||[]).map((s,j)=><React.Fragment key={j}><td style={{...td,color:T.cyan}}>{fmtN(s.sharesSold,4)}</td><td style={{...td,color:T.green}}>{fmt(s.dividendIncome)}</td><td style={{...td,color:T.textDim}}>{fmtN(s.shares,2)}</td></React.Fragment>)}
-          </tr>;})}</tbody>
-      </table>
-    </div>
-  </Card></div>;
-}
-
-// ============================================================
-// TAB: CHARTS (dropdown selector like InvestAnswers)
-// ============================================================
-const CHART_VIEWS=[
-  {id:"portfolio",label:"Total Portfolio Value"},
-  {id:"income",label:"Annual Income (Stacked)"},
-  {id:"appreciation",label:"Growth vs Spending"},
-  {id:"withdrawals",label:"Withdrawals by Asset"},
-  {id:"shares",label:"Remaining Shares (Divest)"},
-  {id:"investmentShares",label:"Registered Investment Value"},
-  {id:"fixedAssets",label:"Fixed Assets Value"},
-];
-
-function ChartsTab({plan, results, T}) {
-  const [view,setView]=useState("portfolio");
-  const ea=plan.divestAssets.filter(a=>a.enabled&&a.shares>0&&a.pricePerShare>0);
-  const ei=plan.investmentIncome.filter(s=>s.enabled&&s.shares>0&&s.pricePerShare>0);
-  const efa=plan.fixedAssets.filter(a=>a.enabled&&a.shares>0&&a.pricePerShare>0);
-  if(!results.length) return <div style={{width:"100%"}}><Card title="Charts" T={T}><Empty T={T}/></Card></div>;
-  const desc={portfolio:"Total portfolio value over time (all assets).",income:"Stacked income breakdown from all sources.",appreciation:"Portfolio appreciation vs total withdrawals each year.",withdrawals:"Annual withdrawal amount from each divest and registered account.",shares:"Remaining share count as divest assets are sold down.",investmentShares:"Registered investment account values over time.",fixedAssets:"Fixed asset appreciation over the projection."};
-  const CTooltip=({active,payload,label})=>{if(!active||!payload?.length)return null;return<div style={{background:"#0d0d1f",border:"1px solid #2a2a4a",borderRadius:8,padding:"10px 14px",fontSize:11,fontFamily:FONT_MONO}}><div style={{color:"#888",marginBottom:4}}>{label}</div>{payload.map((p,i)=><div key={i} style={{color:p.color,marginBottom:2}}>{p.name}: {typeof p.value==="number"&&p.value>100?fmtK(p.value):fmtN(p.value,2)}</div>)}</div>;};
-
-  const renderChart=()=>{
-    if(view==="portfolio"){
-      const data=results.map(r=>({year:r.year,Portfolio:r.totalValue}));
-      return<ResponsiveContainer><AreaChart data={data}><defs><linearGradient id="gP" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={T.accent} stopOpacity={0.3}/><stop offset="100%" stopColor={T.accent} stopOpacity={0}/></linearGradient></defs>
-        <XAxis dataKey="year" tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={{stroke:T.border}}/><YAxis tickFormatter={fmtK} tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={false}/>
-        <Tooltip content={<CTooltip/>}/><Area type="monotone" dataKey="Portfolio" stroke={T.accent} fill="url(#gP)" strokeWidth={2.5}/></AreaChart></ResponsiveContainer>;
-    }
-    if(view==="income"){
-      const data=results.map(r=>({year:r.year,Fixed:r.fixedIncome,Divest_WD:r.assets?.reduce((t,a)=>t+a.withdrawal,0)||0,Reg_WD:(r.investmentIncomeSources||[]).reduce((t,s)=>t+s.withdrawal,0),Dividends:r.dividendIncome,Other:r.otherIncome}));
-      return<ResponsiveContainer><ComposedChart data={data}><XAxis dataKey="year" tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={{stroke:T.border}}/><YAxis tickFormatter={fmtK} tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={false}/>
-        <Tooltip content={<CTooltip/>}/><Legend wrapperStyle={{fontSize:11,fontFamily:FONT_MONO}}/>
-        <Bar dataKey="Fixed" stackId="a" fill={T.accent}/><Bar dataKey="Divest_WD" stackId="a" fill={T.gold}/><Bar dataKey="Reg_WD" stackId="a" fill={T.cyan}/><Bar dataKey="Dividends" stackId="a" fill={T.green}/><Bar dataKey="Other" stackId="a" fill={T.purple} radius={[3,3,0,0]}/></ComposedChart></ResponsiveContainer>;
-    }
-    if(view==="appreciation"){
-      const data=results.map((r,i)=>{const pv=i>0?results[i-1].totalValue:r.totalValue;return{year:r.year,Appreciation:Math.max(r.totalValue-pv+r.totalIncome,0),Spending:r.totalIncome};});
-      return<ResponsiveContainer><ComposedChart data={data}><XAxis dataKey="year" tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={{stroke:T.border}}/><YAxis tickFormatter={fmtK} tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={false}/>
-        <Tooltip content={<CTooltip/>}/><Legend wrapperStyle={{fontSize:11,fontFamily:FONT_MONO}}/>
-        <Bar dataKey="Appreciation" fill={T.accent}/><Line dataKey="Spending" stroke={T.gold} strokeWidth={2} dot={false} strokeDasharray="6 3"/></ComposedChart></ResponsiveContainer>;
-    }
-    if(view==="withdrawals"){
-      const allAssets=[...ea,...ei];
-      const data=results.map(r=>{const o={year:r.year};r.assets.forEach(a=>{o[a.name]=a.withdrawal;});(r.investmentIncomeSources||[]).forEach(s=>{o[s.name]=s.withdrawal;});return o;});
-      return<ResponsiveContainer><LineChart data={data}><XAxis dataKey="year" tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={{stroke:T.border}}/><YAxis tickFormatter={fmtK} tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={false}/>
-        <Tooltip content={<CTooltip/>}/><Legend wrapperStyle={{fontSize:11,fontFamily:FONT_MONO}}/>
-        {allAssets.map((a,i)=><Line key={a.id} type="monotone" dataKey={a.name} stroke={CHART_COLORS[i%CHART_COLORS.length]} strokeWidth={2} dot={false}/>)}</LineChart></ResponsiveContainer>;
-    }
-    if(view==="shares"){
-      const data=results.map(r=>{const o={year:r.year};r.assets.forEach(a=>{o[a.name]=a.shares;});return o;});
-      return<ResponsiveContainer><LineChart data={data}><XAxis dataKey="year" tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={{stroke:T.border}}/><YAxis tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={false}/>
-        <Tooltip content={<CTooltip/>}/><Legend wrapperStyle={{fontSize:11,fontFamily:FONT_MONO}}/>
-        {ea.map((a,i)=><Line key={a.id} type="monotone" dataKey={a.name} stroke={CHART_COLORS[i%CHART_COLORS.length]} strokeWidth={2} dot={false}/>)}</LineChart></ResponsiveContainer>;
-    }
-    if(view==="investmentShares"){
-      if(!ei.length) return<div style={{textAlign:"center",padding:60,color:T.textDim}}>No registered investment accounts enabled.</div>;
-      const data=results.map(r=>{const o={year:r.year};(r.investmentIncomeSources||[]).forEach(s=>{o[s.name]=s.value;});return o;});
-      return<ResponsiveContainer><LineChart data={data}><XAxis dataKey="year" tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={{stroke:T.border}}/><YAxis tickFormatter={fmtK} tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={false}/>
-        <Tooltip content={<CTooltip/>}/><Legend wrapperStyle={{fontSize:11,fontFamily:FONT_MONO}}/>
-        {ei.map((s,i)=><Line key={s.id} type="monotone" dataKey={s.name} stroke={CHART_COLORS[i%CHART_COLORS.length]} strokeWidth={2} dot={false}/>)}</LineChart></ResponsiveContainer>;
-    }
-    if(view==="fixedAssets"){
-      if(!efa.length) return<div style={{textAlign:"center",padding:60,color:T.textDim}}>No fixed assets enabled.</div>;
-      const data=results.map(r=>{const o={year:r.year};(r.fixedAssetValues||[]).forEach(a=>{o[a.name]=a.value;});return o;});
-      return<ResponsiveContainer><LineChart data={data}><XAxis dataKey="year" tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={{stroke:T.border}}/><YAxis tickFormatter={fmtK} tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={false}/>
-        <Tooltip content={<CTooltip/>}/><Legend wrapperStyle={{fontSize:11,fontFamily:FONT_MONO}}/>
-        {efa.map((a,i)=><Line key={a.id} type="monotone" dataKey={a.name} stroke={CHART_COLORS[i%CHART_COLORS.length]} strokeWidth={2} dot={false}/>)}</LineChart></ResponsiveContainer>;
-    }
-  };
-
-  return<div style={{background:T.card,borderRadius:12,border:`1px solid ${T.border}`,overflow:"hidden",width:"100%"}}>
-    <div style={{padding:"16px 20px 12px",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
-      <div><h2 style={{fontFamily:FONT_DISPLAY,fontSize:18,color:T.text,margin:0}}>Portfolio Projections</h2><p style={{fontSize:11,color:T.textDim,margin:"4px 0 0",fontFamily:FONT_LABEL}}>{desc[view]}</p></div>
-      <div>
-        <label style={{fontSize:9,color:T.label,fontFamily:FONT_LABEL,fontWeight:600,letterSpacing:0.5,textTransform:"uppercase",display:"block",marginBottom:3}}>Chart View</label>
-        <select value={view} onChange={e=>setView(e.target.value)} style={{
-          background:T.inputBg,border:`1px solid ${T.border2}`,borderRadius:8,padding:"8px 30px 8px 12px",
-          color:T.text,fontSize:13,fontFamily:FONT_LABEL,cursor:"pointer",appearance:"none",minWidth:220,
-          backgroundImage:`url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%23888' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E")`,
-          backgroundRepeat:"no-repeat",backgroundPosition:"right 10px center",
-        }}>{CHART_VIEWS.map(v=><option key={v.id} value={v.id}>{v.label}</option>)}</select>
-      </div>
-    </div>
-    <div style={{padding:"0 12px 16px",height:440}}>{renderChart()}</div>
-  </div>;
-}
-
-// ============================================================
-// TAB: ADDITIONAL
-// ============================================================
-function AdditionalTab({plan, update, T}) {
-  const total=plan.bigTicketStocks.filter(s=>s.enabled).reduce((t,s)=>t+s.shares*s.price,0);
-  return<div style={{display:"flex",flexDirection:"column",gap:12,width:"100%"}}>
-    <Card title="Notes & Plans" T={T}>
-      <textarea value={plan.notes||""} onChange={e=>update(d=>{d.notes=e.target.value;return d;})} placeholder="Emergency fund, healthcare, estate planning, tax strategies..."
-        style={{width:"100%",minHeight:140,padding:14,background:T.inputBg,border:`1px solid ${T.border}`,borderRadius:8,fontFamily:FONT_LABEL,fontSize:13,color:T.text,resize:"vertical",outline:"none"}}/>
-    </Card>
-    <Card title="Big Ticket Calculator" T={T} action={plan.bigTicketStocks.length<10?()=>update(d=>{d.bigTicketStocks.push({id:mkId(),ticker:"",shares:0,price:0,enabled:false});return d;}):null} actionLabel="+ Add">
-      <Field label="Saving for?" value={plan.bigTicketItem||""} onChange={v=>update(d=>{d.bigTicketItem=v;return d;})} T={T} placeholder="e.g., House down payment"/>
-      <div style={{marginTop:10}}>{plan.bigTicketStocks.map((s,i)=><ItemRow key={s.id} enabled={s.enabled} T={T} onToggle={()=>update(d=>{d.bigTicketStocks[i].enabled=!d.bigTicketStocks[i].enabled;return d;})} onRemove={()=>update(d=>{d.bigTicketStocks.splice(i,1);return d;})}>
-        <MF label="Ticker" value={s.ticker} w="1fr" onChange={v=>update(d=>{d.bigTicketStocks[i].ticker=v;return d;})} T={T}/>
-        <MF label="Shares" value={s.shares} type="number" w="0.7fr" onChange={v=>update(d=>{d.bigTicketStocks[i].shares=+v||0;return d;})} T={T}/>
-        <MF label="Price" value={s.price} type="number" w="0.7fr" onChange={v=>update(d=>{d.bigTicketStocks[i].price=+v||0;return d;})} T={T}/>
-        <YahooLink ticker={s.ticker} T={T}/>
-        {s.enabled&&s.shares>0&&s.price>0&&<div style={{fontSize:11,color:T.green,fontWeight:600,alignSelf:"end",paddingBottom:5,fontFamily:FONT_MONO}}>{fmt(s.shares*s.price)}</div>}
-      </ItemRow>)}</div>
-      {total>0&&<div style={{background:T.summaryBg,border:`1px solid ${T.gold}20`,borderRadius:10,padding:18,marginTop:10,textAlign:"center"}}>
-        <div style={{fontSize:10,color:T.textDim,fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:4,fontFamily:FONT_LABEL}}>Total Available</div>
-        <div style={{fontFamily:FONT_DISPLAY,fontSize:26,fontWeight:700,color:T.gold}}>{fmt(total)}</div>
-      </div>}
-      <div style={{background:T.inputBg,border:`1px solid ${T.border}`,borderRadius:10,padding:"14px 18px",marginTop:10}}>
-        <div style={{fontSize:11,fontWeight:700,color:T.accent,fontFamily:FONT_LABEL,marginBottom:6,textTransform:"uppercase",letterSpacing:0.5}}>What is being sold to fund big ticket items?</div>
-        <div style={{fontSize:12,color:T.textMid,fontFamily:FONT_LABEL,lineHeight:1.7}}>
-          The Big Ticket Calculator shows the <strong style={{color:T.text}}>current market value</strong> of stocks you could liquidate for a major purchase.
-          When selling, consider: <strong style={{color:T.text}}>capital gains tax</strong> on appreciated positions,
-          the <strong style={{color:T.text}}>opportunity cost</strong> of removing assets from your growth portfolio,
-          and whether selling from <strong style={{color:T.text}}>registered accounts</strong> (RRSP/401k/TFSA/IRA) triggers additional withholding tax.
-          Cross-reference with your Assets to Divest and Registered Investment Income tabs to understand the full impact on your retirement projections.
-        </div>
-      </div>
-    </Card>
-  </div>;
-}
-
-// ============================================================
-// SHARED COMPONENTS — modern fonts throughout
-// ============================================================
-function Card({title,badge,children,action,actionLabel,T,noPad}){return<div style={{background:T.card,borderRadius:12,border:`1px solid ${T.border}`,padding:noPad?0:"16px 20px",overflow:"hidden",width:"100%"}}>
-  {title&&<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10,flexWrap:"wrap",gap:6}}>
-    <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}><h2 style={{fontFamily:FONT_DISPLAY,fontSize:17,color:T.text,margin:0}}>{title}</h2>
-    {badge&&<span style={{fontSize:9,color:T.textMid,background:`${T.accent}10`,padding:"2px 8px",borderRadius:10,fontFamily:FONT_LABEL}}>{badge}</span>}</div>
-    {action&&<button onClick={action} style={{padding:"5px 12px",background:T.accent,color:"#fff",border:"none",borderRadius:6,fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:FONT_LABEL}}>{actionLabel}</button>}
-  </div>}{children}</div>;}
-
-function ItemRow({children,enabled,onToggle,onRemove,T}){return<div style={{display:"flex",gap:6,alignItems:"flex-start",padding:"8px 10px",marginBottom:4,borderRadius:8,border:`1px solid ${enabled?T.accent+"20":T.border}`,background:enabled?T.inputBg+"80":"transparent",opacity:enabled?1:0.5,transition:"all 0.15s",flexWrap:"wrap"}}>
-  <button onClick={onToggle} style={{width:18,height:18,borderRadius:3,border:`2px solid ${enabled?T.green:T.border2}`,background:enabled?T.green:"transparent",color:"#fff",fontSize:11,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:16,padding:0}}>{enabled?"\u2713":""}</button>
-  <div style={{display:"flex",gap:6,flex:1,flexWrap:"wrap",alignItems:"flex-start"}}>{children}</div>
-  <button onClick={onRemove} style={{background:"none",border:"none",color:T.textDim,cursor:"pointer",fontSize:14,padding:2,marginTop:14,flexShrink:0}}>{"\u00D7"}</button></div>;}
-
-function Field({label,value,onChange,type="text",step,placeholder,T}){return<div><label style={{fontSize:10,color:T.label,fontWeight:600,textTransform:"uppercase",letterSpacing:0.5,display:"block",marginBottom:3,fontFamily:FONT_LABEL}}>{label}</label>
-  <input type={type} value={value} step={step} placeholder={placeholder} onChange={e=>onChange(e.target.value)} onFocus={e=>e.target.select()} style={{width:"100%",padding:"7px 10px",background:T.inputBg,border:`1px solid ${T.border2}`,borderRadius:6,fontSize:13,color:T.text,fontFamily:FONT_LABEL}}/></div>;}
-
-function MF({label,value,onChange,type="text",step,w="1fr",T}){return<div style={{minWidth:50,flex:w}}><label style={{fontSize:9,color:T.label,fontWeight:600,textTransform:"uppercase",letterSpacing:0.3,display:"block",marginBottom:2,fontFamily:FONT_LABEL}}>{label}</label>
-  <input type={type} value={value} step={step} onChange={e=>onChange(e.target.value)} onFocus={e=>e.target.select()} style={{width:"100%",padding:"4px 6px",background:T.inputBg,border:`1px solid ${T.border2}`,borderRadius:4,fontSize:12,color:T.text,fontFamily:FONT_LABEL}}/></div>;}
-
-function Chk({label,checked,onChange,T}){return<div style={{display:"flex",flexDirection:"column",alignItems:"center",minWidth:32}}><label style={{fontSize:9,color:T.label,fontWeight:600,letterSpacing:0.3,marginBottom:2,fontFamily:FONT_LABEL}}>{label}</label>
-  <input type="checkbox" checked={checked} onChange={onChange} style={{width:14,height:14,cursor:"pointer",accentColor:T.accent}}/></div>;}
-
-function SumCard({label,value,color,T}){return<div style={{background:T.card,borderRadius:10,padding:"14px 16px",textAlign:"center",border:`1px solid ${T.border}`,borderLeft:`3px solid ${color}`,minHeight:72}}>
-  <div style={{fontSize:10,color:T.textDim,fontWeight:600,textTransform:"uppercase",letterSpacing:0.8,marginBottom:5,fontFamily:FONT_LABEL}}>{label}</div>
-  <div style={{fontSize:20,fontWeight:700,color,fontFamily:FONT_DISPLAY,lineHeight:1.2}}>{value}</div></div>;}
-
-function Hint({children,T}){return<p style={{color:T.textDim,fontSize:12,marginBottom:10,fontFamily:FONT_LABEL,lineHeight:1.4}}>{children}</p>;}
-function Empty({T,msg}){return<p style={{color:T.textDim,textAlign:"center",padding:50,fontSize:13,fontFamily:FONT_LABEL}}>{msg||"Enable at least one asset or income source."}</p>;}
-function SaveDot({status,T}){const c=status==="saving"?T.gold:T.green;return<div style={{display:"flex",alignItems:"center",gap:4,fontSize:10,color:c,fontFamily:FONT_LABEL}}><span style={{width:5,height:5,borderRadius:"50%",background:c}}/>{status==="saving"?"Saving...":"Saved"}</div>;}
-function SmBtn({onClick,label,T,danger}){return<button onClick={onClick} style={{padding:"5px 12px",background:danger?T.red+"15":T.inputBg,color:danger?T.red:T.textMid,border:`1px solid ${danger?T.red+"30":T.border2}`,borderRadius:6,fontSize:11,cursor:"pointer",fontWeight:500,fontFamily:FONT_LABEL,whiteSpace:"nowrap"}}>{label}</button>;}
