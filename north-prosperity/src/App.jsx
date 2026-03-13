@@ -127,11 +127,11 @@ function runProjection(plan) {
 
   const aw = ea.map((a,i)=>{
     if(!a.autoCalc)return 0; let sr=0;
-    for(let y=0;y<totalYears;y++){sr+=Math.pow(1+inf,y)/dp[i][y];}return a.shares/sr;
+    for(let y=0;y<totalYears;y++){const yf=(fracYear>0&&y===totalYears-1)?fracYear:1;sr+=yf*Math.pow(1+inf,y)/dp[i][y];}return a.shares/sr;
   });
   const iw = ei.map((s,i)=>{
     if(!s.autoCalc)return 0; let sr=0;
-    for(let y=0;y<totalYears;y++){sr+=Math.pow(1+inf,y)/ip[i][y];}return s.shares/sr;
+    for(let y=0;y<totalYears;y++){const yf=(fracYear>0&&y===totalYears-1)?fracYear:1;sr+=yf*Math.pow(1+inf,y)/ip[i][y];}return s.shares/sr;
   });
 
   const ds = ea.map((a,i)=>({rem:a.shares,bw:Math.round(aw[i])}));
