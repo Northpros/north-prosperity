@@ -81,8 +81,8 @@ function runProjection(plan) {
   const p = plan.params;
   const inf = p.inflationRate / 100;
   const sy = p.startYear, py = p.projectionYears;
-const totalYears = Math.ceil(py);
-const fracYear = py % 1;
+  const totalYears = Math.ceil(py);
+  const fracYear = py % 1;
   const ea = plan.divestAssets.filter(a=>a.enabled&&a.shares>0&&a.pricePerShare>0);
   const ef = plan.fixedIncome.filter(s=>s.enabled&&s.amount>0);
   const ei = plan.investmentIncome.filter(s=>s.enabled&&s.shares>0&&s.pricePerShare>0);
@@ -122,23 +122,23 @@ const fracYear = py % 1;
   });
   const op = eo.map(s=>{
     const b=s.cagr/100,d=(s.cagrDecline||0)/100,pr=[Math.round(s.pricePerShare||0)];
-    for(let y=1;y<py;y++){let yc=b-d*y;yc=Math.max(yc,0);pr.push(Math.round(pr[y-1]*(1+yc)));}return pr;
+    for(let y=1;y<totalYears;y++){let yc=b-d*y;yc=Math.max(yc,0);pr.push(Math.round(pr[y-1]*(1+yc)));}return pr;
   });
 
   const aw = ea.map((a,i)=>{
     if(!a.autoCalc)return 0; let sr=0;
-    for(let y=0;y<py;y++){sr+=Math.pow(1+inf,y)/dp[i][y];}return a.shares/sr;
+    for(let y=0;y<totalYears;y++){sr+=Math.pow(1+inf,y)/dp[i][y];}return a.shares/sr;
   });
   const iw = ei.map((s,i)=>{
     if(!s.autoCalc)return 0; let sr=0;
-    for(let y=0;y<py;y++){sr+=Math.pow(1+inf,y)/ip[i][y];}return s.shares/sr;
+    for(let y=0;y<totalYears;y++){sr+=Math.pow(1+inf,y)/ip[i][y];}return s.shares/sr;
   });
 
   const ds = ea.map((a,i)=>({rem:a.shares,bw:Math.round(aw[i])}));
   const is2 = ei.map((s,i)=>({rem:s.shares,bw:Math.round(iw[i])}));
   const results = [];
 
-  for(let y=0;y<py;y++){
+  for(let y=0;y<totalYears;y++){
     let fi=0;
     ef.forEach(s=>{if(sy+y>=s.startYear){const ya=sy+y-s.startYear;fi+=s.amount*Math.pow(1+s.indexing/100,ya);}});
     let ii=0,di=0; const idata=[];
