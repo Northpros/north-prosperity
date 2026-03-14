@@ -388,9 +388,9 @@ function PlanningTab({plan, update, T}) {
           <MF label="Shares" value={s.shares} type="number" w="0.6fr" onChange={v=>update(d=>{d.investmentIncome[i].shares=+v||0;return d;})} T={T}/>
           <MF label="Price" value={s.pricePerShare} type="number" w="0.7fr" onChange={v=>update(d=>{d.investmentIncome[i].pricePerShare=+v||0;return d;})} T={T}/>
           <MF label="CAGR%" value={s.cagr} type="number" step="0.5" w="0.45fr" onChange={v=>update(d=>{d.investmentIncome[i].cagr=+v||0;return d;})} T={T}/>
-          <MF label="Yr 1-5 ↓%" value={s.cagrDecline1!==undefined?s.cagrDecline1:(s.cagrDecline||0.3)} type="number" step="0.1" w="0.4fr" onChange={v=>update(d=>{d.investmentIncome[i].cagrDecline1=+v||0;return d;})} T={T}/>
-          <MF label="Yr 6-20 ↓%" value={s.cagrDecline2!==undefined?s.cagrDecline2:((s.cagrDecline||0.3)*0.6)} type="number" step="0.1" w="0.4fr" onChange={v=>update(d=>{d.investmentIncome[i].cagrDecline2=+v||0;return d;})} T={T}/>
-          <MF label="Yr 21+ ↓%" value={s.cagrDecline3!==undefined?s.cagrDecline3:((s.cagrDecline||0.3)*0.3)} type="number" step="0.1" w="0.4fr" onChange={v=>update(d=>{d.investmentIncome[i].cagrDecline3=+v||0;return d;})} T={T}/>
+          <MF label="1-5%" value={s.cagrDecline1!==undefined?s.cagrDecline1:(s.cagrDecline||0.3)} type="number" step="0.1" w="0.4fr" onChange={v=>update(d=>{d.investmentIncome[i].cagrDecline1=+v||0;return d;})} T={T}/>
+          <MF label="6-20%" value={s.cagrDecline2!==undefined?s.cagrDecline2:((s.cagrDecline||0.3)*0.6)} type="number" step="0.1" w="0.4fr" onChange={v=>update(d=>{d.investmentIncome[i].cagrDecline2=+v||0;return d;})} T={T}/>
+          <MF label="21+%" value={s.cagrDecline3!==undefined?s.cagrDecline3:((s.cagrDecline||0.3)*0.3)} type="number" step="0.1" w="0.4fr" onChange={v=>update(d=>{d.investmentIncome[i].cagrDecline3=+v||0;return d;})} T={T}/>
           <MF label="Div%" value={s.dividendPercent} type="number" step="0.5" w="0.45fr" onChange={v=>update(d=>{d.investmentIncome[i].dividendPercent=+v||0;return d;})} T={T}/>
           <Chk label="Div" checked={s.includeDividend} onChange={()=>update(d=>{d.investmentIncome[i].includeDividend=!d.investmentIncome[i].includeDividend;return d;})} T={T}/>
           <Chk label="Amort/Sell" checked={s.autoCalc} onChange={()=>update(d=>{d.investmentIncome[i].autoCalc=!d.investmentIncome[i].autoCalc;return d;})} T={T}/>
@@ -441,9 +441,9 @@ function DivestTab({plan, update, T}) {
           <MF label="Shares" value={a.shares} type="number" w="0.6fr" onChange={v=>update(d=>{d.divestAssets[i].shares=+v||0;return d;})} T={T}/>
           <MF label="Price" value={a.pricePerShare} type="number" w="0.7fr" onChange={v=>update(d=>{d.divestAssets[i].pricePerShare=+v||0;return d;})} T={T}/>
           <MF label="CAGR%" value={a.cagr} type="number" step="1" w="0.45fr" onChange={v=>update(d=>{d.divestAssets[i].cagr=+v||0;return d;})} T={T}/>
-          <MF label="Yr 1-5 ↓%" value={a.cagrDecline1} type="number" step="0.1" w="0.4fr" onChange={v=>update(d=>{d.divestAssets[i].cagrDecline1=+v||0;return d;})} T={T}/>
-          <MF label="Yr 6-20 ↓%" value={a.cagrDecline2} type="number" step="0.1" w="0.4fr" onChange={v=>update(d=>{d.divestAssets[i].cagrDecline2=+v||0;return d;})} T={T}/>
-          <MF label="Yr 21+ ↓%" value={a.cagrDecline3} type="number" step="0.1" w="0.4fr" onChange={v=>update(d=>{d.divestAssets[i].cagrDecline3=+v||0;return d;})} T={T}/>
+          <MF label="1-5%" value={a.cagrDecline1} type="number" step="0.1" w="0.4fr" onChange={v=>update(d=>{d.divestAssets[i].cagrDecline1=+v||0;return d;})} T={T}/>
+          <MF label="6-20%" value={a.cagrDecline2} type="number" step="0.1" w="0.4fr" onChange={v=>update(d=>{d.divestAssets[i].cagrDecline2=+v||0;return d;})} T={T}/>
+          <MF label="21+%" value={a.cagrDecline3} type="number" step="0.1" w="0.4fr" onChange={v=>update(d=>{d.divestAssets[i].cagrDecline3=+v||0;return d;})} T={T}/>
           <MF label="Div%" value={a.dividendPercent||0} type="number" step="0.5" w="0.45fr" onChange={v=>update(d=>{d.divestAssets[i].dividendPercent=+v||0;return d;})} T={T}/>
           <Chk label="Div" checked={!!a.includeDividend} onChange={()=>update(d=>{d.divestAssets[i].includeDividend=!d.divestAssets[i].includeDividend;return d;})} T={T}/>
           <Chk label="Amort/Sell" checked={a.autoCalc} onChange={()=>update(d=>{d.divestAssets[i].autoCalc=!d.divestAssets[i].autoCalc;return d;})} T={T}/>
@@ -548,9 +548,9 @@ function FixedAssetsTab({plan, update, T}) {
           <MF label="Units" value={a.shares} type="number" w="0.5fr" onChange={v=>update(d=>{d.fixedAssets[i].shares=+v||0;return d;})} T={T}/>
           <MF label="Price" value={a.pricePerShare} type="number" w="1fr" onChange={v=>update(d=>{d.fixedAssets[i].pricePerShare=+v||0;return d;})} T={T}/>
           <MF label="CAGR%" value={a.cagr} type="number" step="0.5" w="0.45fr" onChange={v=>update(d=>{d.fixedAssets[i].cagr=+v||0;return d;})} T={T}/>
-          <MF label="Yr 1-5 ↓%" value={a.cagrDecline1!==undefined?a.cagrDecline1:(a.cagrDecline||0.1)} type="number" step="0.1" w="0.4fr" onChange={v=>update(d=>{d.fixedAssets[i].cagrDecline1=+v||0;return d;})} T={T}/>
-          <MF label="Yr 6-20 ↓%" value={a.cagrDecline2!==undefined?a.cagrDecline2:((a.cagrDecline||0.1)*0.5)} type="number" step="0.1" w="0.4fr" onChange={v=>update(d=>{d.fixedAssets[i].cagrDecline2=+v||0;return d;})} T={T}/>
-          <MF label="Yr 21+ ↓%" value={a.cagrDecline3!==undefined?a.cagrDecline3:((a.cagrDecline||0.1)*0.2)} type="number" step="0.1" w="0.4fr" onChange={v=>update(d=>{d.fixedAssets[i].cagrDecline3=+v||0;return d;})} T={T}/>
+          <MF label="1-5%" value={a.cagrDecline1!==undefined?a.cagrDecline1:(a.cagrDecline||0.1)} type="number" step="0.1" w="0.4fr" onChange={v=>update(d=>{d.fixedAssets[i].cagrDecline1=+v||0;return d;})} T={T}/>
+          <MF label="6-20%" value={a.cagrDecline2!==undefined?a.cagrDecline2:((a.cagrDecline||0.1)*0.5)} type="number" step="0.1" w="0.4fr" onChange={v=>update(d=>{d.fixedAssets[i].cagrDecline2=+v||0;return d;})} T={T}/>
+          <MF label="21+%" value={a.cagrDecline3!==undefined?a.cagrDecline3:((a.cagrDecline||0.1)*0.2)} type="number" step="0.1" w="0.4fr" onChange={v=>update(d=>{d.fixedAssets[i].cagrDecline3=+v||0;return d;})} T={T}/>
           {a.enabled&&a.pricePerShare>0&&<div style={{fontSize:11,color:T.green,fontWeight:600,whiteSpace:"nowrap",alignSelf:"end",paddingBottom:5,fontFamily:FONT_MONO}}>{fmt(a.shares*a.pricePerShare)}</div>}
           <div style={{display:"flex",flexDirection:"column",gap:2,alignSelf:"end",paddingBottom:4}}>
             <button onClick={()=>setShowPresets(showPresets===i?null:i)} style={{fontSize:9,color:T.accent,background:"none",border:"none",cursor:"pointer",fontFamily:FONT_LABEL}}>CAGR % Preset</button>
@@ -585,13 +585,13 @@ function ProjectionsTab({plan, results, T}) {
           <tr style={{background:"#1a1a3a"}}>
             <th style={{...th,position:"sticky",left:0,zIndex:3,background:"#1a1a3a",textAlign:"left"}}>Year</th>
             <th style={th}>Age</th><th style={{...th,color:T.gold}}>Total Income</th><th style={{...th,color:T.green}}>Portfolio</th>
-            <th style={th}>Fixed</th><th style={th}>Inv.Inc</th><th style={th}>Div</th><th style={th}>Other</th>
+            <th style={th}>Fixed</th><th style={th}>Inv.Inc</th><th style={th}>Div</th><th style={th}>Other Inc</th><th style={{...th,color:T.purple}}>Fixed+Other Assets</th>
             {ea.map(a=><th key={a.id} colSpan={3} style={{...th,background:"#222244"}}>{a.name}</th>)}
             {ei.map(s=><th key={s.id} colSpan={2} style={{...th,background:"#1a2a3a"}}>{s.name}</th>)}
           </tr>
           {(ea.length>0||ei.length>0)&&<tr style={{background:T.card}}>
             <th style={{...th,position:"sticky",left:0,zIndex:3,background:T.card,fontSize:8,color:T.textDim}}/><th style={{...th,fontSize:8,color:T.textDim}}/><th style={{...th,fontSize:8,color:T.textDim}}/><th style={{...th,fontSize:8,color:T.textDim}}/>
-            <th style={{...th,fontSize:8,color:T.textDim}}/><th style={{...th,fontSize:8,color:T.textDim}}/><th style={{...th,fontSize:8,color:T.textDim}}/><th style={{...th,fontSize:8,color:T.textDim}}/>
+            <th style={{...th,fontSize:8,color:T.textDim}}/><th style={{...th,fontSize:8,color:T.textDim}}/><th style={{...th,fontSize:8,color:T.textDim}}/><th style={{...th,fontSize:8,color:T.textDim}}/><th style={{...th,fontSize:8,color:T.textDim}}/>
             {ea.map(a=><React.Fragment key={a.id}><th style={{...th,fontSize:8,color:T.textDim}}>W/D</th><th style={{...th,fontSize:8,color:T.textDim}}>Shrs</th><th style={{...th,fontSize:8,color:T.textDim}}>Px</th></React.Fragment>)}
             {ei.map(s=><React.Fragment key={s.id}><th style={{...th,fontSize:8,color:T.textDim}}>W/D</th><th style={{...th,fontSize:8,color:T.textDim}}>Div</th></React.Fragment>)}
           </tr>}
@@ -600,6 +600,7 @@ function ProjectionsTab({plan, results, T}) {
           <td style={{...td,position:"sticky",left:0,zIndex:1,background:i%2?T.rowAlt:T.card,fontWeight:600,textAlign:"left"}}>{r.year}</td>
           <td style={td}>{r.age}</td><td style={{...td,fontWeight:700,color:T.gold}}>{fmt(r.totalIncome)}</td><td style={{...td,fontWeight:700,color:T.green}}>{fmtK(r.totalValue)}</td>
           <td style={td}>{fmt(r.fixedIncome)}</td><td style={td}>{fmt(r.investmentIncome)}</td><td style={td}>{fmt(r.dividendIncome)}</td><td style={td}>{fmt(r.otherIncome)}</td>
+          <td style={{...td,color:T.purple,fontWeight:600}}>{fmtK((r.fixedAssetValues||[]).reduce((t,a)=>t+a.value,0)+(r.otherIncomeValues||[]).reduce((t,a)=>t+a.value,0))}</td>
           {r.assets.map((a,j)=><React.Fragment key={j}><td style={td}>{fmt(a.withdrawal)}</td><td style={{...td,color:T.textDim}}>{fmtN(a.shares,1)}</td><td style={{...td,color:T.textDim}}>{fmt(a.price)}</td></React.Fragment>)}
           {(r.investmentIncomeSources||[]).map((s,j)=><React.Fragment key={j}><td style={td}>{fmt(s.withdrawal)}</td><td style={{...td,color:T.green}}>{fmt(s.dividendIncome)}</td></React.Fragment>)}
         </tr>)}</tbody>
@@ -652,7 +653,7 @@ const CHART_VIEWS=[
   {id:"withdrawals",label:"Withdrawals by Asset"},
   {id:"shares",label:"Remaining Shares (Divest)"},
   {id:"investmentShares",label:"Registered Investment Value"},
-  {id:"fixedAssets",label:"Fixed Assets Value"},
+  {id:"fixedAssets",label:"Fixed & Other Assets Value"},
 ];
 
 function ChartsTab({plan, results, T}) {
@@ -661,7 +662,7 @@ function ChartsTab({plan, results, T}) {
   const ei=plan.investmentIncome.filter(s=>s.enabled&&s.shares>0&&s.pricePerShare>0);
   const efa=plan.fixedAssets.filter(a=>a.enabled&&a.shares>0&&a.pricePerShare>0);
   if(!results.length) return <div style={{width:"100%"}}><Card title="Charts" T={T}><Empty T={T}/></Card></div>;
-  const desc={portfolio:"Total portfolio value over time (all assets).",income:"Stacked income breakdown from all sources.",appreciation:"Portfolio appreciation vs total withdrawals each year.",withdrawals:"Annual withdrawal amount from each divest and registered account.",shares:"Remaining share count as divest assets are sold down.",investmentShares:"Registered investment account values over time.",fixedAssets:"Fixed asset appreciation over the projection."};
+  const desc={portfolio:"Total portfolio value over time (all assets).",income:"Stacked income breakdown from all sources.",appreciation:"Portfolio appreciation vs total withdrawals each year.",withdrawals:"Annual withdrawal amount from each divest and registered account.",shares:"Remaining share count as divest assets are sold down.",investmentShares:"Registered investment account values over time.",fixedAssets:"Fixed asset and other income source appreciation over the projection."};
   const CTooltip=({active,payload,label})=>{if(!active||!payload?.length)return null;return<div style={{background:"#0d0d1f",border:"1px solid #2a2a4a",borderRadius:8,padding:"10px 14px",fontSize:11,fontFamily:FONT_MONO}}><div style={{color:"#888",marginBottom:4}}>{label}</div>{payload.map((p,i)=><div key={i} style={{color:p.color,marginBottom:2}}>{p.name}: {typeof p.value==="number"&&p.value>100?fmtK(p.value):fmtN(p.value,2)}</div>)}</div>;};
 
   const renderChart=()=>{
@@ -704,11 +705,13 @@ function ChartsTab({plan, results, T}) {
         {ei.map((s,i)=><Line key={s.id} type="monotone" dataKey={s.name} stroke={CHART_COLORS[i%CHART_COLORS.length]} strokeWidth={2} dot={false}/>)}</LineChart></ResponsiveContainer>;
     }
     if(view==="fixedAssets"){
-      if(!efa.length) return<div style={{textAlign:"center",padding:60,color:T.textDim}}>No fixed assets enabled.</div>;
-      const data=results.map(r=>{const o={year:r.year};(r.fixedAssetValues||[]).forEach(a=>{o[a.name]=a.value;});return o;});
+      const eoa=plan.otherIncome.filter(s=>s.enabled&&((s.shares>0&&s.pricePerShare>0)||(s.includeIncome&&s.annualIncome>0)));
+      if(!efa.length&&!eoa.length) return<div style={{textAlign:"center",padding:60,color:T.textDim}}>No fixed or other income assets enabled.</div>;
+      const data=results.map(r=>{const o={year:r.year};(r.fixedAssetValues||[]).forEach(a=>{o[a.name]=a.value;});(r.otherIncomeValues||[]).forEach(a=>{o[a.name]=a.value;});return o;});
+      const allLines=[...efa,...eoa];
       return<ResponsiveContainer><LineChart data={data}><XAxis dataKey="year" tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={{stroke:T.border}}/><YAxis tickFormatter={fmtK} tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={false}/>
         <Tooltip content={<CTooltip/>}/><Legend wrapperStyle={{fontSize:11,fontFamily:FONT_MONO}}/>
-        {efa.map((a,i)=><Line key={a.id} type="monotone" dataKey={a.name} stroke={CHART_COLORS[i%CHART_COLORS.length]} strokeWidth={2} dot={false}/>)}</LineChart></ResponsiveContainer>;
+        {allLines.map((a,i)=><Line key={a.id} type="monotone" dataKey={a.name} stroke={CHART_COLORS[i%CHART_COLORS.length]} strokeWidth={2} dot={false}/>)}</LineChart></ResponsiveContainer>;
     }
   };
 
