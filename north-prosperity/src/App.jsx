@@ -270,7 +270,16 @@ export default function RetirementPlanner() {
         input:focus,select:focus{outline:none;border-color:${T.accent}!important;}
         .np-outer{max-width:${CONTENT_MAX}px;width:100%;margin:0 auto;display:flex;flex-direction:column;}
         .np-outer>*{width:100%!important;max-width:100%!important;min-width:0!important;}
+        .np-disclaimer{position:fixed;bottom:0;left:0;right:0;z-index:9999;background:#0d0d1f;border-top:1px solid #2a2a4a;padding:6px 24px;text-align:center;}
+        .np-disclaimer-text{font-family:'JetBrains Mono','SF Mono',monospace;font-size:10px;color:#555577;line-height:1.4;}
       `}</style>
+
+      {/* Permanent Disclaimer Footer */}
+      <div className="np-disclaimer">
+        <div className="np-disclaimer-text">
+          ⚠️ Not financial advice · For educational and simulation purposes only · Past performance does not guarantee future results · Always consult a qualified financial advisor · © 2026 North Prosperity
+        </div>
+      </div>
 
       <div className="np-outer">
         {/* HEADER — taller, larger fonts */}
