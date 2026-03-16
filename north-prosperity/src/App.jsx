@@ -376,7 +376,7 @@ function PlanningTab({plan, update, T}) {
         <Field label="Projection Years" value={p.projectionYears} type="number" step="0.25" onChange={v=>up("projectionYears",Math.min(parseFloat(v)||30,60))} T={T}/>
       </div>
     </Card>
-    <Card title="Fixed Sources of Income" badge="Pension, CPP, OAS, Social Security" T={T}
+    <Card title="Fixed Sources of Income" badge="Pension (DB), CPP, OAS, Social Security, GIS, Annuity, DPSP" T={T}
       action={plan.fixedIncome.length<10?()=>update(d=>{d.fixedIncome.push({id:mkId(),name:"New Source",amount:0,startYear:p.startYear,indexing:0,enabled:false});return d;}):null} actionLabel="+ Add">
       <Hint T={T}>Pensions, Social Security, CPP, OAS, annuities. Set start year to defer income.</Hint>
       {plan.fixedIncome.map((s,i)=><ItemRow key={s.id} enabled={s.enabled} T={T} onToggle={()=>update(d=>{d.fixedIncome[i].enabled=!d.fixedIncome[i].enabled;return d;})} onRemove={()=>update(d=>{d.fixedIncome.splice(i,1);return d;})}>
@@ -387,7 +387,7 @@ function PlanningTab({plan, update, T}) {
       </ItemRow>)}
     </Card>
     {/* Registered Investment Income — NOW 3-phase CAGR decline */}
-    <Card title="Registered Investment Income" badge="TFSA, RRSP, 401k, IRA" T={T}
+    <Card title="Registered Investment Income" badge="TFSA, RRSP, RRIF, LIRA, 401(k), 403(b), 457(b), IRA, Roth IRA, TSP" T={T}
       action={plan.investmentIncome.length<10?()=>update(d=>{d.investmentIncome.push({id:mkId(),name:"New Investment",note:"",shares:0,pricePerShare:0,cagr:7,cagrDecline1:0.3,cagrDecline2:0.2,cagrDecline3:0.1,dividendPercent:0,includeDividend:false,autoCalc:true,enabled:false});return d;}):null} actionLabel="+ Add">
       <Hint T={T}>Tax-sheltered accounts. Amort/Sell draws balance to $0 by end of term on an amortization schedule. Div pays dividends from remaining balance. Three-phase CAGR decline: Yr 1-5, Yr 6-20, Yr 21+</Hint>
       {plan.investmentIncome.map((s,i)=><div key={s.id}>
