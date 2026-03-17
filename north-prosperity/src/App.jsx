@@ -344,7 +344,7 @@ export default function RetirementPlanner() {
         </div>
 
         {/* CONTENT */}
-        <div style={{width:"100%",overflow:"hidden"}}>
+        <div style={{width:"100%",overflow:"hidden",boxSizing:"border-box"}}>
         {tab==="planning" && <PlanningTab plan={plan} update={update} T={T}/>}
         {tab==="divest" && <DivestTab plan={plan} update={update} T={T}/>}
         {tab==="fixed" && <FixedAssetsTab plan={plan} update={update} T={T}/>}
@@ -669,7 +669,7 @@ function ChartsTab({plan, results, T}) {
   const ea=plan.divestAssets.filter(a=>a.enabled&&a.shares>0&&a.pricePerShare>0);
   const ei=plan.investmentIncome.filter(s=>s.enabled&&s.shares>0&&s.pricePerShare>0);
   const efa=plan.fixedAssets.filter(a=>a.enabled&&a.shares>0&&a.pricePerShare>0);
-  if(!results.length) return <div style={{width:"100%"}}><Card title="Charts" T={T}><Empty T={T}/></Card></div>;
+  if(!results.length) return <div style={{display:"flex",flexDirection:"column",gap:12,width:"100%"}}><Card title="Charts" T={T}><Empty T={T}/></Card></div>;
   const desc={portfolio:"Total portfolio value over time (all assets).",income:"Stacked income breakdown from all sources.",appreciation:"Portfolio appreciation vs total withdrawals each year.",withdrawals:"Annual withdrawal amount from each divest and registered account.",shares:"Remaining share count as divest assets are sold down.",investmentShares:"Registered investment account values over time.",fixedAssets:"Fixed asset and other income source appreciation over the projection."};
   const CTooltip=({active,payload,label})=>{if(!active||!payload?.length)return null;return<div style={{background:"#0d0d1f",border:"1px solid #2a2a4a",borderRadius:8,padding:"10px 14px",fontSize:11,fontFamily:FONT_MONO}}><div style={{color:"#888",marginBottom:4}}>{label}</div>{payload.map((p,i)=><div key={i} style={{color:p.color,marginBottom:2}}>{p.name}: {typeof p.value==="number"&&p.value>100?fmtK(p.value):fmtN(p.value,2)}</div>)}</div>;};
 
@@ -723,20 +723,22 @@ function ChartsTab({plan, results, T}) {
     }
   };
 
-  return<div style={{background:T.card,borderRadius:12,border:`1px solid ${T.border}`,overflow:"hidden",width:"100%"}}>
-    <div style={{padding:"16px 20px 12px",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
-      <div><h2 style={{fontFamily:FONT_DISPLAY,fontSize:18,color:T.text,margin:0}}>Portfolio Projections</h2><p style={{fontSize:11,color:T.textDim,margin:"4px 0 0",fontFamily:FONT_LABEL}}>{desc[view]}</p></div>
-      <div>
-        <label style={{fontSize:9,color:T.label,fontFamily:FONT_LABEL,fontWeight:600,letterSpacing:0.5,textTransform:"uppercase",display:"block",marginBottom:3}}>Chart View</label>
-        <select value={view} onChange={e=>setView(e.target.value)} style={{
-          background:T.inputBg,border:`1px solid ${T.border2}`,borderRadius:8,padding:"8px 30px 8px 12px",
-          color:T.text,fontSize:13,fontFamily:FONT_LABEL,cursor:"pointer",appearance:"none",minWidth:220,
-          backgroundImage:`url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%23888' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E")`,
-          backgroundRepeat:"no-repeat",backgroundPosition:"right 10px center",
-        }}>{CHART_VIEWS.map(v=><option key={v.id} value={v.id}>{v.label}</option>)}</select>
+  return<div style={{display:"flex",flexDirection:"column",gap:12,width:"100%"}}>
+    <div style={{background:T.card,borderRadius:12,border:`1px solid ${T.border}`,overflow:"hidden",width:"100%",boxSizing:"border-box"}}>
+      <div style={{padding:"16px 20px 12px",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
+        <div><h2 style={{fontFamily:FONT_DISPLAY,fontSize:18,color:T.text,margin:0}}>Portfolio Projections</h2><p style={{fontSize:11,color:T.textDim,margin:"4px 0 0",fontFamily:FONT_LABEL}}>{desc[view]}</p></div>
+        <div>
+          <label style={{fontSize:9,color:T.label,fontFamily:FONT_LABEL,fontWeight:600,letterSpacing:0.5,textTransform:"uppercase",display:"block",marginBottom:3}}>Chart View</label>
+          <select value={view} onChange={e=>setView(e.target.value)} style={{
+            background:T.inputBg,border:`1px solid ${T.border2}`,borderRadius:8,padding:"8px 30px 8px 12px",
+            color:T.text,fontSize:13,fontFamily:FONT_LABEL,cursor:"pointer",appearance:"none",minWidth:220,
+            backgroundImage:`url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%23888' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E")`,
+            backgroundRepeat:"no-repeat",backgroundPosition:"right 10px center",
+          }}>{CHART_VIEWS.map(v=><option key={v.id} value={v.id}>{v.label}</option>)}</select>
+        </div>
       </div>
+      <div style={{padding:"0 12px 16px",height:440}}>{renderChart()}</div>
     </div>
-    <div style={{padding:"0 12px 16px",height:440}}>{renderChart()}</div>
   </div>;
 }
 
