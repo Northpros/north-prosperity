@@ -723,7 +723,8 @@ function ChartsTab({plan, results, T}) {
     }
   };
 
-  return<div style={{background:T.card,borderRadius:12,border:`1px solid ${T.border}`,overflow:"hidden",width:"100%"}}>
+  return<div style={{display:"flex",flexDirection:"column",gap:12,width:"100%"}}>
+    <div style={{background:T.card,borderRadius:12,border:`1px solid ${T.border}`,overflow:"hidden",width:"100%"}}>
     <div style={{padding:"16px 20px 12px",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
       <div><h2 style={{fontFamily:FONT_DISPLAY,fontSize:18,color:T.text,margin:0}}>Portfolio Projections</h2><p style={{fontSize:11,color:T.textDim,margin:"4px 0 0",fontFamily:FONT_LABEL}}>{desc[view]}</p></div>
       <div>
@@ -737,6 +738,7 @@ function ChartsTab({plan, results, T}) {
       </div>
     </div>
     <div style={{padding:"0 12px 16px",height:440}}>{renderChart()}</div>
+  </div>
   </div>;
 }
 
