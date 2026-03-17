@@ -269,7 +269,7 @@ export default function RetirementPlanner() {
         input[type=number]{-moz-appearance:textfield;}
         input:focus,select:focus{outline:none;border-color:${T.accent}!important;}
         .np-outer{max-width:${CONTENT_MAX}px;width:100%;margin:0 auto;display:flex;flex-direction:column;}
-        .np-outer>*{width:100%!important;max-width:100%!important;min-width:0!important;}
+        .np-outer>*{width:100%!important;max-width:100%!important;min-width:0!important;flex-shrink:0!important;}
         .np-disclaimer{position:fixed;bottom:0;left:0;right:0;z-index:9999;background:#0d0d1f;border-top:1px solid #2a2a4a;padding:5px 12px;}
         .np-disclaimer-text{font-family:'JetBrains Mono','SF Mono',monospace;font-size:10px;color:#555577;line-height:1.5;display:block;}
       `}</style>
@@ -344,7 +344,7 @@ export default function RetirementPlanner() {
         </div>
 
         {/* CONTENT */}
-        <div style={{width:"100%",overflow:"hidden"}}>
+        <div style={{width:"100%",overflow:"hidden",minWidth:0}}>
         {tab==="planning" && <PlanningTab plan={plan} update={update} T={T}/>}
         {tab==="divest" && <DivestTab plan={plan} update={update} T={T}/>}
         {tab==="fixed" && <FixedAssetsTab plan={plan} update={update} T={T}/>}
@@ -723,7 +723,8 @@ function ChartsTab({plan, results, T}) {
     }
   };
 
-  return<div style={{background:T.card,borderRadius:12,border:`1px solid ${T.border}`,overflow:"hidden",width:"100%"}}>
+  return<div style={{display:"flex",flexDirection:"column",gap:12,width:"100%",minWidth:0}}>
+  <div style={{background:T.card,borderRadius:12,border:`1px solid ${T.border}`,overflow:"hidden",width:"100%",minWidth:0}}>
     <div style={{padding:"16px 20px 12px",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
       <div><h2 style={{fontFamily:FONT_DISPLAY,fontSize:18,color:T.text,margin:0}}>Portfolio Projections</h2><p style={{fontSize:11,color:T.textDim,margin:"4px 0 0",fontFamily:FONT_LABEL}}>{desc[view]}</p></div>
       <div>
@@ -736,24 +737,8 @@ function ChartsTab({plan, results, T}) {
         }}>{CHART_VIEWS.map(v=><option key={v.id} value={v.id}>{v.label}</option>)}</select>
       </div>
     </div>
-    {/* Invisible spacer — holds same width as widest input row (Divest/Planning tabs) so Charts matches other tabs */}
-    <div style={{visibility:"hidden",height:0,overflow:"hidden",padding:"0 10px"}}>
-      <div style={{display:"flex",gap:6,flexWrap:"nowrap"}}>
-        <div style={{minWidth:50,flex:"1fr"}}><div style={{width:"100%",padding:"4px 6px",fontSize:12}}>&nbsp;</div></div>
-        <div style={{minWidth:50,flex:"0.6fr"}}><div style={{width:"100%",padding:"4px 6px",fontSize:12}}>&nbsp;</div></div>
-        <div style={{minWidth:50,flex:"0.7fr"}}><div style={{width:"100%",padding:"4px 6px",fontSize:12}}>&nbsp;</div></div>
-        <div style={{minWidth:50,flex:"0.45fr"}}><div style={{width:"100%",padding:"4px 6px",fontSize:12}}>&nbsp;</div></div>
-        <div style={{minWidth:50,flex:"0.4fr"}}><div style={{width:"100%",padding:"4px 6px",fontSize:12}}>&nbsp;</div></div>
-        <div style={{minWidth:50,flex:"0.4fr"}}><div style={{width:"100%",padding:"4px 6px",fontSize:12}}>&nbsp;</div></div>
-        <div style={{minWidth:50,flex:"0.4fr"}}><div style={{width:"100%",padding:"4px 6px",fontSize:12}}>&nbsp;</div></div>
-        <div style={{minWidth:50,flex:"0.45fr"}}><div style={{width:"100%",padding:"4px 6px",fontSize:12}}>&nbsp;</div></div>
-        <div style={{minWidth:32}}><div style={{width:14,height:14}}>&nbsp;</div></div>
-        <div style={{minWidth:32}}><div style={{width:14,height:14}}>&nbsp;</div></div>
-        <div style={{minWidth:60}}><div style={{fontSize:10}}>&nbsp;</div></div>
-        <div style={{minWidth:40}}><div style={{fontSize:9}}>&nbsp;</div></div>
-      </div>
-    </div>
     <div style={{padding:"0 12px 16px",height:440}}>{renderChart()}</div>
+  </div>
   </div>;
 }
 
