@@ -257,7 +257,7 @@ export default function RetirementPlanner() {
   ];
 
   return (
-    <div style={{fontFamily:FONT_BODY,background:T.bg,minHeight:"100vh",padding:"12px 16px",color:T.text,transition:"background 0.3s,color 0.3s"}}>
+    <div style={{fontFamily:FONT_BODY,background:T.bg,minHeight:"100vh",width:"100%",minWidth:"fit-content",padding:"12px 16px",color:T.text,transition:"background 0.3s,color 0.3s"}}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Lato:wght@300;400;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap');
         *{box-sizing:border-box;margin:0;padding:0;}
@@ -268,8 +268,8 @@ export default function RetirementPlanner() {
         input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0;}
         input[type=number]{-moz-appearance:textfield;}
         input:focus,select:focus{outline:none;border-color:${T.accent}!important;}
-        .np-outer{max-width:${CONTENT_MAX}px;width:100%;margin:0 auto;display:flex;flex-direction:column;}
-        .np-outer>*{width:100%!important;max-width:100%!important;min-width:0!important;flex-shrink:0!important;}
+        .np-outer{max-width:${CONTENT_MAX}px;width:100%;min-width:100%;margin:0 auto;display:flex;flex-direction:column;}
+        .np-outer>*{width:100%!important;max-width:100%!important;min-width:0!important;}
         .np-disclaimer{position:fixed;bottom:0;left:0;right:0;z-index:9999;background:#0d0d1f;border-top:1px solid #2a2a4a;padding:5px 12px;}
         .np-disclaimer-text{font-family:'JetBrains Mono','SF Mono',monospace;font-size:10px;color:#555577;line-height:1.5;display:block;}
       `}</style>
@@ -344,7 +344,7 @@ export default function RetirementPlanner() {
         </div>
 
         {/* CONTENT */}
-        <div style={{width:"100%",overflow:"hidden",minWidth:0}}>
+        <div style={{width:"100%",overflow:"hidden"}}>
         {tab==="planning" && <PlanningTab plan={plan} update={update} T={T}/>}
         {tab==="divest" && <DivestTab plan={plan} update={update} T={T}/>}
         {tab==="fixed" && <FixedAssetsTab plan={plan} update={update} T={T}/>}
@@ -723,8 +723,7 @@ function ChartsTab({plan, results, T}) {
     }
   };
 
-  return<div style={{display:"flex",flexDirection:"column",gap:12,width:"100%",minWidth:0}}>
-  <div style={{background:T.card,borderRadius:12,border:`1px solid ${T.border}`,overflow:"hidden",width:"100%",minWidth:0}}>
+  return<div style={{background:T.card,borderRadius:12,border:`1px solid ${T.border}`,overflow:"hidden",width:"100%"}}>
     <div style={{padding:"16px 20px 12px",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
       <div><h2 style={{fontFamily:FONT_DISPLAY,fontSize:18,color:T.text,margin:0}}>Portfolio Projections</h2><p style={{fontSize:11,color:T.textDim,margin:"4px 0 0",fontFamily:FONT_LABEL}}>{desc[view]}</p></div>
       <div>
@@ -738,7 +737,6 @@ function ChartsTab({plan, results, T}) {
       </div>
     </div>
     <div style={{padding:"0 12px 16px",height:440}}>{renderChart()}</div>
-  </div>
   </div>;
 }
 
