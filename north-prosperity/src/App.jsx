@@ -89,9 +89,10 @@ const DEFAULT_PLAN = {
 };
 
 // ── CALCULATION ENGINE ──
-function runProjection(plan, fxRate=1) {
+function runProjection(plan, fxRates={}) {
   const p = plan.params;
   const base = p.baseCurrency||"USD";
+  const rates = (fxRates&&typeof fxRates==="object")?fxRates:{};
   const inf = p.inflationRate / 100;
   const sy = p.startYear, py = p.projectionYears;
   const totalYears = Math.ceil(py);
