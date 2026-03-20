@@ -496,8 +496,8 @@ function DivestTab({plan, update, T, baseCurrency="USD"}) {
             <YahooLink ticker={a.name} T={T}/>
             <button onClick={()=>setShowPresets(showPresets===i?null:i)} style={{fontSize:9,color:T.accent,background:"none",border:"none",cursor:"pointer",fontFamily:FONT_LABEL}}>CAGR % Preset</button>
           </div>
-          {a.enabled&&a.shares>0&&a.pricePerShare>0&&<div style={{fontSize:11,color:T.gold,fontWeight:600,whiteSpace:"nowrap",alignSelf:"end",paddingBottom:5,fontFamily:FONT_MONO}}>{fmt(a.shares*a.pricePerShare)}</div>}
         </ItemRow>
+        {a.enabled&&a.shares>0&&a.pricePerShare>0&&<div style={{textAlign:"right",fontSize:11,color:T.gold,fontWeight:600,fontFamily:FONT_MONO,paddingRight:10,marginTop:-2,marginBottom:4}}>{fmt(a.shares*a.pricePerShare)}</div>}
         {showPresets===i&&<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(170px,1fr))",gap:6,padding:"6px 28px 10px",background:T.bg,borderRadius:8,margin:"-2px 0 6px"}}>
           {Object.entries(CAGR_PRESETS).map(([k,p])=><button key={k} onClick={()=>applyPreset(i,k)} style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:8,padding:"8px 10px",cursor:"pointer",textAlign:"left"}}>
             <div style={{fontSize:11,fontWeight:600,color:T.text,fontFamily:FONT_LABEL}}>{p.label}</div>
@@ -597,11 +597,11 @@ function FixedAssetsTab({plan, update, T, baseCurrency="USD"}) {
           <MF label="Yr 6-20 ↓%" value={a.cagrDecline2!==undefined?a.cagrDecline2:((a.cagrDecline||0.1)*0.5)} type="number" step="0.1" w="0.3fr" onChange={v=>update(d=>{d.fixedAssets[i].cagrDecline2=+v||0;return d;})} T={T}/>
           <MF label="Yr 21+ ↓%" value={a.cagrDecline3!==undefined?a.cagrDecline3:((a.cagrDecline||0.1)*0.2)} type="number" step="0.1" w="0.3fr" onChange={v=>update(d=>{d.fixedAssets[i].cagrDecline3=+v||0;return d;})} T={T}/>
           <CurrencyTag currency={a.currency||baseCurrency} base={baseCurrency} onChange={v=>update(d=>{d.fixedAssets[i].currency=v;return d;})} T={T}/>
-          {a.enabled&&a.pricePerShare>0&&<div style={{fontSize:11,color:T.green,fontWeight:600,whiteSpace:"nowrap",alignSelf:"end",paddingBottom:5,fontFamily:FONT_MONO}}>{fmt(a.shares*a.pricePerShare)}</div>}
           <div style={{display:"flex",flexDirection:"column",gap:2,alignSelf:"end",paddingBottom:4}}>
             <button onClick={()=>setShowPresets(showPresets===i?null:i)} style={{fontSize:9,color:T.accent,background:"none",border:"none",cursor:"pointer",fontFamily:FONT_LABEL}}>CAGR % Preset</button>
           </div>
         </ItemRow>
+        {a.enabled&&a.pricePerShare>0&&<div style={{textAlign:"right",fontSize:11,color:T.green,fontWeight:600,fontFamily:FONT_MONO,paddingRight:10,marginTop:-2,marginBottom:4}}>{fmt(a.shares*a.pricePerShare)}</div>}
         {showPresets===i&&<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(170px,1fr))",gap:6,padding:"6px 28px 10px",background:T.bg,borderRadius:8,margin:"-2px 0 6px"}}>
           {Object.entries(CAGR_PRESETS).map(([k,p])=><button key={k} onClick={()=>applyPreset(i,k)} style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:8,padding:"8px 10px",cursor:"pointer",textAlign:"left"}}>
             <div style={{fontSize:11,fontWeight:600,color:T.text,fontFamily:FONT_LABEL}}>{p.label}</div>
@@ -795,14 +795,15 @@ function AdditionalTab({plan, update, T, baseCurrency="USD", fxRate={}}) {
     </Card>
     <Card title="Big Ticket Calculator" T={T} action={plan.bigTicketStocks.length<10?()=>update(d=>{d.bigTicketStocks.push({id:mkId(),ticker:"",shares:0,price:0,enabled:false});return d;}):null} actionLabel="+ Add">
       <Field label="Saving for?" value={plan.bigTicketItem||""} onChange={v=>update(d=>{d.bigTicketItem=v;return d;})} T={T} placeholder="e.g., House down payment"/>
-      <div style={{marginTop:10}}>{plan.bigTicketStocks.map((s,i)=><ItemRow key={s.id} enabled={s.enabled} T={T} onToggle={()=>update(d=>{d.bigTicketStocks[i].enabled=!d.bigTicketStocks[i].enabled;return d;})} onRemove={()=>update(d=>{d.bigTicketStocks.splice(i,1);return d;})}>
+      <div style={{marginTop:10}}>{plan.bigTicketStocks.map((s,i)=><React.Fragment key={s.id}><ItemRow enabled={s.enabled} T={T} onToggle={()=>update(d=>{d.bigTicketStocks[i].enabled=!d.bigTicketStocks[i].enabled;return d;})} onRemove={()=>update(d=>{d.bigTicketStocks.splice(i,1);return d;})}>
         <MF label="Ticker" value={s.ticker} w="0.7fr" onChange={v=>update(d=>{d.bigTicketStocks[i].ticker=v;return d;})} T={T}/>
         <MF label="Shares" value={s.shares} type="number" w="0.38fr" onChange={v=>update(d=>{d.bigTicketStocks[i].shares=+v||0;return d;})} T={T}/>
         <MF label="Price" value={s.price} type="number" w="0.38fr" onChange={v=>update(d=>{d.bigTicketStocks[i].price=+v||0;return d;})} T={T}/>
         <CurrencyTag currency={s.currency||baseCurrency} base={baseCurrency} onChange={v=>update(d=>{d.bigTicketStocks[i].currency=v;return d;})} T={T}/>
         <YahooLink ticker={s.ticker} T={T}/>
-        {s.enabled&&s.shares>0&&s.price>0&&<div style={{fontSize:11,color:T.green,fontWeight:600,alignSelf:"end",paddingBottom:5,fontFamily:FONT_MONO}}>{fmt(s.shares*s.price)}</div>}
-      </ItemRow>)}</div>
+      </ItemRow>
+      {s.enabled&&s.shares>0&&s.price>0&&<div style={{textAlign:"right",fontSize:11,color:T.green,fontWeight:600,fontFamily:FONT_MONO,paddingRight:10,marginTop:-2,marginBottom:4}}>{fmt(s.shares*s.price)}</div>}
+      </React.Fragment>)}</div>
       {total>0&&<div style={{background:T.summaryBg,border:`1px solid ${T.gold}20`,borderRadius:10,padding:18,marginTop:10,textAlign:"center"}}>
         <div style={{fontSize:10,color:T.textDim,fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:4,fontFamily:FONT_LABEL}}>Total Available</div>
         <div style={{fontFamily:FONT_DISPLAY,fontSize:26,fontWeight:700,color:T.gold}}>{fmt(totalInBase,base)}</div>
