@@ -12,8 +12,8 @@ import {
 // ============================================================
 
 // ── Formatting ────────────────────────────────────────────────
-const fmt = (v,cur="USD") => new Intl.NumberFormat("en-US",{style:"currency",currency:cur,minimumFractionDigits:0,maximumFractionDigits:0}).format(v||0);
-const fmtK = (v,cur="USD") => { v=v||0; const s=cur==="CAD"?"CA$":"$"; return Math.abs(v)>=1e9?`${s}${(v/1e9).toFixed(1)}B`:Math.abs(v)>=1e6?`${s}${(v/1e6).toFixed(1)}M`:Math.abs(v)>=1e3?`${s}${(v/1e3).toFixed(0)}k`:fmt(v,cur); };
+const fmt = (v,cur="USD") => { const c=(cur==="USD"||cur==="CAD")?cur:"USD"; return new Intl.NumberFormat("en-US",{style:"currency",currency:c,minimumFractionDigits:0,maximumFractionDigits:0}).format(v||0); };
+const fmtK = (v,cur="USD") => { v=v||0; const c=(cur==="USD"||cur==="CAD")?cur:"USD"; cur=c; const s=cur==="CAD"?"CA$":"$"; return Math.abs(v)>=1e9?`${s}${(v/1e9).toFixed(1)}B`:Math.abs(v)>=1e6?`${s}${(v/1e6).toFixed(1)}M`:Math.abs(v)>=1e3?`${s}${(v/1e3).toFixed(0)}k`:fmt(v,cur); };
 const fmtN = (v,d=2) => new Intl.NumberFormat("en-US",{minimumFractionDigits:d,maximumFractionDigits:d}).format(v||0);
 const fmtPct = v => `${(v||0).toFixed(1)}%`;
 const toBase = (v,cur,base,rate) => (!rate||cur===base)?v:(base==="CAD"?v*rate:v/rate);
@@ -802,9 +802,11 @@ function AdditionalTab({plan, update, T, baseCurrency="USD", fxRate=1}) {
       </ItemRow>)}</div>
       {total>0&&<div style={{background:T.summaryBg,border:`1px solid ${T.gold}20`,borderRadius:10,padding:18,marginTop:10,textAlign:"center"}}>
         <div style={{fontSize:10,color:T.textDim,fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:8,fontFamily:FONT_LABEL}}>Total Available</div>
-        <div style={{display:"flex",justifyContent:"center",gap:24,flexWrap:"wrap"}}>
-          {totalUSD>0&&<div><div style={{fontSize:9,color:T.textDim,fontFamily:FONT_LABEL,marginBottom:2}}>USD</div><div style={{fontFamily:FONT_DISPLAY,fontSize:22,fontWeight:700,color:T.gold}}>{fmt(totalUSD,"USD")}</div></div>}
-          {totalCAD>0&&<div><div style={{fontSize:9,color:T.textDim,fontFamily:FONT_LABEL,marginBottom:2}}>CAD</div><div style={{fontFamily:FONT_DISPLAY,fontSize:22,fontWeight:700,color:T.cyan}}>{fmt(totalCAD,"CAD")}</div></div>}
+        <div style={{display:"flex",justifyContent:"center",gap:32,flexWrap:"wrap"}}>
+          {totalUSD>0&&<div><div style={{fontSize:9,color:T.textDim,fontFamily:FONT_LABEL,marginBottom:2}}>USD</div><div style={{fontFamily:FONT_DISPLAY,fontSize:26,fontWeight:700,color:T.gold}}>{fmt(totalUSD,"USD")}</div></div>}
+          {base==="CAD"&&totalUSD>0&&fxRate&&<div><div style={{fontSize:9,color:T.textDim,fontFamily:FONT_LABEL,marginBottom:2}}>CAD</div><div style={{fontFamily:FONT_DISPLAY,fontSize:26,fontWeight:700,color:T.gold}}>{fmt(totalUSD*fxRate,"CAD")}</div></div>}
+          {totalCAD>0&&<div><div style={{fontSize:9,color:T.textDim,fontFamily:FONT_LABEL,marginBottom:2}}>CAD</div><div style={{fontFamily:FONT_DISPLAY,fontSize:26,fontWeight:700,color:T.gold}}>{fmt(totalCAD,"CAD")}</div></div>}
+          {base==="USD"&&totalCAD>0&&fxRate&&<div><div style={{fontSize:9,color:T.textDim,fontFamily:FONT_LABEL,marginBottom:2}}>USD</div><div style={{fontFamily:FONT_DISPLAY,fontSize:26,fontWeight:700,color:T.gold}}>{fmt(totalCAD/fxRate,"USD")}</div></div>}
         </div>
       </div>}
       <div style={{background:T.inputBg,border:`1px solid ${T.border}`,borderRadius:10,padding:"14px 18px",marginTop:10}}>
