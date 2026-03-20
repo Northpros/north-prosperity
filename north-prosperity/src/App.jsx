@@ -782,10 +782,9 @@ function ChartsTab({plan, results, T, baseCurrency="USD"}) {
 // TAB: ADDITIONAL
 // ============================================================
 function AdditionalTab({plan, update, T, baseCurrency="USD", fxRate={}}) {
-  const base=baseCurrency;
+  const base=baseCurrency||"USD";
   const btEnabled=plan.bigTicketStocks.filter(s=>s.enabled&&s.shares>0&&s.price>0);
   const total=btEnabled.reduce((t,s)=>t+s.shares*s.price,0);
-  const byCurrency=btEnabled.reduce((acc,s)=>{const cur=s.currency||base;acc[cur]=(acc[cur]||0)+s.shares*s.price;return acc;},{});
   const totalInBase=btEnabled.reduce((t,s)=>t+toBase(s.shares*s.price,s.currency||base,base,fxRate),0);
   return<div style={{display:"flex",flexDirection:"column",gap:12,width:"100%"}}>
     <Card title="Notes & Plans" T={T}>
@@ -803,13 +802,8 @@ function AdditionalTab({plan, update, T, baseCurrency="USD", fxRate={}}) {
         {s.enabled&&s.shares>0&&s.price>0&&<div style={{fontSize:11,color:T.green,fontWeight:600,alignSelf:"end",paddingBottom:5,fontFamily:FONT_MONO}}>{fmt(s.shares*s.price)}</div>}
       </ItemRow>)}</div>
       {total>0&&<div style={{background:T.summaryBg,border:`1px solid ${T.gold}20`,borderRadius:10,padding:18,marginTop:10,textAlign:"center"}}>
-        <div style={{fontSize:10,color:T.textDim,fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:8,fontFamily:FONT_LABEL}}>Total Available</div>
-        <div style={{display:"flex",justifyContent:"center",gap:32,flexWrap:"wrap"}}>
-          {totalUSD>0&&<div><div style={{fontSize:9,color:T.textDim,fontFamily:FONT_LABEL,marginBottom:2}}>USD</div><div style={{fontFamily:FONT_DISPLAY,fontSize:26,fontWeight:700,color:T.gold}}>{fmt(totalUSD,"USD")}</div></div>}
-          {base==="CAD"&&totalUSD>0&&fxRate&&<div><div style={{fontSize:9,color:T.textDim,fontFamily:FONT_LABEL,marginBottom:2}}>CAD</div><div style={{fontFamily:FONT_DISPLAY,fontSize:26,fontWeight:700,color:T.gold}}>{fmt(totalUSD*fxRate,"CAD")}</div></div>}
-          {totalCAD>0&&<div><div style={{fontSize:9,color:T.textDim,fontFamily:FONT_LABEL,marginBottom:2}}>CAD</div><div style={{fontFamily:FONT_DISPLAY,fontSize:26,fontWeight:700,color:T.gold}}>{fmt(totalCAD,"CAD")}</div></div>}
-          {base==="USD"&&totalCAD>0&&fxRate&&<div><div style={{fontSize:9,color:T.textDim,fontFamily:FONT_LABEL,marginBottom:2}}>USD</div><div style={{fontFamily:FONT_DISPLAY,fontSize:26,fontWeight:700,color:T.gold}}>{fmt(totalCAD/fxRate,"USD")}</div></div>}
-        </div>
+        <div style={{fontSize:10,color:T.textDim,fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:4,fontFamily:FONT_LABEL}}>Total Available</div>
+        <div style={{fontFamily:FONT_DISPLAY,fontSize:26,fontWeight:700,color:T.gold}}>{fmt(totalInBase,base)}</div>
       </div>}
       <div style={{background:T.inputBg,border:`1px solid ${T.border}`,borderRadius:10,padding:"14px 18px",marginTop:10}}>
         <div style={{fontSize:11,fontWeight:700,color:T.accent,fontFamily:FONT_LABEL,marginBottom:6,textTransform:"uppercase",letterSpacing:0.5}}>What is being sold to fund big ticket items?</div>
