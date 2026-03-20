@@ -325,10 +325,10 @@ export default function RetirementPlanner() {
           </div>
           <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
             <SaveDot status={saveStatus} T={T}/>
-            <div style={{display:"flex",flexDirection:"column",alignItems:"center"}}>
-              <button onClick={()=>setShowCurrencyModal(true)} style={{padding:"4px 12px",background:`${T.accent}20`,color:T.accent,border:`1px solid ${T.accent}50`,borderRadius:6,fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:FONT_LABEL}}>{plan.params.baseCurrency||"USD"} ▾</button>
-              {fxRate&&<div style={{fontSize:9,color:T.textDim,fontFamily:FONT_MONO,marginTop:2}}>1 USD = {fxRate.toFixed(4)} CAD</div>}
-              {fxError&&<div style={{fontSize:9,color:T.red,fontFamily:FONT_MONO,marginTop:2}}>FX offline</div>}
+            <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
+              <button onClick={()=>setShowCurrencyModal(true)} style={{padding:"5px 12px",background:`${T.accent}20`,color:T.accent,border:`1px solid ${T.accent}50`,borderRadius:6,fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:FONT_LABEL,lineHeight:"1.2"}}>{plan.params.baseCurrency||"USD"} ▾</button>
+              {fxRate&&<div style={{fontSize:8,color:T.textDim,fontFamily:FONT_MONO,marginTop:1,whiteSpace:"nowrap"}}>1 USD = {fxRate.toFixed(4)} CAD</div>}
+              {fxError&&<div style={{fontSize:8,color:T.red,fontFamily:FONT_MONO,marginTop:1}}>FX offline</div>}
             </div>
             <SmBtn onClick={()=>setDarkMode(!darkMode)} label={darkMode?"\u2600\uFE0F Light":"\u{1F319} Dark"} T={T}/>
             <SmBtn onClick={importPlan} label={"\u{1F4C2} Import"} T={T}/>
@@ -802,11 +802,9 @@ function AdditionalTab({plan, update, T, baseCurrency="USD", fxRate=1}) {
       </ItemRow>)}</div>
       {total>0&&<div style={{background:T.summaryBg,border:`1px solid ${T.gold}20`,borderRadius:10,padding:18,marginTop:10,textAlign:"center"}}>
         <div style={{fontSize:10,color:T.textDim,fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:8,fontFamily:FONT_LABEL}}>Total Available</div>
-        <div style={{display:"flex",justifyContent:"center",gap:32,flexWrap:"wrap"}}>
-          {totalUSD>0&&<div><div style={{fontSize:9,color:T.textDim,fontFamily:FONT_LABEL,marginBottom:2}}>USD</div><div style={{fontFamily:FONT_DISPLAY,fontSize:26,fontWeight:700,color:T.gold}}>{fmt(totalUSD,"USD")}</div></div>}
-          {base==="CAD"&&totalUSD>0&&fxRate&&<div><div style={{fontSize:9,color:T.textDim,fontFamily:FONT_LABEL,marginBottom:2}}>CAD</div><div style={{fontFamily:FONT_DISPLAY,fontSize:26,fontWeight:700,color:T.gold}}>{fmt(totalUSD*fxRate,"CAD")}</div></div>}
-          {totalCAD>0&&<div><div style={{fontSize:9,color:T.textDim,fontFamily:FONT_LABEL,marginBottom:2}}>CAD</div><div style={{fontFamily:FONT_DISPLAY,fontSize:26,fontWeight:700,color:T.gold}}>{fmt(totalCAD,"CAD")}</div></div>}
-          {base==="USD"&&totalCAD>0&&fxRate&&<div><div style={{fontSize:9,color:T.textDim,fontFamily:FONT_LABEL,marginBottom:2}}>USD</div><div style={{fontFamily:FONT_DISPLAY,fontSize:26,fontWeight:700,color:T.gold}}>{fmt(totalCAD/fxRate,"USD")}</div></div>}
+        <div style={{display:"flex",justifyContent:"center",gap:24,flexWrap:"wrap"}}>
+          {totalUSD>0&&<div><div style={{fontSize:9,color:T.textDim,fontFamily:FONT_LABEL,marginBottom:2}}>USD</div><div style={{fontFamily:FONT_DISPLAY,fontSize:22,fontWeight:700,color:T.gold}}>{fmt(totalUSD,"USD")}</div></div>}
+          {totalCAD>0&&<div><div style={{fontSize:9,color:T.textDim,fontFamily:FONT_LABEL,marginBottom:2}}>CAD</div><div style={{fontFamily:FONT_DISPLAY,fontSize:22,fontWeight:700,color:T.cyan}}>{fmt(totalCAD,"CAD")}</div></div>}
         </div>
       </div>}
       <div style={{background:T.inputBg,border:`1px solid ${T.border}`,borderRadius:10,padding:"14px 18px",marginTop:10}}>
