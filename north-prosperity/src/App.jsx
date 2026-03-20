@@ -295,7 +295,6 @@ export default function RetirementPlanner() {
         input:focus,select:focus{outline:none;border-color:${T.accent}!important;}
         .np-outer{max-width:${CONTENT_MAX}px;width:100%;margin:0 auto;display:flex;flex-direction:column;}
         .np-outer>*{width:100%!important;max-width:100%!important;min-width:0!important;}
-        .ccy-info-wrap:hover .ccy-tooltip{opacity:1!important;}
         .np-disclaimer{position:fixed;bottom:0;left:0;right:0;z-index:9999;background:#0d0d1f;border-top:1px solid #2a2a4a;padding:8px 12px;}
         .np-disclaimer-text{font-family:'JetBrains Mono','SF Mono',monospace;font-size:10px;color:#555577;line-height:1.5;display:block;}
       `}</style>
@@ -395,7 +394,7 @@ function PlanningTab({plan, update, T, baseCurrency="USD", fxRate=null, fxError=
   const applyInvPreset = (i,key)=>{const pr=CAGR_PRESETS[key];update(d=>{d.investmentIncome[i].cagr=pr.cagr;d.investmentIncome[i].cagrDecline1=pr.d1;d.investmentIncome[i].cagrDecline2=pr.d2;d.investmentIncome[i].cagrDecline3=pr.d3;return d;});setShowInvPresets(null);};
   return <div style={{display:"flex",flexDirection:"column",gap:12,width:"100%"}}>
     <Card title="Planning Parameters" T={T}>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(120px,1fr))",gap:10}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(170px,1fr))",gap:10}}>
         <Field label="Person / Couple" value={p.personName} onChange={v=>up("personName",v)} T={T}/>
         <Field label="Age at Start" value={p.ageAtStart} type="number" onChange={v=>up("ageAtStart",+v||60)} T={T}/>
         <Field label="Inflation %" value={p.inflationRate} type="number" step="0.5" onChange={v=>up("inflationRate",+v||0)} T={T}/>
@@ -416,8 +415,8 @@ function PlanningTab({plan, update, T, baseCurrency="USD", fxRate=null, fxError=
       {plan.fixedIncome.map((s,i)=><ItemRow key={s.id} enabled={s.enabled} T={T} onToggle={()=>update(d=>{d.fixedIncome[i].enabled=!d.fixedIncome[i].enabled;return d;})} onRemove={()=>update(d=>{d.fixedIncome.splice(i,1);return d;})}>
         <MF label="Name" value={s.name} w="1.5fr" onChange={v=>update(d=>{d.fixedIncome[i].name=v;return d;})} T={T}/>
         <MF label="Annual $" value={s.amount} type="number" w="1fr" onChange={v=>update(d=>{d.fixedIncome[i].amount=+v||0;return d;})} T={T}/>
-        <MF label="Start Year" value={s.startYear} type="number" w="0.35fr" onChange={v=>update(d=>{d.fixedIncome[i].startYear=+v||2030;return d;})} T={T}/>
-        <MF label="Index%" value={s.indexing} type="number" step="0.5" w="0.35fr" onChange={v=>update(d=>{d.fixedIncome[i].indexing=+v||0;return d;})} T={T}/>
+        <MF label="Start Year" value={s.startYear} type="number" w="0.52fr" onChange={v=>update(d=>{d.fixedIncome[i].startYear=+v||2030;return d;})} T={T}/>
+        <MF label="Index%" value={s.indexing} type="number" step="0.5" w="0.38fr" onChange={v=>update(d=>{d.fixedIncome[i].indexing=+v||0;return d;})} T={T}/>
         <CurrencyTag currency={s.currency||baseCurrency} base={baseCurrency} onChange={v=>update(d=>{d.fixedIncome[i].currency=v;return d;})} T={T}/>
       </ItemRow>)}
     </Card>
@@ -428,13 +427,13 @@ function PlanningTab({plan, update, T, baseCurrency="USD", fxRate=null, fxError=
       {plan.investmentIncome.map((s,i)=><div key={s.id}>
         <ItemRow enabled={s.enabled} T={T} onToggle={()=>update(d=>{d.investmentIncome[i].enabled=!d.investmentIncome[i].enabled;return d;})} onRemove={()=>update(d=>{d.investmentIncome.splice(i,1);return d;})}>
           <MF label="Name" value={s.name} w="1.2fr" onChange={v=>update(d=>{d.investmentIncome[i].name=v;return d;})} T={T}/>
-          <MF label="Shares" value={s.shares} type="number" w="0.35fr" onChange={v=>update(d=>{d.investmentIncome[i].shares=+v||0;return d;})} T={T}/>
+          <MF label="Shares" value={s.shares} type="number" w="0.34fr" onChange={v=>update(d=>{d.investmentIncome[i].shares=+v||0;return d;})} T={T}/>
           <MF label="Price" value={s.pricePerShare} type="number" w="0.7fr" onChange={v=>update(d=>{d.investmentIncome[i].pricePerShare=+v||0;return d;})} T={T}/>
-          <MF label="CAGR%" value={s.cagr} type="number" step="0.5" w="0.35fr" onChange={v=>update(d=>{d.investmentIncome[i].cagr=+v||0;return d;})} T={T}/>
-          <MF label="Yr 1-5 ↓%" value={s.cagrDecline1!==undefined?s.cagrDecline1:(s.cagrDecline||0.3)} type="number" step="0.1" w="0.35fr" onChange={v=>update(d=>{d.investmentIncome[i].cagrDecline1=+v||0;return d;})} T={T}/>
-          <MF label="Yr 6-20 ↓%" value={s.cagrDecline2!==undefined?s.cagrDecline2:((s.cagrDecline||0.3)*0.6)} type="number" step="0.1" w="0.35fr" onChange={v=>update(d=>{d.investmentIncome[i].cagrDecline2=+v||0;return d;})} T={T}/>
-          <MF label="Yr 21+ ↓%" value={s.cagrDecline3!==undefined?s.cagrDecline3:((s.cagrDecline||0.3)*0.3)} type="number" step="0.1" w="0.35fr" onChange={v=>update(d=>{d.investmentIncome[i].cagrDecline3=+v||0;return d;})} T={T}/>
-          <MF label="Div%" value={s.dividendPercent} type="number" step="0.5" w="0.35fr" onChange={v=>update(d=>{d.investmentIncome[i].dividendPercent=+v||0;return d;})} T={T}/>
+          <MF label="CAGR%" value={s.cagr} type="number" step="0.5" w="0.34fr" onChange={v=>update(d=>{d.investmentIncome[i].cagr=+v||0;return d;})} T={T}/>
+          <MF label="Yr 1-5 ↓%" value={s.cagrDecline1!==undefined?s.cagrDecline1:(s.cagrDecline||0.3)} type="number" step="0.1" w="0.3fr" onChange={v=>update(d=>{d.investmentIncome[i].cagrDecline1=+v||0;return d;})} T={T}/>
+          <MF label="Yr 6-20 ↓%" value={s.cagrDecline2!==undefined?s.cagrDecline2:((s.cagrDecline||0.3)*0.6)} type="number" step="0.1" w="0.3fr" onChange={v=>update(d=>{d.investmentIncome[i].cagrDecline2=+v||0;return d;})} T={T}/>
+          <MF label="Yr 21+ ↓%" value={s.cagrDecline3!==undefined?s.cagrDecline3:((s.cagrDecline||0.3)*0.3)} type="number" step="0.1" w="0.3fr" onChange={v=>update(d=>{d.investmentIncome[i].cagrDecline3=+v||0;return d;})} T={T}/>
+          <MF label="Div%" value={s.dividendPercent} type="number" step="0.5" w="0.34fr" onChange={v=>update(d=>{d.investmentIncome[i].dividendPercent=+v||0;return d;})} T={T}/>
           <CurrencyTag currency={s.currency||baseCurrency} base={baseCurrency} onChange={v=>update(d=>{d.investmentIncome[i].currency=v;return d;})} T={T}/>
           <Chk label="Div" checked={s.includeDividend} onChange={()=>update(d=>{d.investmentIncome[i].includeDividend=!d.investmentIncome[i].includeDividend;return d;})} T={T}/>
           <Chk label="Amort/Sell" checked={s.autoCalc} onChange={()=>update(d=>{d.investmentIncome[i].autoCalc=!d.investmentIncome[i].autoCalc;return d;})} T={T}/>
@@ -457,10 +456,10 @@ function PlanningTab({plan, update, T, baseCurrency="USD", fxRate=null, fxError=
       <Hint T={T}>Business income, rental properties, royalties. Appreciate in value + optional annual income.</Hint>
       {plan.otherIncome.map((s,i)=><ItemRow key={s.id} enabled={s.enabled} T={T} onToggle={()=>update(d=>{d.otherIncome[i].enabled=!d.otherIncome[i].enabled;return d;})} onRemove={()=>update(d=>{d.otherIncome.splice(i,1);return d;})}>
         <MF label="Name" value={s.name} w="1.2fr" onChange={v=>update(d=>{d.otherIncome[i].name=v;return d;})} T={T}/>
-        <MF label="Units" value={s.shares} type="number" w="0.35fr" onChange={v=>update(d=>{d.otherIncome[i].shares=+v||0;return d;})} T={T}/>
+        <MF label="Units" value={s.shares} type="number" w="0.38fr" onChange={v=>update(d=>{d.otherIncome[i].shares=+v||0;return d;})} T={T}/>
         <MF label="Price" value={s.pricePerShare} type="number" w="0.7fr" onChange={v=>update(d=>{d.otherIncome[i].pricePerShare=+v||0;return d;})} T={T}/>
-        <MF label="CAGR%" value={s.cagr} type="number" step="0.5" w="0.35fr" onChange={v=>update(d=>{d.otherIncome[i].cagr=+v||0;return d;})} T={T}/>
-        <MF label="Decl%" value={s.cagrDecline} type="number" step="0.1" w="0.35fr" onChange={v=>update(d=>{d.otherIncome[i].cagrDecline=+v||0;return d;})} T={T}/>
+        <MF label="CAGR%" value={s.cagr} type="number" step="0.5" w="0.34fr" onChange={v=>update(d=>{d.otherIncome[i].cagr=+v||0;return d;})} T={T}/>
+        <MF label="Decl%" value={s.cagrDecline} type="number" step="0.1" w="0.34fr" onChange={v=>update(d=>{d.otherIncome[i].cagrDecline=+v||0;return d;})} T={T}/>
         <MF label="Annual$" value={s.annualIncome} type="number" w="0.7fr" onChange={v=>update(d=>{d.otherIncome[i].annualIncome=+v||0;return d;})} T={T}/>
         <CurrencyTag currency={s.currency||baseCurrency} base={baseCurrency} onChange={v=>update(d=>{d.otherIncome[i].currency=v;return d;})} T={T}/>
         <Chk label="Inc" checked={s.includeIncome} onChange={()=>update(d=>{d.otherIncome[i].includeIncome=!d.otherIncome[i].includeIncome;return d;})} T={T}/>
@@ -483,13 +482,13 @@ function DivestTab({plan, update, T, baseCurrency="USD"}) {
       {plan.divestAssets.map((a,i)=><div key={a.id}>
         <ItemRow enabled={a.enabled} T={T} onToggle={()=>update(d=>{d.divestAssets[i].enabled=!d.divestAssets[i].enabled;return d;})} onRemove={()=>update(d=>{d.divestAssets.splice(i,1);return d;})}>
           <MF label="Ticker" value={a.name} w="1fr" onChange={v=>update(d=>{d.divestAssets[i].name=v;return d;})} T={T}/>
-          <MF label="Shares" value={a.shares} type="number" w="0.35fr" onChange={v=>update(d=>{d.divestAssets[i].shares=+v||0;return d;})} T={T}/>
+          <MF label="Shares" value={a.shares} type="number" w="0.34fr" onChange={v=>update(d=>{d.divestAssets[i].shares=+v||0;return d;})} T={T}/>
           <MF label="Price" value={a.pricePerShare} type="number" w="0.7fr" onChange={v=>update(d=>{d.divestAssets[i].pricePerShare=+v||0;return d;})} T={T}/>
-          <MF label="CAGR%" value={a.cagr} type="number" step="1" w="0.35fr" onChange={v=>update(d=>{d.divestAssets[i].cagr=+v||0;return d;})} T={T}/>
-          <MF label="Yr 1-5 ↓%" value={a.cagrDecline1} type="number" step="0.1" w="0.35fr" onChange={v=>update(d=>{d.divestAssets[i].cagrDecline1=+v||0;return d;})} T={T}/>
-          <MF label="Yr 6-20 ↓%" value={a.cagrDecline2} type="number" step="0.1" w="0.35fr" onChange={v=>update(d=>{d.divestAssets[i].cagrDecline2=+v||0;return d;})} T={T}/>
-          <MF label="Yr 21+ ↓%" value={a.cagrDecline3} type="number" step="0.1" w="0.35fr" onChange={v=>update(d=>{d.divestAssets[i].cagrDecline3=+v||0;return d;})} T={T}/>
-          <MF label="Div%" value={a.dividendPercent||0} type="number" step="0.5" w="0.35fr" onChange={v=>update(d=>{d.divestAssets[i].dividendPercent=+v||0;return d;})} T={T}/>
+          <MF label="CAGR%" value={a.cagr} type="number" step="1" w="0.34fr" onChange={v=>update(d=>{d.divestAssets[i].cagr=+v||0;return d;})} T={T}/>
+          <MF label="Yr 1-5 ↓%" value={a.cagrDecline1} type="number" step="0.1" w="0.3fr" onChange={v=>update(d=>{d.divestAssets[i].cagrDecline1=+v||0;return d;})} T={T}/>
+          <MF label="Yr 6-20 ↓%" value={a.cagrDecline2} type="number" step="0.1" w="0.3fr" onChange={v=>update(d=>{d.divestAssets[i].cagrDecline2=+v||0;return d;})} T={T}/>
+          <MF label="Yr 21+ ↓%" value={a.cagrDecline3} type="number" step="0.1" w="0.3fr" onChange={v=>update(d=>{d.divestAssets[i].cagrDecline3=+v||0;return d;})} T={T}/>
+          <MF label="Div%" value={a.dividendPercent||0} type="number" step="0.5" w="0.34fr" onChange={v=>update(d=>{d.divestAssets[i].dividendPercent=+v||0;return d;})} T={T}/>
           <CurrencyTag currency={a.currency||baseCurrency} base={baseCurrency} onChange={v=>update(d=>{d.divestAssets[i].currency=v;return d;})} T={T}/>
           <Chk label="Div" checked={!!a.includeDividend} onChange={()=>update(d=>{d.divestAssets[i].includeDividend=!d.divestAssets[i].includeDividend;return d;})} T={T}/>
           <Chk label="Amort/Sell" checked={a.autoCalc} onChange={()=>update(d=>{d.divestAssets[i].autoCalc=!d.divestAssets[i].autoCalc;return d;})} T={T}/>
@@ -591,12 +590,12 @@ function FixedAssetsTab({plan, update, T, baseCurrency="USD"}) {
       {plan.fixedAssets.map((a,i)=><div key={a.id}>
         <ItemRow enabled={a.enabled} T={T} onToggle={()=>update(d=>{d.fixedAssets[i].enabled=!d.fixedAssets[i].enabled;return d;})} onRemove={()=>update(d=>{d.fixedAssets.splice(i,1);return d;})}>
           <MF label="Name" value={a.name} w="1.5fr" onChange={v=>update(d=>{d.fixedAssets[i].name=v;return d;})} T={T}/>
-          <MF label="Units" value={a.shares} type="number" w="0.35fr" onChange={v=>update(d=>{d.fixedAssets[i].shares=+v||0;return d;})} T={T}/>
+          <MF label="Units" value={a.shares} type="number" w="0.38fr" onChange={v=>update(d=>{d.fixedAssets[i].shares=+v||0;return d;})} T={T}/>
           <MF label="Price" value={a.pricePerShare} type="number" w="1fr" onChange={v=>update(d=>{d.fixedAssets[i].pricePerShare=+v||0;return d;})} T={T}/>
-          <MF label="CAGR%" value={a.cagr} type="number" step="0.5" w="0.35fr" onChange={v=>update(d=>{d.fixedAssets[i].cagr=+v||0;return d;})} T={T}/>
-          <MF label="Yr 1-5 ↓%" value={a.cagrDecline1!==undefined?a.cagrDecline1:(a.cagrDecline||0.1)} type="number" step="0.1" w="0.35fr" onChange={v=>update(d=>{d.fixedAssets[i].cagrDecline1=+v||0;return d;})} T={T}/>
-          <MF label="Yr 6-20 ↓%" value={a.cagrDecline2!==undefined?a.cagrDecline2:((a.cagrDecline||0.1)*0.5)} type="number" step="0.1" w="0.35fr" onChange={v=>update(d=>{d.fixedAssets[i].cagrDecline2=+v||0;return d;})} T={T}/>
-          <MF label="Yr 21+ ↓%" value={a.cagrDecline3!==undefined?a.cagrDecline3:((a.cagrDecline||0.1)*0.2)} type="number" step="0.1" w="0.35fr" onChange={v=>update(d=>{d.fixedAssets[i].cagrDecline3=+v||0;return d;})} T={T}/>
+          <MF label="CAGR%" value={a.cagr} type="number" step="0.5" w="0.34fr" onChange={v=>update(d=>{d.fixedAssets[i].cagr=+v||0;return d;})} T={T}/>
+          <MF label="Yr 1-5 ↓%" value={a.cagrDecline1!==undefined?a.cagrDecline1:(a.cagrDecline||0.1)} type="number" step="0.1" w="0.3fr" onChange={v=>update(d=>{d.fixedAssets[i].cagrDecline1=+v||0;return d;})} T={T}/>
+          <MF label="Yr 6-20 ↓%" value={a.cagrDecline2!==undefined?a.cagrDecline2:((a.cagrDecline||0.1)*0.5)} type="number" step="0.1" w="0.3fr" onChange={v=>update(d=>{d.fixedAssets[i].cagrDecline2=+v||0;return d;})} T={T}/>
+          <MF label="Yr 21+ ↓%" value={a.cagrDecline3!==undefined?a.cagrDecline3:((a.cagrDecline||0.1)*0.2)} type="number" step="0.1" w="0.3fr" onChange={v=>update(d=>{d.fixedAssets[i].cagrDecline3=+v||0;return d;})} T={T}/>
           <CurrencyTag currency={a.currency||baseCurrency} base={baseCurrency} onChange={v=>update(d=>{d.fixedAssets[i].currency=v;return d;})} T={T}/>
           {a.enabled&&a.pricePerShare>0&&<div style={{fontSize:11,color:T.green,fontWeight:600,whiteSpace:"nowrap",alignSelf:"end",paddingBottom:5,fontFamily:FONT_MONO}}>{fmt(a.shares*a.pricePerShare)}</div>}
           <div style={{display:"flex",flexDirection:"column",gap:2,alignSelf:"end",paddingBottom:4}}>
@@ -796,7 +795,7 @@ function AdditionalTab({plan, update, T, baseCurrency="USD", fxRate={}}) {
       <Field label="Saving for?" value={plan.bigTicketItem||""} onChange={v=>update(d=>{d.bigTicketItem=v;return d;})} T={T} placeholder="e.g., House down payment"/>
       <div style={{marginTop:10}}>{plan.bigTicketStocks.map((s,i)=><ItemRow key={s.id} enabled={s.enabled} T={T} onToggle={()=>update(d=>{d.bigTicketStocks[i].enabled=!d.bigTicketStocks[i].enabled;return d;})} onRemove={()=>update(d=>{d.bigTicketStocks.splice(i,1);return d;})}>
         <MF label="Ticker" value={s.ticker} w="1fr" onChange={v=>update(d=>{d.bigTicketStocks[i].ticker=v;return d;})} T={T}/>
-        <MF label="Shares" value={s.shares} type="number" w="0.35fr" onChange={v=>update(d=>{d.bigTicketStocks[i].shares=+v||0;return d;})} T={T}/>
+        <MF label="Shares" value={s.shares} type="number" w="0.52fr" onChange={v=>update(d=>{d.bigTicketStocks[i].shares=+v||0;return d;})} T={T}/>
         <MF label="Price" value={s.price} type="number" w="0.7fr" onChange={v=>update(d=>{d.bigTicketStocks[i].price=+v||0;return d;})} T={T}/>
         <CurrencyTag currency={s.currency||baseCurrency} base={baseCurrency} onChange={v=>update(d=>{d.bigTicketStocks[i].currency=v;return d;})} T={T}/>
         <YahooLink ticker={s.ticker} T={T}/>
@@ -853,13 +852,7 @@ function CurrencyTag({currency,onChange,base,T}){
   const isForeign=cur!==base;
   return<div style={{display:"flex",flexDirection:"column",alignItems:"center",minWidth:54}}>
     <label style={{fontSize:9,color:T.label,fontWeight:600,letterSpacing:0.3,marginBottom:2,fontFamily:FONT_LABEL,display:"flex",alignItems:"center",gap:2}}>
-      CCY
-      <div style={{position:"relative",display:"inline-block"}} className="ccy-info-wrap">
-        <span style={{cursor:"help",color:T.accent,fontSize:9}}>ⓘ</span>
-        <div style={{position:"absolute",bottom:"120%",left:"50%",transform:"translateX(-50%)",background:T.card,border:`1px solid ${T.border2}`,borderRadius:8,padding:"8px 10px",width:160,fontSize:10,color:T.textMid,fontFamily:FONT_LABEL,lineHeight:1.5,zIndex:200,pointerEvents:"none",opacity:0,transition:"opacity 0.15s",boxShadow:"0 4px 12px rgba(0,0,0,0.3)"}} className="ccy-tooltip">
-          Select the currency this asset is priced in. If different from your base, values convert automatically at the live rate.
-        </div>
-      </div>
+      CCY<span title="Select the currency this asset is priced in. If different from your base currency, values will be converted automatically using the live exchange rate." style={{cursor:"help",color:T.accent,fontSize:9}}>ⓘ</span>
     </label>
     <select value={cur} onChange={e=>onChange(e.target.value)} style={{
       padding:"2px 4px",fontSize:9,fontWeight:600,
