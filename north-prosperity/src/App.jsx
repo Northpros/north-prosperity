@@ -856,21 +856,17 @@ function CurrencyTag({currency,onChange,base,T}){
   const cur=currency||base;
   const isForeign=cur!==base;
   const [tip,setTip]=React.useState(false);
+  const [pos,setPos]=React.useState({top:0,left:0});
+  const show=(e)=>{const r=e.currentTarget.getBoundingClientRect();setPos({top:r.bottom+8,left:r.left+r.width/2});setTip(true);};
   return<div style={{display:"flex",flexDirection:"column",alignItems:"center",minWidth:54}}>
     <label style={{fontSize:9,color:T.label,fontWeight:600,letterSpacing:0.3,marginBottom:2,fontFamily:FONT_LABEL,display:"flex",alignItems:"center",gap:2}}>
       CCY
-      <div style={{position:"relative",display:"inline-block"}}>
-        <span
-          onMouseEnter={()=>setTip(true)}
-          onMouseLeave={()=>setTip(false)}
-          onTouchStart={e=>{e.preventDefault();setTip(t=>!t);}}
-          onClick={()=>setTip(t=>!t)}
-          style={{cursor:"pointer",color:"#fff",background:T.accent,borderRadius:"50%",width:12,height:12,fontSize:8,fontWeight:700,display:"inline-flex",alignItems:"center",justifyContent:"center",userSelect:"none",flexShrink:0}}>?</span>
-        {tip&&<div style={{position:"absolute",bottom:"120%",left:"50%",transform:"translateX(-50%)",background:T.card,border:`1px solid ${T.border2}`,borderRadius:8,padding:"8px 10px",width:160,fontSize:10,color:T.textMid,fontFamily:FONT_LABEL,lineHeight:1.5,zIndex:200,boxShadow:"0 4px 12px rgba(0,0,0,0.3)",whiteSpace:"normal"}}>
-          Select the currency this asset is priced in. If different from your base, values convert automatically at the live rate.
-        </div>}
-      </div>
+      <span onMouseEnter={show} onMouseLeave={()=>setTip(false)} onTouchStart={e=>{e.preventDefault();show(e);}} onClick={show}
+        style={{cursor:"pointer",color:"#fff",background:T.accent,borderRadius:"50%",width:13,height:13,fontSize:8,fontWeight:700,display:"inline-flex",alignItems:"center",justifyContent:"center",userSelect:"none",flexShrink:0,marginLeft:2}}>?</span>
     </label>
+    {tip&&ReactDOM.createPortal(<div onMouseLeave={()=>setTip(false)} style={{position:"fixed",top:pos.top,left:pos.left,transform:"translateX(-50%)",background:T.card,border:`1px solid ${T.accent}`,borderRadius:8,padding:"10px 12px",width:190,fontSize:11,color:T.text,fontFamily:FONT_LABEL,lineHeight:1.6,zIndex:99999,boxShadow:"0 6px 24px rgba(0,0,0,0.5)"}}>
+      Select the currency this asset is priced in. If different from your base currency, values convert automatically using the live rate.
+    </div>,document.body)}
     <select value={cur} onChange={e=>onChange(e.target.value)} style={{
       padding:"2px 4px",fontSize:9,fontWeight:600,
       background:isForeign?`${T.accent}18`:T.inputBg,
