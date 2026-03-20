@@ -442,7 +442,7 @@ function PlanningTab({plan, update, T, baseCurrency="USD", fxRate=null, fxError=
             <button onClick={()=>setShowInvPresets(showInvPresets===i?null:i)} style={{fontSize:9,color:T.accent,background:"none",border:"none",cursor:"pointer",fontFamily:FONT_LABEL}}>CAGR % Preset</button>
           </div>
         </ItemRow>
-        {s.enabled&&s.shares>0&&s.pricePerShare>0&&<div style={{textAlign:"right",fontSize:11,color:T.green,fontWeight:600,fontFamily:FONT_MONO,paddingRight:10,marginTop:-2,marginBottom:4}}>{fmt(s.shares*s.pricePerShare)}</div>}
+        {s.enabled&&s.shares>0&&s.pricePerShare>0&&<div style={{textAlign:"right",fontSize:11,color:T.gold,fontWeight:600,fontFamily:FONT_MONO,paddingRight:10,marginTop:-2,marginBottom:4}}>{fmt(s.shares*s.pricePerShare)}</div>}
         {showInvPresets===i&&<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(170px,1fr))",gap:6,padding:"6px 28px 10px",background:T.bg,borderRadius:8,margin:"-2px 0 6px"}}>
           {Object.entries(CAGR_PRESETS).map(([k,pr])=><button key={k} onClick={()=>applyInvPreset(i,k)} style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:8,padding:"8px 10px",cursor:"pointer",textAlign:"left"}}>
             <div style={{fontSize:11,fontWeight:600,color:T.text,fontFamily:FONT_LABEL}}>{pr.label}</div>
@@ -455,7 +455,7 @@ function PlanningTab({plan, update, T, baseCurrency="USD", fxRate=null, fxError=
     <Card title="Other Sources of Income" badge="Business, Rental" T={T}
       action={plan.otherIncome.length<10?()=>update(d=>{d.otherIncome.push({id:mkId(),name:"New Source",note:"",shares:1,pricePerShare:0,cagr:3,cagrDecline:0.1,annualIncome:0,includeIncome:false,enabled:false});return d;}):null} actionLabel="+ Add">
       <Hint T={T}>Business income, rental properties, royalties. Appreciate in value + optional annual income.</Hint>
-      {plan.otherIncome.map((s,i)=><ItemRow key={s.id} enabled={s.enabled} T={T} onToggle={()=>update(d=>{d.otherIncome[i].enabled=!d.otherIncome[i].enabled;return d;})} onRemove={()=>update(d=>{d.otherIncome.splice(i,1);return d;})}>
+      {plan.otherIncome.map((s,i)=><React.Fragment key={s.id}><ItemRow enabled={s.enabled} T={T} onToggle={()=>update(d=>{d.otherIncome[i].enabled=!d.otherIncome[i].enabled;return d;})} onRemove={()=>update(d=>{d.otherIncome.splice(i,1);return d;})}>
         <MF label="Name" value={s.name} w="0.9fr" onChange={v=>update(d=>{d.otherIncome[i].name=v;return d;})} T={T}/>
         <MF label="Units" value={s.shares} type="number" w="0.38fr" onChange={v=>update(d=>{d.otherIncome[i].shares=+v||0;return d;})} T={T}/>
         <MF label="Price" value={s.pricePerShare} type="number" w="0.38fr" onChange={v=>update(d=>{d.otherIncome[i].pricePerShare=+v||0;return d;})} T={T}/>
@@ -464,7 +464,9 @@ function PlanningTab({plan, update, T, baseCurrency="USD", fxRate=null, fxError=
         <MF label="Annual$" value={s.annualIncome} type="number" w="0.38fr" onChange={v=>update(d=>{d.otherIncome[i].annualIncome=+v||0;return d;})} T={T}/>
         <CurrencyTag currency={s.currency||baseCurrency} base={baseCurrency} onChange={v=>update(d=>{d.otherIncome[i].currency=v;return d;})} T={T}/>
         <Chk label="Inc" checked={s.includeIncome} onChange={()=>update(d=>{d.otherIncome[i].includeIncome=!d.otherIncome[i].includeIncome;return d;})} T={T}/>
-      </ItemRow>)}
+      </ItemRow>
+      {s.enabled&&s.shares>0&&s.pricePerShare>0&&<div style={{textAlign:"right",fontSize:11,color:T.gold,fontWeight:600,fontFamily:FONT_MONO,paddingRight:10,marginTop:-2,marginBottom:4}}>{fmt(s.shares*s.pricePerShare)}</div>}
+      </React.Fragment>)}
     </Card>
     <CagrExamplesBox T={T}/>
   </div>;
@@ -602,7 +604,7 @@ function FixedAssetsTab({plan, update, T, baseCurrency="USD"}) {
             <button onClick={()=>setShowPresets(showPresets===i?null:i)} style={{fontSize:9,color:T.accent,background:"none",border:"none",cursor:"pointer",fontFamily:FONT_LABEL}}>CAGR % Preset</button>
           </div>
         </ItemRow>
-        {a.enabled&&a.pricePerShare>0&&<div style={{textAlign:"right",fontSize:11,color:T.green,fontWeight:600,fontFamily:FONT_MONO,paddingRight:10,marginTop:-2,marginBottom:4}}>{fmt(a.shares*a.pricePerShare)}</div>}
+        {a.enabled&&a.pricePerShare>0&&<div style={{textAlign:"right",fontSize:11,color:T.gold,fontWeight:600,fontFamily:FONT_MONO,paddingRight:10,marginTop:-2,marginBottom:4}}>{fmt(a.shares*a.pricePerShare)}</div>}
         {showPresets===i&&<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(170px,1fr))",gap:6,padding:"6px 28px 10px",background:T.bg,borderRadius:8,margin:"-2px 0 6px"}}>
           {Object.entries(CAGR_PRESETS).map(([k,p])=><button key={k} onClick={()=>applyPreset(i,k)} style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:8,padding:"8px 10px",cursor:"pointer",textAlign:"left"}}>
             <div style={{fontSize:11,fontWeight:600,color:T.text,fontFamily:FONT_LABEL}}>{p.label}</div>
@@ -803,7 +805,7 @@ function AdditionalTab({plan, update, T, baseCurrency="USD", fxRate={}}) {
         <CurrencyTag currency={s.currency||baseCurrency} base={baseCurrency} onChange={v=>update(d=>{d.bigTicketStocks[i].currency=v;return d;})} T={T}/>
         <YahooLink ticker={s.ticker} T={T}/>
       </ItemRow>
-      {s.enabled&&s.shares>0&&s.price>0&&<div style={{textAlign:"right",fontSize:11,color:T.green,fontWeight:600,fontFamily:FONT_MONO,paddingRight:10,marginTop:-2,marginBottom:4}}>{fmt(s.shares*s.price)}</div>}
+      {s.enabled&&s.shares>0&&s.price>0&&<div style={{textAlign:"right",fontSize:11,color:T.gold,fontWeight:600,fontFamily:FONT_MONO,paddingRight:10,marginTop:-2,marginBottom:4}}>{fmt(s.shares*s.price)}</div>}
       </React.Fragment>)}</div>
       {total>0&&<div style={{background:T.summaryBg,border:`1px solid ${T.gold}20`,borderRadius:10,padding:18,marginTop:10,textAlign:"center"}}>
         <div style={{fontSize:10,color:T.textDim,fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:4,fontFamily:FONT_LABEL}}>Total Available</div>
