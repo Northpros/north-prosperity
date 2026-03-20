@@ -370,7 +370,7 @@ export default function RetirementPlanner() {
         </div>
 
         {/* CONTENT */}
-        <div style={{width:"100%",overflow:"hidden"}}>
+        <div style={{width:"100%"}}>
         {tab==="planning" && <PlanningTab plan={plan} update={update} T={T} baseCurrency={plan.params.baseCurrency||"USD"} fxRate={fxRate} fxError={fxError}/>}
         {tab==="divest" && <DivestTab plan={plan} update={update} T={T} baseCurrency={plan.params.baseCurrency||"USD"}/>}
         {tab==="fixed" && <FixedAssetsTab plan={plan} update={update} T={T} baseCurrency={plan.params.baseCurrency||"USD"}/>}
@@ -855,9 +855,20 @@ function SumCard({label,value,color,T}){return<div style={{background:T.card,bor
 function CurrencyTag({currency,onChange,base,T}){
   const cur=currency||base;
   const isForeign=cur!==base;
+  const [tip,setTip]=React.useState(false);
   return<div style={{display:"flex",flexDirection:"column",alignItems:"center",minWidth:54}}>
     <label style={{fontSize:9,color:T.label,fontWeight:600,letterSpacing:0.3,marginBottom:2,fontFamily:FONT_LABEL,display:"flex",alignItems:"center",gap:2}}>
-      CCY<span title="Select the currency this asset is priced in. If different from your base currency, values convert automatically using the live rate." style={{cursor:"help",color:T.accent,fontSize:9}}>ⓘ</span>
+      CCY
+      <div style={{position:"relative",display:"inline-block"}}>
+        <span
+          onMouseEnter={()=>setTip(true)}
+          onMouseLeave={()=>setTip(false)}
+          onTouchStart={e=>{e.preventDefault();setTip(t=>!t);}}
+          style={{cursor:"help",color:T.accent,fontSize:9,userSelect:"none"}}>ⓘ</span>
+        {tip&&<div style={{position:"absolute",bottom:"120%",left:"50%",transform:"translateX(-50%)",background:T.card,border:`1px solid ${T.border2}`,borderRadius:8,padding:"8px 10px",width:160,fontSize:10,color:T.textMid,fontFamily:FONT_LABEL,lineHeight:1.5,zIndex:200,boxShadow:"0 4px 12px rgba(0,0,0,0.3)",whiteSpace:"normal"}}>
+          Select the currency this asset is priced in. If different from your base, values convert automatically at the live rate.
+        </div>}
+      </div>
     </label>
     <select value={cur} onChange={e=>onChange(e.target.value)} style={{
       padding:"2px 4px",fontSize:9,fontWeight:600,
