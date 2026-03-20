@@ -442,6 +442,7 @@ function PlanningTab({plan, update, T, baseCurrency="USD", fxRate=null, fxError=
             <button onClick={()=>setShowInvPresets(showInvPresets===i?null:i)} style={{fontSize:9,color:T.accent,background:"none",border:"none",cursor:"pointer",fontFamily:FONT_LABEL}}>CAGR % Preset</button>
           </div>
         </ItemRow>
+        {s.enabled&&s.shares>0&&s.pricePerShare>0&&<div style={{textAlign:"right",fontSize:11,color:T.green,fontWeight:600,fontFamily:FONT_MONO,paddingRight:10,marginTop:-2,marginBottom:4}}>{fmt(s.shares*s.pricePerShare)}</div>}
         {showInvPresets===i&&<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(170px,1fr))",gap:6,padding:"6px 28px 10px",background:T.bg,borderRadius:8,margin:"-2px 0 6px"}}>
           {Object.entries(CAGR_PRESETS).map(([k,pr])=><button key={k} onClick={()=>applyInvPreset(i,k)} style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:8,padding:"8px 10px",cursor:"pointer",textAlign:"left"}}>
             <div style={{fontSize:11,fontWeight:600,color:T.text,fontFamily:FONT_LABEL}}>{pr.label}</div>
