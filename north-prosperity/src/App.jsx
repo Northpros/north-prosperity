@@ -426,7 +426,7 @@ function PlanningTab({plan, update, T, baseCurrency="USD", fxRate=null, fxError=
       <Hint T={T}>Tax-deferred accounts worldwide. Amort/Sell draws balance to $0 by end of term. Div pays dividends from remaining balance. Three-phase CAGR decline: Yr 1-5, Yr 6-20, Yr 21+</Hint>
       {plan.investmentIncome.map((s,i)=><div key={s.id}>
         <ItemRow enabled={s.enabled} T={T} onToggle={()=>update(d=>{d.investmentIncome[i].enabled=!d.investmentIncome[i].enabled;return d;})} onRemove={()=>update(d=>{d.investmentIncome.splice(i,1);return d;})}>
-          <MF label="Name" value={s.name} w="1.2fr" onChange={v=>update(d=>{d.investmentIncome[i].name=v;return d;})} T={T}/>
+          <MF label="Name" value={s.name} w="1.0fr" onChange={v=>update(d=>{d.investmentIncome[i].name=v;return d;})} T={T}/>
           <MF label="Shares" value={s.shares} type="number" w="0.34fr" onChange={v=>update(d=>{d.investmentIncome[i].shares=+v||0;return d;})} T={T}/>
           <MF label="Price" value={s.pricePerShare} type="number" w="0.38fr" onChange={v=>update(d=>{d.investmentIncome[i].pricePerShare=+v||0;return d;})} T={T}/>
           <MF label="CAGR%" value={s.cagr} type="number" step="0.5" w="0.34fr" onChange={v=>update(d=>{d.investmentIncome[i].cagr=+v||0;return d;})} T={T}/>
@@ -831,10 +831,10 @@ function Card({title,badge,children,action,actionLabel,T,noPad}){return<div styl
     {action&&<button onClick={action} style={{padding:"5px 12px",background:T.accent,color:"#fff",border:"none",borderRadius:6,fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:FONT_LABEL}}>{actionLabel}</button>}
   </div>}{children}</div>;}
 
-function ItemRow({children,enabled,onToggle,onRemove,T}){return<div style={{display:"flex",gap:6,alignItems:"flex-start",padding:"8px 10px",marginBottom:4,borderRadius:8,border:`1px solid ${enabled?T.accent+"20":T.border}`,background:enabled?T.inputBg+"80":"transparent",opacity:enabled?1:0.5,transition:"all 0.15s",flexWrap:"wrap"}}>
-  <button onClick={onToggle} style={{width:18,height:18,borderRadius:3,border:`2px solid ${enabled?T.green:T.border2}`,background:enabled?T.green:"transparent",color:"#fff",fontSize:11,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:16,padding:0}}>{enabled?"\u2713":""}</button>
+function ItemRow({children,enabled,onToggle,onRemove,T}){return<div style={{display:"flex",gap:6,alignItems:"center",padding:"8px 10px",marginBottom:4,borderRadius:8,border:`1px solid ${enabled?T.accent+"20":T.border}`,background:enabled?T.inputBg+"80":"transparent",opacity:enabled?1:0.5,transition:"all 0.15s",flexWrap:"nowrap",overflowX:"auto"}}>
+  <button onClick={onToggle} style={{width:18,height:18,borderRadius:3,border:`2px solid ${enabled?T.green:T.border2}`,background:enabled?T.green:"transparent",color:"#fff",fontSize:11,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,padding:0}}>{enabled?"\u2713":""}</button>
   <div style={{display:"flex",gap:6,flex:1,flexWrap:"nowrap",alignItems:"flex-start",overflowX:"auto"}}>{children}</div>
-  <button onClick={onRemove} style={{background:"none",border:"none",color:T.textDim,cursor:"pointer",fontSize:14,padding:2,marginTop:14,flexShrink:0}}>{"\u00D7"}</button></div>;}
+  <button onClick={onRemove} style={{background:"none",border:"none",color:T.textDim,cursor:"pointer",fontSize:14,padding:2,flexShrink:0}}>{"\u00D7"}</button></div>;}
 
 function Field({label,value,onChange,type="text",step,placeholder,T}){return<div><label style={{fontSize:10,color:T.label,fontWeight:600,textTransform:"uppercase",letterSpacing:0.5,display:"block",marginBottom:3,fontFamily:FONT_LABEL}}>{label}</label>
   <input type={type} value={value} step={step} placeholder={placeholder} onChange={e=>onChange(e.target.value)} onFocus={e=>e.target.select()} style={{width:"100%",padding:"7px 10px",background:T.inputBg,border:`1px solid ${T.border2}`,borderRadius:6,fontSize:13,color:T.text,fontFamily:FONT_LABEL}}/></div>;}
