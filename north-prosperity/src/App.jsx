@@ -840,8 +840,8 @@ function Field({label,value,onChange,type="text",step,placeholder,T}){return<div
   <input type={type} value={value} step={step} placeholder={placeholder} onChange={e=>onChange(e.target.value)} onFocus={e=>e.target.select()} style={{width:"100%",padding:"7px 10px",background:T.inputBg,border:`1px solid ${T.border2}`,borderRadius:6,fontSize:13,color:T.text,fontFamily:FONT_LABEL}}/></div>;}
 
 function MF({label,value,onChange,type="text",step,w="1fr",T}){
-  const pw={"1.2fr":155,"1.0fr":140,"1fr":140,"0.9fr":125,"0.8fr":110,"0.7fr":100,"0.6fr":90,"0.5fr":80,"0.38fr":72,"0.34fr":68,"0.3fr":62};
-  const px=pw[w]||140;
+  const pw={"1.2fr":185,"1.0fr":170,"1fr":170,"0.9fr":155,"0.8fr":140,"0.7fr":125,"0.6fr":112,"0.5fr":100,"0.38fr":90,"0.34fr":84,"0.3fr":78};
+  const px=pw[w]||170;
   return<div style={{width:px,minWidth:px,maxWidth:px,flexShrink:0,flexGrow:0}}><label style={{fontSize:9,color:T.label,fontWeight:600,textTransform:"uppercase",letterSpacing:0.3,display:"block",marginBottom:2,fontFamily:FONT_LABEL}}>{label}</label>
   <input type={type} value={value} step={step} onChange={e=>onChange(e.target.value)} onFocus={e=>e.target.select()} style={{width:"100%",padding:"4px 6px",background:T.inputBg,border:`1px solid ${T.border2}`,borderRadius:4,fontSize:12,color:T.text,fontFamily:FONT_LABEL,boxSizing:"border-box"}}/></div>;}
 
@@ -855,9 +855,20 @@ function SumCard({label,value,color,T}){return<div style={{background:T.card,bor
 function CurrencyTag({currency,onChange,base,T}){
   const cur=currency||base;
   const isForeign=cur!==base;
+  const [tip,setTip]=React.useState(false);
   return<div style={{display:"flex",flexDirection:"column",alignItems:"center",minWidth:54}}>
     <label style={{fontSize:9,color:T.label,fontWeight:600,letterSpacing:0.3,marginBottom:2,fontFamily:FONT_LABEL,display:"flex",alignItems:"center",gap:2}}>
-      CCY<span title="Select the currency this asset is priced in. If different from your base currency, values will be converted automatically using the live exchange rate." style={{cursor:"help",color:T.accent,fontSize:9}}>ⓘ</span>
+      CCY
+      <div style={{position:"relative",display:"inline-block"}}>
+        <span
+          onMouseEnter={()=>setTip(true)}
+          onMouseLeave={()=>setTip(false)}
+          onTouchStart={e=>{e.preventDefault();setTip(t=>!t);}}
+          style={{cursor:"help",color:T.accent,fontSize:9,userSelect:"none"}}>ⓘ</span>
+        {tip&&<div style={{position:"absolute",bottom:"120%",left:"50%",transform:"translateX(-50%)",background:T.card,border:`1px solid ${T.border2}`,borderRadius:8,padding:"8px 10px",width:160,fontSize:10,color:T.textMid,fontFamily:FONT_LABEL,lineHeight:1.5,zIndex:200,boxShadow:"0 4px 12px rgba(0,0,0,0.3)",whiteSpace:"normal"}}>
+          Select the currency this asset is priced in. If different from your base, values convert automatically at the live rate.
+        </div>}
+      </div>
     </label>
     <select value={cur} onChange={e=>onChange(e.target.value)} style={{
       padding:"2px 4px",fontSize:9,fontWeight:600,
