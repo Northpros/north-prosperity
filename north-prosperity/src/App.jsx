@@ -274,6 +274,8 @@ export default function RetirementPlanner() {
     <div style={{fontFamily:FONT_BODY,background:T.bg,minHeight:"100vh",padding:"12px 16px 70px",color:T.text,transition:"background 0.3s,color 0.3s"}}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Lato:wght@300;400;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap');
+        html,body,#root{background-color:${T.bg}!important;color:${T.text}!important;}
+        @media(prefers-color-scheme:light){html,body,#root{background-color:${T.bg}!important;}}
         *{box-sizing:border-box;margin:0;padding:0;}
         ::selection{background:#6C8EFF40;}
         ::-webkit-scrollbar{width:5px;height:5px;}
@@ -742,7 +744,7 @@ function ChartsTab({plan, results, T, baseCurrency="USD"}) {
         {ea.map((a,i)=><Line key={a.id} type="monotone" dataKey={a.name} stroke={CHART_COLORS[i%CHART_COLORS.length]} strokeWidth={2} dot={false}/>)}</LineChart></ResponsiveContainer>;
     }
     if(view==="investmentShares"){
-      if(!ei.length) return<div style={{textAlign:"center",padding:60,color:T.textDim,background:T.card}}>No registered investment accounts enabled.</div>;
+      if(!ei.length) return<div style={{textAlign:"center",padding:60,color:T.textDim}}>No registered investment accounts enabled.</div>;
       const data=results.map(r=>{const o={year:r.year};(r.investmentIncomeSources||[]).forEach(s=>{o[s.name]=s.value;});return o;});
       return<ResponsiveContainer><LineChart data={data}><XAxis dataKey="year" tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={{stroke:T.border}}/><YAxis tickFormatter={fmtK} tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={false}/>
         <Tooltip content={<CTooltip/>}/><Legend wrapperStyle={{fontSize:11,fontFamily:FONT_MONO}}/>
@@ -750,7 +752,7 @@ function ChartsTab({plan, results, T, baseCurrency="USD"}) {
     }
     if(view==="fixedAssets"){
       const eoa=plan.otherIncome.filter(s=>s.enabled&&((s.shares>0&&s.pricePerShare>0)||(s.includeIncome&&s.annualIncome>0)));
-      if(!efa.length&&!eoa.length) return<div style={{textAlign:"center",padding:60,color:T.textDim,background:T.card}}>No fixed or other income assets enabled.</div>;
+      if(!efa.length&&!eoa.length) return<div style={{textAlign:"center",padding:60,color:T.textDim}}>No fixed or other income assets enabled.</div>;
       const data=results.map(r=>{const o={year:r.year};(r.fixedAssetValues||[]).forEach(a=>{o[a.name]=a.value;});(r.otherIncomeValues||[]).forEach(a=>{o[a.name]=a.value;});return o;});
       const allLines=[...efa,...eoa];
       return<ResponsiveContainer><LineChart data={data}><XAxis dataKey="year" tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={{stroke:T.border}}/><YAxis tickFormatter={fmtK} tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={false}/>
@@ -772,7 +774,7 @@ function ChartsTab({plan, results, T, baseCurrency="USD"}) {
         }}>{CHART_VIEWS.map(v=><option key={v.id} value={v.id}>{v.label}</option>)}</select>
       </div>
     </div>
-    <div style={{padding:"0 12px 16px",height:440,background:T.card}}>{renderChart()}</div>
+    <div style={{padding:"0 12px 16px",height:440}}>{renderChart()}</div>
   </div></div>;
 }
 
@@ -798,7 +800,7 @@ function AdditionalTab({plan, update, T, baseCurrency="USD", fxRate=1}) {
         <MF label="Price" value={s.price} type="number" w="0.7fr" onChange={v=>update(d=>{d.bigTicketStocks[i].price=+v||0;return d;})} T={T}/>
         <CurrencyTag currency={s.currency||baseCurrency} base={baseCurrency} onChange={v=>update(d=>{d.bigTicketStocks[i].currency=v;return d;})} T={T}/>
         <YahooLink ticker={s.ticker} T={T}/>
-        {s.enabled&&s.shares>0&&s.price>0&&<div style={{fontSize:11,color:T.green,fontWeight:600,alignSelf:"end",paddingBottom:5,fontFamily:FONT_MONO}}>{fmt(s.shares*s.price,s.currency||baseCurrency)}</div>}
+        {s.enabled&&s.shares>0&&s.price>0&&<div style={{fontSize:11,color:T.green,fontWeight:600,alignSelf:"end",paddingBottom:5,fontFamily:FONT_MONO}}>{fmt(s.shares*s.price)}</div>}
       </ItemRow>)}</div>
       {total>0&&<div style={{background:T.summaryBg,border:`1px solid ${T.gold}20`,borderRadius:10,padding:18,marginTop:10,textAlign:"center"}}>
         <div style={{fontSize:10,color:T.textDim,fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:8,fontFamily:FONT_LABEL}}>Total Available</div>
