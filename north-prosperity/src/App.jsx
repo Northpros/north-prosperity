@@ -12,22 +12,11 @@ import {
 // ============================================================
 
 // ── Formatting ────────────────────────────────────────────────
-const CURRENCIES = [
-  {code:"USD",label:"🇺🇸 USD — US Dollar"},
-  {code:"CAD",label:"🇨🇦 CAD — Canadian Dollar"},
-  {code:"EUR",label:"🇪🇺 EUR — Euro"},
-  {code:"GBP",label:"🇬🇧 GBP — British Pound"},
-  {code:"AUD",label:"🇦🇺 AUD — Australian Dollar"},
-  {code:"NZD",label:"🇳🇿 NZD — New Zealand Dollar"},
-  {code:"CHF",label:"🇨🇭 CHF — Swiss Franc"},
-  {code:"MXN",label:"🇲🇽 MXN — Mexican Peso"},
-];
-const CURRENCY_CODES = CURRENCIES.map(c=>c.code);
-const fmt = (v,cur="USD") => { const c=CURRENCY_CODES.includes(cur)?cur:"USD"; return new Intl.NumberFormat("en-US",{style:"currency",currency:c,minimumFractionDigits:0,maximumFractionDigits:0}).format(v||0); };
-const fmtK = (v,cur="USD") => { v=v||0; const c=CURRENCY_CODES.includes(cur)?cur:"USD"; try{const sym=new Intl.NumberFormat("en-US",{style:"currency",currency:c,minimumFractionDigits:0,maximumFractionDigits:0}).formatToParts(1).find(p=>p.type==="currency")?.value||"$"; return Math.abs(v)>=1e9?`${sym}${(v/1e9).toFixed(1)}B`:Math.abs(v)>=1e6?`${sym}${(v/1e6).toFixed(1)}M`:Math.abs(v)>=1e3?`${sym}${(v/1e3).toFixed(0)}k`:fmt(v,c);}catch{return fmt(v,c);} };
+const fmt = (v,cur="USD") => { const c=(cur==="USD"||cur==="CAD")?cur:"USD"; return new Intl.NumberFormat("en-US",{style:"currency",currency:c,minimumFractionDigits:0,maximumFractionDigits:0}).format(v||0); };
+const fmtK = (v,cur="USD") => { v=v||0; const c=(cur==="USD"||cur==="CAD")?cur:"USD"; cur=c; const s=cur==="CAD"?"CA$":"$"; return Math.abs(v)>=1e9?`${s}${(v/1e9).toFixed(1)}B`:Math.abs(v)>=1e6?`${s}${(v/1e6).toFixed(1)}M`:Math.abs(v)>=1e3?`${s}${(v/1e3).toFixed(0)}k`:fmt(v,cur); };
 const fmtN = (v,d=2) => new Intl.NumberFormat("en-US",{minimumFractionDigits:d,maximumFractionDigits:d}).format(v||0);
 const fmtPct = v => `${(v||0).toFixed(1)}%`;
-const toBase = (v,cur,base,rates) => { if(!rates||cur===base)return v; const usdV=cur==="USD"?v:(rates[cur]?v/rates[cur]:v); return base==="USD"?usdV:(rates[base]?usdV*rates[base]:usdV); };
+const toBase = (v,cur,base,rate) => (!rate||cur===base)?v:(base==="CAD"?v*rate:v/rate);
 
 // ── Theme ─────────────────────────────────────────────────────
 const themes = {
@@ -89,10 +78,9 @@ const DEFAULT_PLAN = {
 };
 
 // ── CALCULATION ENGINE ──
-function runProjection(plan, fxRates={}) {
+function runProjection(plan, fxRate=1) {
   const p = plan.params;
   const base = p.baseCurrency||"USD";
-  const rates = fxRates||{};
   const inf = p.inflationRate / 100;
   const sy = p.startYear, py = p.projectionYears;
   const totalYears = Math.ceil(py);
@@ -118,7 +106,7 @@ function runProjection(plan, fxRates={}) {
 
   const dp = ea.map(a=>{
     const mult = build3Phase(a.cagr, a.cagrDecline1, a.cagrDecline2, a.cagrDecline3);
-    const bp=toBase(a.pricePerShare,a.currency||base,base,rates);
+    const bp=toBase(a.pricePerShare,a.currency||base,base,fxRate);
     return mult.map(m=>Math.round(bp*m));
   });
   const ip = ei.map(s=>{
@@ -126,7 +114,7 @@ function runProjection(plan, fxRates={}) {
     const d2=s.cagrDecline2!==undefined?s.cagrDecline2:((s.cagrDecline||0.3)*0.6);
     const d3=s.cagrDecline3!==undefined?s.cagrDecline3:((s.cagrDecline||0.3)*0.3);
     const mult = build3Phase(s.cagr, d1, d2, d3);
-    const bp=toBase(s.pricePerShare,s.currency||base,base,rates);
+    const bp=toBase(s.pricePerShare,s.currency||base,base,fxRate);
     return mult.map(m=>Math.round(bp*m));
   });
   const fap = efa.map(a=>{
@@ -134,11 +122,11 @@ function runProjection(plan, fxRates={}) {
     const d2=a.cagrDecline2!==undefined?a.cagrDecline2:((a.cagrDecline||0.1)*0.5);
     const d3=a.cagrDecline3!==undefined?a.cagrDecline3:((a.cagrDecline||0.1)*0.2);
     const mult = build3Phase(a.cagr, d1, d2, d3);
-    const bp=toBase(a.pricePerShare,a.currency||base,base,rates);
+    const bp=toBase(a.pricePerShare,a.currency||base,base,fxRate);
     return mult.map(m=>Math.round(bp*m));
   });
   const op = eo.map(s=>{
-    const b=s.cagr/100,d=(s.cagrDecline||0)/100,pr=[Math.round(toBase(s.pricePerShare||0,s.currency||base,base,rates))];
+    const b=s.cagr/100,d=(s.cagrDecline||0)/100,pr=[Math.round(toBase(s.pricePerShare||0,s.currency||base,base,fxRate))];
     for(let y=1;y<totalYears;y++){let yc=b-d*y;yc=Math.max(yc,0);pr.push(Math.round(pr[y-1]*(1+yc)));}return pr;
   });
 
@@ -158,7 +146,7 @@ function runProjection(plan, fxRates={}) {
   for(let y=0;y<totalYears;y++){
     const yf = (fracYear>0 && y===totalYears-1) ? fracYear : 1;
     let fi=0;
-    ef.forEach(s=>{if(sy+y>=s.startYear){const ya=sy+y-s.startYear;fi+=toBase(s.amount*Math.pow(1+s.indexing/100,ya)*yf,s.currency||base,base,rates);}});
+    ef.forEach(s=>{if(sy+y>=s.startYear){const ya=sy+y-s.startYear;fi+=toBase(s.amount*Math.pow(1+s.indexing/100,ya)*yf,s.currency||base,base,fxRate);}});
     let ii=0,di=0; const idata=[];
     is2.forEach((st,idx)=>{
       const s=ei[idx],pr=ip[idx][y],cv=st.rem*pr;
@@ -185,7 +173,7 @@ function runProjection(plan, fxRates={}) {
     let oi=0;const odata=[];
     eo.forEach((s,idx)=>{
       const pr=op[idx][y],cv=Math.round((s.shares||0)*pr);
-      let ai=0;if(s.includeIncome&&s.annualIncome>0){ai=Math.round(toBase(s.annualIncome,s.currency||base,base,rates)*yf);oi+=ai;}
+      let ai=0;if(s.includeIncome&&s.annualIncome>0){ai=Math.round(toBase(s.annualIncome,s.currency||base,base,fxRate)*yf);oi+=ai;}
       odata.push({name:s.name,value:cv,annualIncome:ai});yd.totalValue+=cv;
     });
     yd.otherIncome=Math.round(oi);yd.otherIncomeValues=odata;yd.totalIncome+=Math.round(oi);
@@ -227,6 +215,7 @@ export default function RetirementPlanner() {
   const [saveStatus, setSaveStatus] = useState("saved");
   const [fxRate, setFxRate] = useState(null);
   const [fxError, setFxError] = useState(false);
+  const [showCurrencyModal, setShowCurrencyModal] = useState(!load()?.params?.baseCurrency);
   const saveTimer = useRef(null);
   const T = darkMode ? themes.dark : themes.light;
 
@@ -240,14 +229,14 @@ export default function RetirementPlanner() {
     setPlan(prev=>{const next=fn(JSON.parse(JSON.stringify(prev)));triggerSave(next);return next;});
   },[triggerSave]);
 
-  const results = useMemo(()=>runProjection(plan,fxRate||{}),[plan,fxRate]);
+  const results = useMemo(()=>runProjection(plan,fxRate||1),[plan,fxRate]);
   const y1=results[0]||{}, yL=results[results.length-1]||{};
   const peakIncome=results.length?Math.max(...results.map(r=>r.totalIncome)):0;
   const peakValue=results.length?Math.max(...results.map(r=>r.totalValue)):0;
 
   useEffect(()=>{
     fetch("https://open.er-api.com/v6/latest/USD")
-      .then(r=>r.json()).then(d=>{if(d.rates){setFxRate(d.rates);}})
+      .then(r=>r.json()).then(d=>{if(d.rates?.CAD)setFxRate(d.rates.CAD);})
       .catch(()=>setFxError(true));
   },[]);
 
@@ -295,6 +284,8 @@ export default function RetirementPlanner() {
         input:focus,select:focus{outline:none;border-color:${T.accent}!important;}
         .np-outer{max-width:${CONTENT_MAX}px;width:100%;margin:0 auto;display:flex;flex-direction:column;}
         .np-outer>*{width:100%!important;max-width:100%!important;min-width:0!important;}
+        .fx-btn-wrap:hover .fx-tooltip{opacity:1!important;}
+        .fx-btn-wrap:hover .fx-tooltip{opacity:1!important;}
         .np-disclaimer{position:fixed;bottom:0;left:0;right:0;z-index:9999;background:#0d0d1f;border-top:1px solid #2a2a4a;padding:8px 12px;}
         .np-disclaimer-text{font-family:'JetBrains Mono','SF Mono',monospace;font-size:10px;color:#555577;line-height:1.5;display:block;}
       `}</style>
@@ -336,7 +327,12 @@ export default function RetirementPlanner() {
           </div>
           <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
             <SaveDot status={saveStatus} T={T}/>
-
+            <div style={{position:"relative",display:"inline-block"}} className="fx-btn-wrap">
+              <button onClick={()=>setShowCurrencyModal(true)} style={{padding:"5px 12px",background:`${T.accent}20`,color:T.accent,border:`1px solid ${T.accent}50`,borderRadius:6,fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:FONT_LABEL}}>{plan.params.baseCurrency||"USD"} ▾</button>
+              <div style={{position:"absolute",top:"110%",left:"50%",transform:"translateX(-50%)",background:T.card,border:`1px solid ${T.border2}`,borderRadius:6,padding:"4px 8px",whiteSpace:"nowrap",fontSize:9,color:T.textDim,fontFamily:FONT_MONO,pointerEvents:"none",opacity:0,transition:"opacity 0.15s",zIndex:100}} className="fx-tooltip">
+                {fxRate?`1 USD = ${fxRate.toFixed(4)} CAD`:fxError?"FX offline":"Loading rate..."}
+              </div>
+            </div>
             <SmBtn onClick={()=>setDarkMode(!darkMode)} label={darkMode?"\u2600\uFE0F Light":"\u{1F319} Dark"} T={T}/>
             <SmBtn onClick={importPlan} label={"\u{1F4C2} Import"} T={T}/>
             <SmBtn onClick={exportPlan} label={"\u{1F4BE} Export"} T={T}/>
@@ -344,15 +340,27 @@ export default function RetirementPlanner() {
           </div>
         </div>
 
+        {/* CURRENCY MODAL */}
+        {showCurrencyModal&&<div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.75)",zIndex:10000,display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <div style={{background:T.card,borderRadius:16,border:`1px solid ${T.border2}`,padding:"32px 40px",maxWidth:400,width:"90%",textAlign:"center"}}>
+            <div style={{fontFamily:FONT_DISPLAY,fontSize:22,fontWeight:700,color:T.gold,marginBottom:8}}>Select Base Currency</div>
+            <div style={{fontFamily:FONT_LABEL,fontSize:13,color:T.textMid,marginBottom:24,lineHeight:1.6}}>All projections will display in your base currency. Assets in a different currency will be converted using the live exchange rate.</div>
+            <div style={{display:"flex",gap:16,justifyContent:"center"}}>
+              <button onClick={()=>{update(d=>{d.params.baseCurrency="USD";return d;});setShowCurrencyModal(false);}} style={{padding:"12px 32px",background:T.accent,color:"#fff",border:"none",borderRadius:8,fontSize:15,fontWeight:600,cursor:"pointer",fontFamily:FONT_LABEL}}>USD</button>
+              <button onClick={()=>{update(d=>{d.params.baseCurrency="CAD";return d;});setShowCurrencyModal(false);}} style={{padding:"12px 32px",background:T.gold,color:"#000",border:"none",borderRadius:8,fontSize:15,fontWeight:600,cursor:"pointer",fontFamily:FONT_LABEL}}>CAD</button>
+            </div>
+          </div>
+        </div>}
+
         {/* SUMMARY — taller cards, bigger text */}
         {results.length>0 && (
           <div style={{display:"grid",gridTemplateColumns:"repeat(6,1fr)",gap:10,marginBottom:14}}>
-            <SumCard label="Year 1 Income" value={fmt(y1.totalIncome)} color={T.accent} T={T}/>
-            <SumCard label="Peak Income" value={fmt(peakIncome)} color={T.gold} T={T}/>
-            <SumCard label="Year 1 Portfolio" value={fmtK(y1.totalValue)} color={T.green} T={T}/>
-            <SumCard label="Peak Portfolio" value={fmtK(peakValue)} color={T.purple} T={T}/>
-            <SumCard label="Final Income" value={fmt(yL.totalIncome)} color={T.cyan} T={T}/>
-            <SumCard label="Final Portfolio" value={fmtK(yL.totalValue)} color={T.accent} T={T}/>
+            <SumCard label="Year 1 Income" value={fmt(y1.totalIncome,plan.params.baseCurrency||"USD")} color={T.accent} T={T}/>
+            <SumCard label="Peak Income" value={fmt(peakIncome,plan.params.baseCurrency||"USD")} color={T.gold} T={T}/>
+            <SumCard label="Year 1 Portfolio" value={fmtK(y1.totalValue,plan.params.baseCurrency||"USD")} color={T.green} T={T}/>
+            <SumCard label="Peak Portfolio" value={fmtK(peakValue,plan.params.baseCurrency||"USD")} color={T.purple} T={T}/>
+            <SumCard label="Final Income" value={fmt(yL.totalIncome,plan.params.baseCurrency||"USD")} color={T.cyan} T={T}/>
+            <SumCard label="Final Portfolio" value={fmtK(yL.totalValue,plan.params.baseCurrency||"USD")} color={T.accent} T={T}/>
           </div>
         )}
 
@@ -371,7 +379,7 @@ export default function RetirementPlanner() {
 
         {/* CONTENT */}
         <div style={{width:"100%",overflow:"hidden"}}>
-        {tab==="planning" && <PlanningTab plan={plan} update={update} T={T} baseCurrency={plan.params.baseCurrency||"USD"} fxRate={fxRate} fxError={fxError}/>}
+        {tab==="planning" && <PlanningTab plan={plan} update={update} T={T} baseCurrency={plan.params.baseCurrency||"USD"}/>}
         {tab==="divest" && <DivestTab plan={plan} update={update} T={T} baseCurrency={plan.params.baseCurrency||"USD"}/>}
         {tab==="fixed" && <FixedAssetsTab plan={plan} update={update} T={T} baseCurrency={plan.params.baseCurrency||"USD"}/>}
         {tab==="projections" && <ProjectionsTab plan={plan} results={results} T={T}/>}
@@ -387,7 +395,7 @@ export default function RetirementPlanner() {
 // ============================================================
 // TAB: PLANNING
 // ============================================================
-function PlanningTab({plan, update, T, baseCurrency="USD", fxRate=null, fxError=false}) {
+function PlanningTab({plan, update, T, baseCurrency="USD"}) {
   const p = plan.params;
   const up = (k,v)=>update(d=>{d.params[k]=v;return d;});
   const [showInvPresets, setShowInvPresets] = useState(null);
@@ -400,13 +408,6 @@ function PlanningTab({plan, update, T, baseCurrency="USD", fxRate=null, fxError=
         <Field label="Inflation %" value={p.inflationRate} type="number" step="0.5" onChange={v=>up("inflationRate",+v||0)} T={T}/>
         <Field label="Start Year" value={p.startYear} type="number" onChange={v=>up("startYear",+v||2030)} T={T}/>
         <Field label="Projection Years" value={p.projectionYears} type="number" step="0.25" onChange={v=>up("projectionYears",Math.min(parseFloat(v)||30,60))} T={T}/>
-        <div><label style={{fontSize:10,color:T.label,fontWeight:600,textTransform:"uppercase",letterSpacing:0.5,display:"block",marginBottom:3,fontFamily:FONT_LABEL}}>Base Currency</label>
-        <select value={p.baseCurrency||"USD"} onChange={e=>up("baseCurrency",e.target.value)} style={{width:"100%",padding:"7px 10px",background:T.inputBg,border:`1px solid ${T.border2}`,borderRadius:6,fontSize:13,color:T.text,fontFamily:FONT_LABEL}}>
-          {CURRENCIES.map(c=><option key={c.code} value={c.code}>{c.label}</option>)}
-        </select>
-        {fxRate&&<div style={{fontSize:9,color:T.textDim,fontFamily:FONT_MONO,marginTop:3}}>Live rates loaded ✓</div>}
-        {fxError&&<div style={{fontSize:9,color:T.red,fontFamily:FONT_MONO,marginTop:3}}>FX offline — using 1:1</div>}
-        </div>
       </div>
     </Card>
     <Card title="Fixed Sources of Income" badge="Pension (DB), CPP, OAS, Social Security, GIS, Annuity, DPSP" T={T}
@@ -420,9 +421,10 @@ function PlanningTab({plan, update, T, baseCurrency="USD", fxRate=null, fxError=
         <CurrencyTag currency={s.currency||baseCurrency} base={baseCurrency} onChange={v=>update(d=>{d.fixedIncome[i].currency=v;return d;})} T={T}/>
       </ItemRow>)}
     </Card>
-    <Card title="Tax Deferred Sources of Income" badge="RRSP, TFSA, RRIF, 401(k), IRA, ISA, SIPP, Super, KiwiSaver, Pillar 3a, Afore" T={T}
+    {/* Registered Investment Income — NOW 3-phase CAGR decline */}
+    <Card title="Registered Investment Income" badge="TFSA, RRSP, RRIF, LIRA, 401(k), 403(b), 457(b), IRA, Roth IRA, TSP" T={T}
       action={plan.investmentIncome.length<10?()=>update(d=>{d.investmentIncome.push({id:mkId(),name:"New Investment",note:"",shares:0,pricePerShare:0,cagr:7,cagrDecline1:0.3,cagrDecline2:0.2,cagrDecline3:0.1,dividendPercent:0,includeDividend:false,autoCalc:true,enabled:false});return d;}):null} actionLabel="+ Add">
-      <Hint T={T}>Tax-deferred accounts worldwide. Amort/Sell draws balance to $0 by end of term. Div pays dividends from remaining balance. Three-phase CAGR decline: Yr 1-5, Yr 6-20, Yr 21+</Hint>
+      <Hint T={T}>Tax-sheltered accounts. Amort/Sell draws balance to $0 by end of term on an amortization schedule. Div pays dividends from remaining balance. Three-phase CAGR decline: Yr 1-5, Yr 6-20, Yr 21+</Hint>
       {plan.investmentIncome.map((s,i)=><div key={s.id}>
         <ItemRow enabled={s.enabled} T={T} onToggle={()=>update(d=>{d.investmentIncome[i].enabled=!d.investmentIncome[i].enabled;return d;})} onRemove={()=>update(d=>{d.investmentIncome.splice(i,1);return d;})}>
           <MF label="Name" value={s.name} w="1.2fr" onChange={v=>update(d=>{d.investmentIncome[i].name=v;return d;})} T={T}/>
@@ -697,7 +699,7 @@ const CHART_VIEWS=[
   {id:"appreciation",label:"Growth vs Spending"},
   {id:"withdrawals",label:"Withdrawals by Asset"},
   {id:"shares",label:"Remaining Shares (Divest)"},
-  {id:"investmentShares",label:"Tax Deferred Account Value"},
+  {id:"investmentShares",label:"Registered Investment Value"},
   {id:"fixedAssets",label:"Fixed & Other Assets Value"},
 ];
 
@@ -780,12 +782,12 @@ function ChartsTab({plan, results, T, baseCurrency="USD"}) {
 // ============================================================
 // TAB: ADDITIONAL
 // ============================================================
-function AdditionalTab({plan, update, T, baseCurrency="USD", fxRate=1}) {
+function AdditionalTab({plan, update, T, baseCurrency="USD", fxRate={}}) {
   const base=baseCurrency;
   const btEnabled=plan.bigTicketStocks.filter(s=>s.enabled&&s.shares>0&&s.price>0);
-  const totalUSD=btEnabled.filter(s=>(s.currency||base)==="USD").reduce((t,s)=>t+s.shares*s.price,0);
-  const totalCAD=btEnabled.filter(s=>(s.currency||base)==="CAD").reduce((t,s)=>t+s.shares*s.price,0);
   const total=btEnabled.reduce((t,s)=>t+s.shares*s.price,0);
+  const byCurrency=btEnabled.reduce((acc,s)=>{const cur=s.currency||base;acc[cur]=(acc[cur]||0)+s.shares*s.price;return acc;},{});
+  const totalInBase=btEnabled.reduce((t,s)=>t+toBase(s.shares*s.price,s.currency||base,base,fxRate),0);
   return<div style={{display:"flex",flexDirection:"column",gap:12,width:"100%"}}>
     <Card title="Notes & Plans" T={T}>
       <textarea value={plan.notes||""} onChange={e=>update(d=>{d.notes=e.target.value;return d;})} placeholder="Emergency fund, healthcare, estate planning, tax strategies..."
@@ -803,7 +805,7 @@ function AdditionalTab({plan, update, T, baseCurrency="USD", fxRate=1}) {
       </ItemRow>)}</div>
       {total>0&&<div style={{background:T.summaryBg,border:`1px solid ${T.gold}20`,borderRadius:10,padding:18,marginTop:10,textAlign:"center"}}>
         <div style={{fontSize:10,color:T.textDim,fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:8,fontFamily:FONT_LABEL}}>Total Available</div>
-        <div style={{fontFamily:FONT_DISPLAY,fontSize:26,fontWeight:700,color:T.gold,marginBottom:8}}>{fmt(totalInBase,base)}</div>
+        <div style={{fontFamily:FONT_DISPLAY,fontSize:26,fontWeight:700,color:T.gold,marginBottom:6}}>{fmt(totalInBase,base)}</div>
         {Object.keys(byCurrency).length>1&&<div style={{display:"flex",justifyContent:"center",gap:20,flexWrap:"wrap"}}>
           {Object.entries(byCurrency).map(([cur,val])=><div key={cur} style={{fontSize:10,color:T.textDim,fontFamily:FONT_MONO}}>{fmt(val,cur)}</div>)}
         </div>}
@@ -815,7 +817,7 @@ function AdditionalTab({plan, update, T, baseCurrency="USD", fxRate=1}) {
           When selling, consider: <strong style={{color:T.text}}>capital gains tax</strong> on appreciated positions,
           the <strong style={{color:T.text}}>opportunity cost</strong> of removing assets from your growth portfolio,
           and whether selling from <strong style={{color:T.text}}>registered accounts</strong> (RRSP/401k/TFSA/IRA) triggers additional withholding tax.
-          Cross-reference with your Assets to Divest and Tax Deferred Income tabs to understand the full impact on your retirement projections.
+          Cross-reference with your Assets to Divest and Registered Investment Income tabs to understand the full impact on your retirement projections.
         </div>
       </div>
     </Card>
@@ -851,14 +853,17 @@ function SumCard({label,value,color,T}){return<div style={{background:T.card,bor
   <div style={{fontSize:20,fontWeight:700,color,fontFamily:FONT_DISPLAY,lineHeight:1.2}}>{value}</div></div>;}
 
 function CurrencyTag({currency,onChange,base,T}){
-  const isForeign=(currency||base)!==base;
+  const cur=currency||base;
+  const isForeign=cur!==base;
   return<div style={{display:"flex",flexDirection:"column",alignItems:"center",minWidth:54}}>
     <label style={{fontSize:9,color:T.label,fontWeight:600,letterSpacing:0.3,marginBottom:2,fontFamily:FONT_LABEL,display:"flex",alignItems:"center",gap:2}}>
       CCY<span title="Select the currency this asset is priced in. If different from your base currency, values will be converted automatically using the live exchange rate." style={{cursor:"help",color:T.accent,fontSize:9}}>ⓘ</span>
     </label>
-    <select value={currency||base} onChange={e=>onChange(e.target.value)} style={{
-      padding:"2px 4px",fontSize:9,fontWeight:600,background:isForeign?`${T.gold}20`:T.inputBg,
-      color:isForeign?T.gold:T.text,border:`1px solid ${isForeign?T.gold:T.border2}`,
+    <select value={cur} onChange={e=>onChange(e.target.value)} style={{
+      padding:"2px 4px",fontSize:9,fontWeight:600,
+      background:isForeign?`${T.accent}18`:T.inputBg,
+      color:isForeign?T.accent:T.text,
+      border:`1px solid ${isForeign?T.accent+"50":T.border2}`,
       borderRadius:4,cursor:"pointer",fontFamily:FONT_LABEL,width:"100%"
     }}>
       {CURRENCIES.map(c=><option key={c.code} value={c.code}>{c.code}</option>)}
