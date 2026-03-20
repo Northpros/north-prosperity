@@ -293,7 +293,7 @@ export default function RetirementPlanner() {
         input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0;}
         input[type=number]{-moz-appearance:textfield;}
         input:focus,select:focus{outline:none;border-color:${T.accent}!important;}
-        .np-outer{max-width:${CONTENT_MAX}px;width:100%;margin:0 auto;display:flex;flex-direction:column;overflow-x:hidden;}
+        .np-outer{max-width:${CONTENT_MAX}px;width:100%;margin:0 auto;display:flex;flex-direction:column;}
         .np-outer>*{width:100%!important;max-width:100%!important;min-width:0!important;}
         .np-disclaimer{position:fixed;bottom:0;left:0;right:0;z-index:9999;background:#0d0d1f;border-top:1px solid #2a2a4a;padding:8px 12px;}
         .np-disclaimer-text{font-family:'JetBrains Mono','SF Mono',monospace;font-size:10px;color:#555577;line-height:1.5;display:block;}
@@ -426,7 +426,7 @@ function PlanningTab({plan, update, T, baseCurrency="USD", fxRate=null, fxError=
       <Hint T={T}>Tax-deferred accounts worldwide. Amort/Sell draws balance to $0 by end of term. Div pays dividends from remaining balance. Three-phase CAGR decline: Yr 1-5, Yr 6-20, Yr 21+</Hint>
       {plan.investmentIncome.map((s,i)=><div key={s.id}>
         <ItemRow enabled={s.enabled} T={T} onToggle={()=>update(d=>{d.investmentIncome[i].enabled=!d.investmentIncome[i].enabled;return d;})} onRemove={()=>update(d=>{d.investmentIncome.splice(i,1);return d;})}>
-          <MF label="Name" value={s.name} w="1.0fr" onChange={v=>update(d=>{d.investmentIncome[i].name=v;return d;})} T={T}/>
+          <MF label="Name" value={s.name} w="1.2fr" onChange={v=>update(d=>{d.investmentIncome[i].name=v;return d;})} T={T}/>
           <MF label="Shares" value={s.shares} type="number" w="0.34fr" onChange={v=>update(d=>{d.investmentIncome[i].shares=+v||0;return d;})} T={T}/>
           <MF label="Price" value={s.pricePerShare} type="number" w="0.38fr" onChange={v=>update(d=>{d.investmentIncome[i].pricePerShare=+v||0;return d;})} T={T}/>
           <MF label="CAGR%" value={s.cagr} type="number" step="0.5" w="0.34fr" onChange={v=>update(d=>{d.investmentIncome[i].cagr=+v||0;return d;})} T={T}/>
@@ -496,7 +496,7 @@ function DivestTab({plan, update, T, baseCurrency="USD"}) {
             <YahooLink ticker={a.name} T={T}/>
             <button onClick={()=>setShowPresets(showPresets===i?null:i)} style={{fontSize:9,color:T.accent,background:"none",border:"none",cursor:"pointer",fontFamily:FONT_LABEL}}>CAGR % Preset</button>
           </div>
-          <div style={{width:80,minWidth:80,maxWidth:80,textAlign:"right",fontSize:11,color:T.gold,fontWeight:600,fontFamily:FONT_MONO}}>{a.enabled&&a.shares>0&&a.pricePerShare>0?fmt(a.shares*a.pricePerShare):""}</div>
+          {a.enabled&&a.shares>0&&a.pricePerShare>0&&<div style={{fontSize:11,color:T.gold,fontWeight:600,whiteSpace:"nowrap",alignSelf:"end",paddingBottom:5,fontFamily:FONT_MONO}}>{fmt(a.shares*a.pricePerShare)}</div>}
         </ItemRow>
         {showPresets===i&&<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(170px,1fr))",gap:6,padding:"6px 28px 10px",background:T.bg,borderRadius:8,margin:"-2px 0 6px"}}>
           {Object.entries(CAGR_PRESETS).map(([k,p])=><button key={k} onClick={()=>applyPreset(i,k)} style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:8,padding:"8px 10px",cursor:"pointer",textAlign:"left"}}>
@@ -597,7 +597,7 @@ function FixedAssetsTab({plan, update, T, baseCurrency="USD"}) {
           <MF label="Yr 6-20 ↓%" value={a.cagrDecline2!==undefined?a.cagrDecline2:((a.cagrDecline||0.1)*0.5)} type="number" step="0.1" w="0.3fr" onChange={v=>update(d=>{d.fixedAssets[i].cagrDecline2=+v||0;return d;})} T={T}/>
           <MF label="Yr 21+ ↓%" value={a.cagrDecline3!==undefined?a.cagrDecline3:((a.cagrDecline||0.1)*0.2)} type="number" step="0.1" w="0.3fr" onChange={v=>update(d=>{d.fixedAssets[i].cagrDecline3=+v||0;return d;})} T={T}/>
           <CurrencyTag currency={a.currency||baseCurrency} base={baseCurrency} onChange={v=>update(d=>{d.fixedAssets[i].currency=v;return d;})} T={T}/>
-          <div style={{width:80,minWidth:80,maxWidth:80,textAlign:"right",fontSize:11,color:T.green,fontWeight:600,fontFamily:FONT_MONO}}>{a.enabled&&a.pricePerShare>0?fmt(a.shares*a.pricePerShare):""}</div>
+          {a.enabled&&a.pricePerShare>0&&<div style={{fontSize:11,color:T.green,fontWeight:600,whiteSpace:"nowrap",alignSelf:"end",paddingBottom:5,fontFamily:FONT_MONO}}>{fmt(a.shares*a.pricePerShare)}</div>}
           <div style={{display:"flex",flexDirection:"column",gap:2,alignSelf:"end",paddingBottom:4}}>
             <button onClick={()=>setShowPresets(showPresets===i?null:i)} style={{fontSize:9,color:T.accent,background:"none",border:"none",cursor:"pointer",fontFamily:FONT_LABEL}}>CAGR % Preset</button>
           </div>
@@ -831,19 +831,16 @@ function Card({title,badge,children,action,actionLabel,T,noPad}){return<div styl
     {action&&<button onClick={action} style={{padding:"5px 12px",background:T.accent,color:"#fff",border:"none",borderRadius:6,fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:FONT_LABEL}}>{actionLabel}</button>}
   </div>}{children}</div>;}
 
-function ItemRow({children,enabled,onToggle,onRemove,T}){return<div style={{display:"flex",gap:4,alignItems:"center",padding:"8px 10px",marginBottom:4,borderRadius:8,border:`1px solid ${enabled?T.accent+"20":T.border}`,background:enabled?T.inputBg+"80":"transparent",opacity:enabled?1:0.5,transition:"all 0.15s",flexWrap:"nowrap",overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
-  <button onClick={onToggle} style={{width:18,height:18,borderRadius:3,border:`2px solid ${enabled?T.green:T.border2}`,background:enabled?T.green:"transparent",color:"#fff",fontSize:11,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,padding:0}}>{enabled?"\u2713":""}</button>
+function ItemRow({children,enabled,onToggle,onRemove,T}){return<div style={{display:"flex",gap:6,alignItems:"flex-start",padding:"8px 10px",marginBottom:4,borderRadius:8,border:`1px solid ${enabled?T.accent+"20":T.border}`,background:enabled?T.inputBg+"80":"transparent",opacity:enabled?1:0.5,transition:"all 0.15s",flexWrap:"wrap"}}>
+  <button onClick={onToggle} style={{width:18,height:18,borderRadius:3,border:`2px solid ${enabled?T.green:T.border2}`,background:enabled?T.green:"transparent",color:"#fff",fontSize:11,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:16,padding:0}}>{enabled?"\u2713":""}</button>
   <div style={{display:"flex",gap:6,flex:1,flexWrap:"nowrap",alignItems:"flex-start",overflowX:"auto"}}>{children}</div>
-  <button onClick={onRemove} style={{background:"none",border:"none",color:T.textDim,cursor:"pointer",fontSize:14,padding:2,flexShrink:0}}>{"\u00D7"}</button></div>;}
+  <button onClick={onRemove} style={{background:"none",border:"none",color:T.textDim,cursor:"pointer",fontSize:14,padding:2,marginTop:14,flexShrink:0}}>{"\u00D7"}</button></div>;}
 
 function Field({label,value,onChange,type="text",step,placeholder,T}){return<div><label style={{fontSize:10,color:T.label,fontWeight:600,textTransform:"uppercase",letterSpacing:0.5,display:"block",marginBottom:3,fontFamily:FONT_LABEL}}>{label}</label>
   <input type={type} value={value} step={step} placeholder={placeholder} onChange={e=>onChange(e.target.value)} onFocus={e=>e.target.select()} style={{width:"100%",padding:"7px 10px",background:T.inputBg,border:`1px solid ${T.border2}`,borderRadius:6,fontSize:13,color:T.text,fontFamily:FONT_LABEL}}/></div>;}
 
-function MF({label,value,onChange,type="text",step,w="1fr",T}){
-  const pw={"1.2fr":185,"1.0fr":170,"1fr":170,"0.9fr":155,"0.8fr":140,"0.7fr":125,"0.6fr":112,"0.5fr":100,"0.38fr":90,"0.34fr":84,"0.3fr":78};
-  const px=pw[w]||170;
-  return<div style={{width:px,minWidth:px,maxWidth:px,flexShrink:0,flexGrow:0}}><label style={{fontSize:9,color:T.label,fontWeight:600,textTransform:"uppercase",letterSpacing:0.3,display:"block",marginBottom:2,fontFamily:FONT_LABEL}}>{label}</label>
-  <input type={type} value={value} step={step} onChange={e=>onChange(e.target.value)} onFocus={e=>e.target.select()} style={{width:"100%",padding:"4px 6px",background:T.inputBg,border:`1px solid ${T.border2}`,borderRadius:4,fontSize:12,color:T.text,fontFamily:FONT_LABEL,boxSizing:"border-box"}}/></div>;}
+function MF({label,value,onChange,type="text",step,w="1fr",T}){return<div style={{minWidth:30,flex:w}}><label style={{fontSize:9,color:T.label,fontWeight:600,textTransform:"uppercase",letterSpacing:0.3,display:"block",marginBottom:2,fontFamily:FONT_LABEL}}>{label}</label>
+  <input type={type} value={value} step={step} onChange={e=>onChange(e.target.value)} onFocus={e=>e.target.select()} style={{width:"100%",padding:"4px 6px",background:T.inputBg,border:`1px solid ${T.border2}`,borderRadius:4,fontSize:12,color:T.text,fontFamily:FONT_LABEL}}/></div>;}
 
 function Chk({label,checked,onChange,T}){return<div style={{display:"flex",flexDirection:"column",alignItems:"center",minWidth:32}}><label style={{fontSize:9,color:T.label,fontWeight:600,letterSpacing:0.3,marginBottom:2,fontFamily:FONT_LABEL}}>{label}</label>
   <input type="checkbox" checked={checked} onChange={onChange} style={{width:14,height:14,cursor:"pointer",accentColor:T.accent}}/></div>;}
@@ -855,20 +852,9 @@ function SumCard({label,value,color,T}){return<div style={{background:T.card,bor
 function CurrencyTag({currency,onChange,base,T}){
   const cur=currency||base;
   const isForeign=cur!==base;
-  const [tip,setTip]=React.useState(false);
   return<div style={{display:"flex",flexDirection:"column",alignItems:"center",minWidth:54}}>
     <label style={{fontSize:9,color:T.label,fontWeight:600,letterSpacing:0.3,marginBottom:2,fontFamily:FONT_LABEL,display:"flex",alignItems:"center",gap:2}}>
-      CCY
-      <div style={{position:"relative",display:"inline-block"}}>
-        <span
-          onMouseEnter={()=>setTip(true)}
-          onMouseLeave={()=>setTip(false)}
-          onTouchStart={e=>{e.preventDefault();setTip(t=>!t);}}
-          style={{cursor:"help",color:T.accent,fontSize:9,userSelect:"none"}}>ⓘ</span>
-        {tip&&<div style={{position:"absolute",bottom:"120%",left:"50%",transform:"translateX(-50%)",background:T.card,border:`1px solid ${T.border2}`,borderRadius:8,padding:"8px 10px",width:160,fontSize:10,color:T.textMid,fontFamily:FONT_LABEL,lineHeight:1.5,zIndex:200,boxShadow:"0 4px 12px rgba(0,0,0,0.3)",whiteSpace:"normal"}}>
-          Select the currency this asset is priced in. If different from your base, values convert automatically at the live rate.
-        </div>}
-      </div>
+      CCY<span title="Select the currency this asset is priced in. If different from your base currency, values will be converted automatically using the live exchange rate." style={{cursor:"help",color:T.accent,fontSize:9}}>ⓘ</span>
     </label>
     <select value={cur} onChange={e=>onChange(e.target.value)} style={{
       padding:"2px 4px",fontSize:9,fontWeight:600,
