@@ -293,7 +293,7 @@ export default function RetirementPlanner() {
         input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0;}
         input[type=number]{-moz-appearance:textfield;}
         input:focus,select:focus{outline:none;border-color:${T.accent}!important;}
-        .np-outer{max-width:${CONTENT_MAX}px;width:100%;margin:0 auto;display:flex;flex-direction:column;}
+        .np-outer{max-width:${CONTENT_MAX}px;width:100%;margin:0 auto;display:flex;flex-direction:column;overflow-x:hidden;}
         .np-outer>*{width:100%!important;max-width:100%!important;min-width:0!important;}
         .np-disclaimer{position:fixed;bottom:0;left:0;right:0;z-index:9999;background:#0d0d1f;border-top:1px solid #2a2a4a;padding:8px 12px;}
         .np-disclaimer-text{font-family:'JetBrains Mono','SF Mono',monospace;font-size:10px;color:#555577;line-height:1.5;display:block;}
@@ -370,7 +370,7 @@ export default function RetirementPlanner() {
         </div>
 
         {/* CONTENT */}
-        <div style={{width:"100%"}}>
+        <div style={{width:"100%",overflow:"hidden"}}>
         {tab==="planning" && <PlanningTab plan={plan} update={update} T={T} baseCurrency={plan.params.baseCurrency||"USD"} fxRate={fxRate} fxError={fxError}/>}
         {tab==="divest" && <DivestTab plan={plan} update={update} T={T} baseCurrency={plan.params.baseCurrency||"USD"}/>}
         {tab==="fixed" && <FixedAssetsTab plan={plan} update={update} T={T} baseCurrency={plan.params.baseCurrency||"USD"}/>}
@@ -824,14 +824,14 @@ function AdditionalTab({plan, update, T, baseCurrency="USD", fxRate={}}) {
 // ============================================================
 // SHARED COMPONENTS — modern fonts throughout
 // ============================================================
-function Card({title,badge,children,action,actionLabel,T,noPad}){return<div style={{background:T.card,borderRadius:12,border:`1px solid ${T.border}`,padding:noPad?0:"20px 28px",overflow:"hidden",width:"100%"}}>
+function Card({title,badge,children,action,actionLabel,T,noPad}){return<div style={{background:T.card,borderRadius:12,border:`1px solid ${T.border}`,padding:noPad?0:"16px 20px",overflow:"hidden",width:"100%"}}>
   {title&&<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10,flexWrap:"wrap",gap:6}}>
     <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}><h2 style={{fontFamily:FONT_DISPLAY,fontSize:17,color:T.text,margin:0}}>{title}</h2>
     {badge&&<span style={{fontSize:9,color:T.textMid,background:`${T.accent}10`,padding:"2px 8px",borderRadius:10,fontFamily:FONT_LABEL}}>{badge}</span>}</div>
     {action&&<button onClick={action} style={{padding:"5px 12px",background:T.accent,color:"#fff",border:"none",borderRadius:6,fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:FONT_LABEL}}>{actionLabel}</button>}
   </div>}{children}</div>;}
 
-function ItemRow({children,enabled,onToggle,onRemove,T}){return<div style={{display:"flex",gap:4,alignItems:"center",padding:"8px 10px",marginBottom:4,borderRadius:8,border:`1px solid ${enabled?T.accent+"20":T.border}`,background:enabled?T.inputBg+"80":"transparent",opacity:enabled?1:0.5,transition:"all 0.15s",flexWrap:"nowrap",overflowX:"auto"}}>
+function ItemRow({children,enabled,onToggle,onRemove,T}){return<div style={{display:"flex",gap:4,alignItems:"center",padding:"8px 10px",marginBottom:4,borderRadius:8,border:`1px solid ${enabled?T.accent+"20":T.border}`,background:enabled?T.inputBg+"80":"transparent",opacity:enabled?1:0.5,transition:"all 0.15s",flexWrap:"nowrap",overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
   <button onClick={onToggle} style={{width:18,height:18,borderRadius:3,border:`2px solid ${enabled?T.green:T.border2}`,background:enabled?T.green:"transparent",color:"#fff",fontSize:11,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,padding:0}}>{enabled?"\u2713":""}</button>
   <div style={{display:"flex",gap:6,flex:1,flexWrap:"nowrap",alignItems:"flex-start",overflowX:"auto"}}>{children}</div>
   <button onClick={onRemove} style={{background:"none",border:"none",color:T.textDim,cursor:"pointer",fontSize:14,padding:2,flexShrink:0}}>{"\u00D7"}</button></div>;}
