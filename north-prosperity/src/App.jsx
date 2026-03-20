@@ -839,7 +839,9 @@ function ItemRow({children,enabled,onToggle,onRemove,T}){return<div style={{disp
 function Field({label,value,onChange,type="text",step,placeholder,T}){return<div><label style={{fontSize:10,color:T.label,fontWeight:600,textTransform:"uppercase",letterSpacing:0.5,display:"block",marginBottom:3,fontFamily:FONT_LABEL}}>{label}</label>
   <input type={type} value={value} step={step} placeholder={placeholder} onChange={e=>onChange(e.target.value)} onFocus={e=>e.target.select()} style={{width:"100%",padding:"7px 10px",background:T.inputBg,border:`1px solid ${T.border2}`,borderRadius:6,fontSize:13,color:T.text,fontFamily:FONT_LABEL}}/></div>;}
 
-function MF({label,value,onChange,type="text",step,w="1fr",T}){return<div style={{minWidth:30,flex:w}}><label style={{fontSize:9,color:T.label,fontWeight:600,textTransform:"uppercase",letterSpacing:0.3,display:"block",marginBottom:2,fontFamily:FONT_LABEL}}>{label}</label>
+function MF({label,value,onChange,type="text",step,w="1fr",T}){
+  const mxw={"0.3fr":80,"0.34fr":85,"0.38fr":90,"0.4fr":95,"0.45fr":100,"0.5fr":105,"0.6fr":115,"0.7fr":125,"0.8fr":140,"0.9fr":155,"1fr":200,"1.0fr":200,"1.2fr":220,"1.5fr":250};
+  return<div style={{minWidth:30,flex:w,maxWidth:mxw[w]||"none",flexShrink:0}}><label style={{fontSize:9,color:T.label,fontWeight:600,textTransform:"uppercase",letterSpacing:0.3,display:"block",marginBottom:2,fontFamily:FONT_LABEL}}>{label}</label>
   <input type={type} value={value} step={step} onChange={e=>onChange(e.target.value)} onFocus={e=>e.target.select()} style={{width:"100%",padding:"4px 6px",background:T.inputBg,border:`1px solid ${T.border2}`,borderRadius:4,fontSize:12,color:T.text,fontFamily:FONT_LABEL}}/></div>;}
 
 function Chk({label,checked,onChange,T}){return<div style={{display:"flex",flexDirection:"column",alignItems:"center",minWidth:32}}><label style={{fontSize:9,color:T.label,fontWeight:600,letterSpacing:0.3,marginBottom:2,fontFamily:FONT_LABEL}}>{label}</label>
