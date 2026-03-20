@@ -831,9 +831,9 @@ function Card({title,badge,children,action,actionLabel,T,noPad}){return<div styl
     {action&&<button onClick={action} style={{padding:"5px 12px",background:T.accent,color:"#fff",border:"none",borderRadius:6,fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:FONT_LABEL}}>{actionLabel}</button>}
   </div>}{children}</div>;}
 
-function ItemRow({children,enabled,onToggle,onRemove,T}){return<div style={{display:"flex",gap:4,alignItems:"center",padding:"8px 10px",marginBottom:4,borderRadius:8,border:`1px solid ${enabled?T.accent+"20":T.border}`,background:enabled?T.inputBg+"80":"transparent",opacity:enabled?1:0.5,transition:"all 0.15s",flexWrap:"nowrap",overflowX:"auto"}}>
+function ItemRow({children,enabled,onToggle,onRemove,T}){return<div style={{display:"flex",gap:4,alignItems:"center",padding:"8px 10px",marginBottom:4,borderRadius:8,border:`1px solid ${enabled?T.accent+"20":T.border}`,background:enabled?T.inputBg+"80":"transparent",opacity:enabled?1:0.5,transition:"all 0.15s",flexWrap:"nowrap"}}>
   <button onClick={onToggle} style={{width:18,height:18,borderRadius:3,border:`2px solid ${enabled?T.green:T.border2}`,background:enabled?T.green:"transparent",color:"#fff",fontSize:11,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,padding:0}}>{enabled?"\u2713":""}</button>
-  <div style={{display:"flex",gap:6,flex:1,flexWrap:"nowrap",alignItems:"flex-start",overflowX:"auto"}}>{children}</div>
+  <div style={{display:"flex",gap:6,flex:1,flexWrap:"nowrap",alignItems:"flex-start"}}>{children}</div>
   <button onClick={onRemove} style={{background:"none",border:"none",color:T.textDim,cursor:"pointer",fontSize:14,padding:2,flexShrink:0}}>{"\u00D7"}</button></div>;}
 
 function Field({label,value,onChange,type="text",step,placeholder,T}){return<div><label style={{fontSize:10,color:T.label,fontWeight:600,textTransform:"uppercase",letterSpacing:0.5,display:"block",marginBottom:3,fontFamily:FONT_LABEL}}>{label}</label>
@@ -856,17 +856,15 @@ function CurrencyTag({currency,onChange,base,T}){
   const cur=currency||base;
   const isForeign=cur!==base;
   const [tip,setTip]=React.useState(false);
-  const [pos,setPos]=React.useState({top:0,left:0});
-  const show=(e)=>{const r=e.currentTarget.getBoundingClientRect();setPos({top:r.bottom+8,left:r.left+r.width/2});setTip(true);};
-  return<div style={{display:"flex",flexDirection:"column",alignItems:"center",minWidth:54}}>
+  return<div style={{display:"flex",flexDirection:"column",alignItems:"center",minWidth:54,position:"relative"}}>
     <label style={{fontSize:9,color:T.label,fontWeight:600,letterSpacing:0.3,marginBottom:2,fontFamily:FONT_LABEL,display:"flex",alignItems:"center",gap:2}}>
       CCY
-      <span onMouseEnter={show} onMouseLeave={()=>setTip(false)} onTouchStart={e=>{e.preventDefault();show(e);}} onClick={show}
-        style={{cursor:"pointer",color:"#fff",background:T.accent,borderRadius:"50%",width:13,height:13,fontSize:8,fontWeight:700,display:"inline-flex",alignItems:"center",justifyContent:"center",userSelect:"none",flexShrink:0,marginLeft:2}}>?</span>
+      <span onMouseEnter={()=>setTip(true)} onMouseLeave={()=>setTip(false)} onTouchStart={e=>{e.preventDefault();setTip(t=>!t);}} onClick={()=>setTip(t=>!t)}
+        style={{cursor:"pointer",color:T.accent,fontSize:10,userSelect:"none",marginLeft:1}}>ⓘ</span>
     </label>
-    {tip&&ReactDOM.createPortal(<div onMouseLeave={()=>setTip(false)} style={{position:"fixed",top:pos.top,left:pos.left,transform:"translateX(-50%)",background:T.card,border:`1px solid ${T.accent}`,borderRadius:8,padding:"10px 12px",width:190,fontSize:11,color:T.text,fontFamily:FONT_LABEL,lineHeight:1.6,zIndex:99999,boxShadow:"0 6px 24px rgba(0,0,0,0.5)"}}>
+    {tip&&<div style={{position:"absolute",top:"100%",left:"50%",transform:"translateX(-50%)",marginTop:4,background:"#1e2235",border:"1px solid #3a3f5c",borderRadius:8,padding:"10px 12px",width:200,fontSize:11,color:"#e2e8f0",fontFamily:FONT_LABEL,lineHeight:1.6,zIndex:9999,boxShadow:"0 8px 24px rgba(0,0,0,0.6)",whiteSpace:"normal",pointerEvents:"none"}}>
       Select the currency this asset is priced in. If different from your base currency, values convert automatically using the live rate.
-    </div>,document.body)}
+    </div>}
     <select value={cur} onChange={e=>onChange(e.target.value)} style={{
       padding:"2px 4px",fontSize:9,fontWeight:600,
       background:isForeign?`${T.accent}18`:T.inputBg,
