@@ -413,7 +413,7 @@ function PlanningTab({plan, update, T, baseCurrency="USD", fxRate=null, fxError=
       action={plan.fixedIncome.length<10?()=>update(d=>{d.fixedIncome.push({id:mkId(),name:"New Source",amount:0,startYear:p.startYear,indexing:0,enabled:false});return d;}):null} actionLabel="+ Add">
       <Hint T={T}>Pensions, Social Security, CPP, OAS, annuities. Set start year to defer income.</Hint>
       {plan.fixedIncome.map((s,i)=><ItemRow key={s.id} enabled={s.enabled} T={T} onToggle={()=>update(d=>{d.fixedIncome[i].enabled=!d.fixedIncome[i].enabled;return d;})} onRemove={()=>update(d=>{d.fixedIncome.splice(i,1);return d;})}>
-        <MF label="Name" value={s.name} w="1.5fr" onChange={v=>update(d=>{d.fixedIncome[i].name=v;return d;})} T={T}/>
+        <MF label="Name" value={s.name} w="1.0fr" onChange={v=>update(d=>{d.fixedIncome[i].name=v;return d;})} T={T}/>
         <MF label="Annual $" value={s.amount} type="number" w="0.6fr" onChange={v=>update(d=>{d.fixedIncome[i].amount=+v||0;return d;})} T={T}/>
         <MF label="Start Year" value={s.startYear} type="number" w="0.38fr" onChange={v=>update(d=>{d.fixedIncome[i].startYear=+v||2030;return d;})} T={T}/>
         <MF label="Index%" value={s.indexing} type="number" step="0.5" w="0.38fr" onChange={v=>update(d=>{d.fixedIncome[i].indexing=+v||0;return d;})} T={T}/>
@@ -481,7 +481,7 @@ function DivestTab({plan, update, T, baseCurrency="USD"}) {
       <Hint T={T}>Unregistered assets sold on an amortization schedule to $0 by end of term. Three-phase CAGR decline: Yr 1-5, Yr 6-20, Yr 21+. Cap gains may apply.</Hint>
       {plan.divestAssets.map((a,i)=><div key={a.id}>
         <ItemRow enabled={a.enabled} T={T} onToggle={()=>update(d=>{d.divestAssets[i].enabled=!d.divestAssets[i].enabled;return d;})} onRemove={()=>update(d=>{d.divestAssets.splice(i,1);return d;})}>
-          <MF label="Ticker" value={a.name} w="1fr" onChange={v=>update(d=>{d.divestAssets[i].name=v;return d;})} T={T}/>
+          <MF label="Ticker" value={a.name} w="0.8fr" onChange={v=>update(d=>{d.divestAssets[i].name=v;return d;})} T={T}/>
           <MF label="Shares" value={a.shares} type="number" w="0.34fr" onChange={v=>update(d=>{d.divestAssets[i].shares=+v||0;return d;})} T={T}/>
           <MF label="Price" value={a.pricePerShare} type="number" w="0.38fr" onChange={v=>update(d=>{d.divestAssets[i].pricePerShare=+v||0;return d;})} T={T}/>
           <MF label="CAGR%" value={a.cagr} type="number" step="1" w="0.34fr" onChange={v=>update(d=>{d.divestAssets[i].cagr=+v||0;return d;})} T={T}/>
@@ -589,7 +589,7 @@ function FixedAssetsTab({plan, update, T, baseCurrency="USD"}) {
       <Hint T={T}>Assets that grow in value but don't generate income. Three-phase CAGR decline: Yr 1-5, Yr 6-20, Yr 21+</Hint>
       {plan.fixedAssets.map((a,i)=><div key={a.id}>
         <ItemRow enabled={a.enabled} T={T} onToggle={()=>update(d=>{d.fixedAssets[i].enabled=!d.fixedAssets[i].enabled;return d;})} onRemove={()=>update(d=>{d.fixedAssets.splice(i,1);return d;})}>
-          <MF label="Name" value={a.name} w="1.5fr" onChange={v=>update(d=>{d.fixedAssets[i].name=v;return d;})} T={T}/>
+          <MF label="Name" value={a.name} w="1.0fr" onChange={v=>update(d=>{d.fixedAssets[i].name=v;return d;})} T={T}/>
           <MF label="Units" value={a.shares} type="number" w="0.38fr" onChange={v=>update(d=>{d.fixedAssets[i].shares=+v||0;return d;})} T={T}/>
           <MF label="Price" value={a.pricePerShare} type="number" w="0.6fr" onChange={v=>update(d=>{d.fixedAssets[i].pricePerShare=+v||0;return d;})} T={T}/>
           <MF label="CAGR%" value={a.cagr} type="number" step="0.5" w="0.34fr" onChange={v=>update(d=>{d.fixedAssets[i].cagr=+v||0;return d;})} T={T}/>
@@ -833,7 +833,7 @@ function Card({title,badge,children,action,actionLabel,T,noPad}){return<div styl
 
 function ItemRow({children,enabled,onToggle,onRemove,T}){return<div style={{display:"flex",gap:6,alignItems:"flex-start",padding:"8px 10px",marginBottom:4,borderRadius:8,border:`1px solid ${enabled?T.accent+"20":T.border}`,background:enabled?T.inputBg+"80":"transparent",opacity:enabled?1:0.5,transition:"all 0.15s",flexWrap:"wrap"}}>
   <button onClick={onToggle} style={{width:18,height:18,borderRadius:3,border:`2px solid ${enabled?T.green:T.border2}`,background:enabled?T.green:"transparent",color:"#fff",fontSize:11,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:16,padding:0}}>{enabled?"\u2713":""}</button>
-  <div style={{display:"flex",gap:6,flex:1,flexWrap:"wrap",alignItems:"flex-start"}}>{children}</div>
+  <div style={{display:"flex",gap:6,flex:1,flexWrap:"nowrap",alignItems:"flex-start",overflowX:"auto"}}>{children}</div>
   <button onClick={onRemove} style={{background:"none",border:"none",color:T.textDim,cursor:"pointer",fontSize:14,padding:2,marginTop:14,flexShrink:0}}>{"\u00D7"}</button></div>;}
 
 function Field({label,value,onChange,type="text",step,placeholder,T}){return<div><label style={{fontSize:10,color:T.label,fontWeight:600,textTransform:"uppercase",letterSpacing:0.5,display:"block",marginBottom:3,fontFamily:FONT_LABEL}}>{label}</label>
