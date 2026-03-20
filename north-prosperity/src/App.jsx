@@ -824,7 +824,7 @@ function AdditionalTab({plan, update, T, baseCurrency="USD", fxRate={}}) {
 // ============================================================
 // SHARED COMPONENTS — modern fonts throughout
 // ============================================================
-function Card({title,badge,children,action,actionLabel,T,noPad}){return<div style={{background:T.card,borderRadius:12,border:`1px solid ${T.border}`,padding:noPad?0:"16px 20px",overflow:"hidden",width:"100%"}}>
+function Card({title,badge,children,action,actionLabel,T,noPad}){return<div style={{background:T.card,borderRadius:12,border:`1px solid ${T.border}`,padding:noPad?0:"20px 28px",overflow:"hidden",width:"100%"}}>
   {title&&<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10,flexWrap:"wrap",gap:6}}>
     <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}><h2 style={{fontFamily:FONT_DISPLAY,fontSize:17,color:T.text,margin:0}}>{title}</h2>
     {badge&&<span style={{fontSize:9,color:T.textMid,background:`${T.accent}10`,padding:"2px 8px",borderRadius:10,fontFamily:FONT_LABEL}}>{badge}</span>}</div>
