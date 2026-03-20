@@ -12,8 +12,8 @@ import {
 // ============================================================
 
 // ── Formatting ────────────────────────────────────────────────
-const fmt = (v,cur="USD") => { const c=(cur==="USD"||cur==="CAD")?cur:"USD"; return new Intl.NumberFormat("en-US",{style:"currency",currency:c,minimumFractionDigits:0,maximumFractionDigits:0}).format(v||0); };
-const fmtK = (v,cur="USD") => { v=v||0; const c=(cur==="USD"||cur==="CAD")?cur:"USD"; cur=c; const s=cur==="CAD"?"CA$":"$"; return Math.abs(v)>=1e9?`${s}${(v/1e9).toFixed(1)}B`:Math.abs(v)>=1e6?`${s}${(v/1e6).toFixed(1)}M`:Math.abs(v)>=1e3?`${s}${(v/1e3).toFixed(0)}k`:fmt(v,cur); };
+const fmt = (v,cur="USD") => new Intl.NumberFormat("en-US",{style:"currency",currency:cur,minimumFractionDigits:0,maximumFractionDigits:0}).format(v||0);
+const fmtK = (v,cur="USD") => { v=v||0; const s=cur==="CAD"?"CA$":"$"; return Math.abs(v)>=1e9?`${s}${(v/1e9).toFixed(1)}B`:Math.abs(v)>=1e6?`${s}${(v/1e6).toFixed(1)}M`:Math.abs(v)>=1e3?`${s}${(v/1e3).toFixed(0)}k`:fmt(v,cur); };
 const fmtN = (v,d=2) => new Intl.NumberFormat("en-US",{minimumFractionDigits:d,maximumFractionDigits:d}).format(v||0);
 const fmtPct = v => `${(v||0).toFixed(1)}%`;
 const toBase = (v,cur,base,rate) => (!rate||cur===base)?v:(base==="CAD"?v*rate:v/rate);
@@ -284,6 +284,7 @@ export default function RetirementPlanner() {
         input:focus,select:focus{outline:none;border-color:${T.accent}!important;}
         .np-outer{max-width:${CONTENT_MAX}px;width:100%;margin:0 auto;display:flex;flex-direction:column;}
         .np-outer>*{width:100%!important;max-width:100%!important;min-width:0!important;}
+        .fx-btn-wrap:hover .fx-tooltip{opacity:1!important;}
         .np-disclaimer{position:fixed;bottom:0;left:0;right:0;z-index:9999;background:#0d0d1f;border-top:1px solid #2a2a4a;padding:5px 12px;}
         .np-disclaimer-text{font-family:'JetBrains Mono','SF Mono',monospace;font-size:10px;color:#555577;line-height:1.5;display:block;}
       `}</style>
@@ -325,10 +326,11 @@ export default function RetirementPlanner() {
           </div>
           <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
             <SaveDot status={saveStatus} T={T}/>
-            <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
-              <button onClick={()=>setShowCurrencyModal(true)} style={{padding:"5px 12px",background:`${T.accent}20`,color:T.accent,border:`1px solid ${T.accent}50`,borderRadius:6,fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:FONT_LABEL,lineHeight:"1.2"}}>{plan.params.baseCurrency||"USD"} ▾</button>
-              {fxRate&&<div style={{fontSize:8,color:T.textDim,fontFamily:FONT_MONO,marginTop:1,whiteSpace:"nowrap"}}>1 USD = {fxRate.toFixed(4)} CAD</div>}
-              {fxError&&<div style={{fontSize:8,color:T.red,fontFamily:FONT_MONO,marginTop:1}}>FX offline</div>}
+            <div style={{position:"relative",display:"inline-block"}} className="fx-btn-wrap">
+              <button onClick={()=>setShowCurrencyModal(true)} style={{padding:"5px 12px",background:`${T.accent}20`,color:T.accent,border:`1px solid ${T.accent}50`,borderRadius:6,fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:FONT_LABEL}}>{plan.params.baseCurrency||"USD"} ▾</button>
+              <div style={{position:"absolute",top:"110%",left:"50%",transform:"translateX(-50%)",background:T.card,border:`1px solid ${T.border2}`,borderRadius:6,padding:"4px 8px",whiteSpace:"nowrap",fontSize:9,color:T.textDim,fontFamily:FONT_MONO,pointerEvents:"none",opacity:0,transition:"opacity 0.15s",zIndex:100}} className="fx-tooltip">
+                {fxRate?`1 USD = ${fxRate.toFixed(4)} CAD`:fxError?"FX offline":"Loading rate..."}
+              </div>
             </div>
             <SmBtn onClick={()=>setDarkMode(!darkMode)} label={darkMode?"\u2600\uFE0F Light":"\u{1F319} Dark"} T={T}/>
             <SmBtn onClick={importPlan} label={"\u{1F4C2} Import"} T={T}/>
@@ -802,11 +804,9 @@ function AdditionalTab({plan, update, T, baseCurrency="USD", fxRate=1}) {
       </ItemRow>)}</div>
       {total>0&&<div style={{background:T.summaryBg,border:`1px solid ${T.gold}20`,borderRadius:10,padding:18,marginTop:10,textAlign:"center"}}>
         <div style={{fontSize:10,color:T.textDim,fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:8,fontFamily:FONT_LABEL}}>Total Available</div>
-        <div style={{display:"flex",justifyContent:"center",gap:32,flexWrap:"wrap"}}>
-          {totalUSD>0&&<div><div style={{fontSize:9,color:T.textDim,fontFamily:FONT_LABEL,marginBottom:2}}>USD</div><div style={{fontFamily:FONT_DISPLAY,fontSize:26,fontWeight:700,color:T.gold}}>{fmt(totalUSD,"USD")}</div></div>}
-          {base==="CAD"&&totalUSD>0&&fxRate&&<div><div style={{fontSize:9,color:T.textDim,fontFamily:FONT_LABEL,marginBottom:2}}>CAD</div><div style={{fontFamily:FONT_DISPLAY,fontSize:26,fontWeight:700,color:T.gold}}>{fmt(totalUSD*fxRate,"CAD")}</div></div>}
-          {totalCAD>0&&<div><div style={{fontSize:9,color:T.textDim,fontFamily:FONT_LABEL,marginBottom:2}}>CAD</div><div style={{fontFamily:FONT_DISPLAY,fontSize:26,fontWeight:700,color:T.gold}}>{fmt(totalCAD,"CAD")}</div></div>}
-          {base==="USD"&&totalCAD>0&&fxRate&&<div><div style={{fontSize:9,color:T.textDim,fontFamily:FONT_LABEL,marginBottom:2}}>USD</div><div style={{fontFamily:FONT_DISPLAY,fontSize:26,fontWeight:700,color:T.gold}}>{fmt(totalCAD/fxRate,"USD")}</div></div>}
+        <div style={{display:"flex",justifyContent:"center",gap:24,flexWrap:"wrap"}}>
+          {totalUSD>0&&<div><div style={{fontSize:9,color:T.textDim,fontFamily:FONT_LABEL,marginBottom:2}}>USD</div><div style={{fontFamily:FONT_DISPLAY,fontSize:22,fontWeight:700,color:T.gold}}>{fmt(totalUSD,"USD")}</div></div>}
+          {totalCAD>0&&<div><div style={{fontSize:9,color:T.textDim,fontFamily:FONT_LABEL,marginBottom:2}}>CAD</div><div style={{fontFamily:FONT_DISPLAY,fontSize:22,fontWeight:700,color:T.cyan}}>{fmt(totalCAD,"CAD")}</div></div>}
         </div>
       </div>}
       <div style={{background:T.inputBg,border:`1px solid ${T.border}`,borderRadius:10,padding:"14px 18px",marginTop:10}}>
