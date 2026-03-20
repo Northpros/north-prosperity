@@ -482,8 +482,8 @@ function DivestTab({plan, update, T, baseCurrency="USD"}) {
       {plan.divestAssets.map((a,i)=><div key={a.id}>
         <ItemRow enabled={a.enabled} T={T} onToggle={()=>update(d=>{d.divestAssets[i].enabled=!d.divestAssets[i].enabled;return d;})} onRemove={()=>update(d=>{d.divestAssets.splice(i,1);return d;})}>
           <MF label="Ticker" value={a.name} w="0.8fr" onChange={v=>update(d=>{d.divestAssets[i].name=v;return d;})} T={T}/>
-          <MF label="Shares" value={a.shares} type="number" w="0.34fr" noGrow onChange={v=>update(d=>{d.divestAssets[i].shares=+v||0;return d;})} T={T}/>
-          <MF label="Price" value={a.pricePerShare} type="number" w="0.38fr" noGrow onChange={v=>update(d=>{d.divestAssets[i].pricePerShare=+v||0;return d;})} T={T}/>
+          <MF label="Shares" value={a.shares} type="number" w="0.34fr" lock onChange={v=>update(d=>{d.divestAssets[i].shares=+v||0;return d;})} T={T}/>
+          <MF label="Price" value={a.pricePerShare} type="number" w="0.38fr" lock onChange={v=>update(d=>{d.divestAssets[i].pricePerShare=+v||0;return d;})} T={T}/>
           <MF label="CAGR%" value={a.cagr} type="number" step="1" w="0.34fr" onChange={v=>update(d=>{d.divestAssets[i].cagr=+v||0;return d;})} T={T}/>
           <MF label="Yr 1-5 ↓%" value={a.cagrDecline1} type="number" step="0.1" w="0.3fr" onChange={v=>update(d=>{d.divestAssets[i].cagrDecline1=+v||0;return d;})} T={T}/>
           <MF label="Yr 6-20 ↓%" value={a.cagrDecline2} type="number" step="0.1" w="0.3fr" onChange={v=>update(d=>{d.divestAssets[i].cagrDecline2=+v||0;return d;})} T={T}/>
@@ -590,8 +590,8 @@ function FixedAssetsTab({plan, update, T, baseCurrency="USD"}) {
       {plan.fixedAssets.map((a,i)=><div key={a.id}>
         <ItemRow enabled={a.enabled} T={T} onToggle={()=>update(d=>{d.fixedAssets[i].enabled=!d.fixedAssets[i].enabled;return d;})} onRemove={()=>update(d=>{d.fixedAssets.splice(i,1);return d;})}>
           <MF label="Name" value={a.name} w="1.0fr" onChange={v=>update(d=>{d.fixedAssets[i].name=v;return d;})} T={T}/>
-          <MF label="Units" value={a.shares} type="number" w="0.38fr" noGrow onChange={v=>update(d=>{d.fixedAssets[i].shares=+v||0;return d;})} T={T}/>
-          <MF label="Price" value={a.pricePerShare} type="number" w="0.6fr" noGrow onChange={v=>update(d=>{d.fixedAssets[i].pricePerShare=+v||0;return d;})} T={T}/>
+          <MF label="Units" value={a.shares} type="number" w="0.38fr" lock onChange={v=>update(d=>{d.fixedAssets[i].shares=+v||0;return d;})} T={T}/>
+          <MF label="Price" value={a.pricePerShare} type="number" w="0.6fr" lock onChange={v=>update(d=>{d.fixedAssets[i].pricePerShare=+v||0;return d;})} T={T}/>
           <MF label="CAGR%" value={a.cagr} type="number" step="0.5" w="0.34fr" onChange={v=>update(d=>{d.fixedAssets[i].cagr=+v||0;return d;})} T={T}/>
           <MF label="Yr 1-5 ↓%" value={a.cagrDecline1!==undefined?a.cagrDecline1:(a.cagrDecline||0.1)} type="number" step="0.1" w="0.3fr" onChange={v=>update(d=>{d.fixedAssets[i].cagrDecline1=+v||0;return d;})} T={T}/>
           <MF label="Yr 6-20 ↓%" value={a.cagrDecline2!==undefined?a.cagrDecline2:((a.cagrDecline||0.1)*0.5)} type="number" step="0.1" w="0.3fr" onChange={v=>update(d=>{d.fixedAssets[i].cagrDecline2=+v||0;return d;})} T={T}/>
@@ -839,7 +839,7 @@ function ItemRow({children,enabled,onToggle,onRemove,T}){return<div style={{disp
 function Field({label,value,onChange,type="text",step,placeholder,T}){return<div><label style={{fontSize:10,color:T.label,fontWeight:600,textTransform:"uppercase",letterSpacing:0.5,display:"block",marginBottom:3,fontFamily:FONT_LABEL}}>{label}</label>
   <input type={type} value={value} step={step} placeholder={placeholder} onChange={e=>onChange(e.target.value)} onFocus={e=>e.target.select()} style={{width:"100%",padding:"7px 10px",background:T.inputBg,border:`1px solid ${T.border2}`,borderRadius:6,fontSize:13,color:T.text,fontFamily:FONT_LABEL}}/></div>;}
 
-function MF({label,value,onChange,type="text",step,w="1fr",noGrow=false,T}){return<div style={{minWidth:30,flex:w,flexGrow:noGrow?0:1,flexShrink:noGrow?0:1}}><label style={{fontSize:9,color:T.label,fontWeight:600,textTransform:"uppercase",letterSpacing:0.3,display:"block",marginBottom:2,fontFamily:FONT_LABEL}}>{label}</label>
+function MF({label,value,onChange,type="text",step,w="1fr",lock=false,T}){return<div style={{minWidth:30,flex:lock?"0 0 auto":w}}><label style={{fontSize:9,color:T.label,fontWeight:600,textTransform:"uppercase",letterSpacing:0.3,display:"block",marginBottom:2,fontFamily:FONT_LABEL}}>{label}</label>
   <input type={type} value={value} step={step} onChange={e=>onChange(e.target.value)} onFocus={e=>e.target.select()} style={{width:"100%",padding:"4px 6px",background:T.inputBg,border:`1px solid ${T.border2}`,borderRadius:4,fontSize:12,color:T.text,fontFamily:FONT_LABEL}}/></div>;}
 
 function Chk({label,checked,onChange,T}){return<div style={{display:"flex",flexDirection:"column",alignItems:"center",minWidth:32}}><label style={{fontSize:9,color:T.label,fontWeight:600,letterSpacing:0.3,marginBottom:2,fontFamily:FONT_LABEL}}>{label}</label>
