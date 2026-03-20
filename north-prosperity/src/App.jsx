@@ -864,7 +864,8 @@ function CurrencyTag({currency,onChange,base,T}){
           onMouseEnter={()=>setTip(true)}
           onMouseLeave={()=>setTip(false)}
           onTouchStart={e=>{e.preventDefault();setTip(t=>!t);}}
-          style={{cursor:"help",color:T.accent,fontSize:9,userSelect:"none"}}>ⓘ</span>
+          onClick={()=>setTip(t=>!t)}
+          style={{cursor:"pointer",color:"#fff",background:T.accent,borderRadius:"50%",width:12,height:12,fontSize:8,fontWeight:700,display:"inline-flex",alignItems:"center",justifyContent:"center",userSelect:"none",flexShrink:0}}>?</span>
         {tip&&<div style={{position:"absolute",bottom:"120%",left:"50%",transform:"translateX(-50%)",background:T.card,border:`1px solid ${T.border2}`,borderRadius:8,padding:"8px 10px",width:160,fontSize:10,color:T.textMid,fontFamily:FONT_LABEL,lineHeight:1.5,zIndex:200,boxShadow:"0 4px 12px rgba(0,0,0,0.3)",whiteSpace:"normal"}}>
           Select the currency this asset is priced in. If different from your base, values convert automatically at the live rate.
         </div>}
