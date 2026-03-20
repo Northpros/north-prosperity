@@ -12,8 +12,8 @@ import {
 // ============================================================
 
 // ── Formatting ────────────────────────────────────────────────
-const fmt = (v,cur="USD") => new Intl.NumberFormat("en-US",{style:"currency",currency:cur,minimumFractionDigits:0,maximumFractionDigits:0}).format(v||0);
-const fmtK = (v,cur="USD") => { v=v||0; const s=cur==="CAD"?"CA$":"$"; return Math.abs(v)>=1e9?`${s}${(v/1e9).toFixed(1)}B`:Math.abs(v)>=1e6?`${s}${(v/1e6).toFixed(1)}M`:Math.abs(v)>=1e3?`${s}${(v/1e3).toFixed(0)}k`:fmt(v,cur); };
+const fmt = (v,cur="USD") => { const c=(cur==="USD"||cur==="CAD")?cur:"USD"; return new Intl.NumberFormat("en-US",{style:"currency",currency:c,minimumFractionDigits:0,maximumFractionDigits:0}).format(v||0); };
+const fmtK = (v,cur="USD") => { v=v||0; const c=(cur==="USD"||cur==="CAD")?cur:"USD"; cur=c; const s=cur==="CAD"?"CA$":"$"; return Math.abs(v)>=1e9?`${s}${(v/1e9).toFixed(1)}B`:Math.abs(v)>=1e6?`${s}${(v/1e6).toFixed(1)}M`:Math.abs(v)>=1e3?`${s}${(v/1e3).toFixed(0)}k`:fmt(v,cur); };
 const fmtN = (v,d=2) => new Intl.NumberFormat("en-US",{minimumFractionDigits:d,maximumFractionDigits:d}).format(v||0);
 const fmtPct = v => `${(v||0).toFixed(1)}%`;
 const toBase = (v,cur,base,rate) => (!rate||cur===base)?v:(base==="CAD"?v*rate:v/rate);
@@ -710,55 +710,53 @@ function ChartsTab({plan, results, T, baseCurrency="USD"}) {
   const CTooltip=({active,payload,label})=>{if(!active||!payload?.length)return null;return<div style={{background:"#0d0d1f",border:"1px solid #2a2a4a",borderRadius:8,padding:"10px 14px",fontSize:11,fontFamily:FONT_MONO}}><div style={{color:"#888",marginBottom:4}}>{label}</div>{payload.map((p,i)=><div key={i} style={{color:p.color,marginBottom:2}}>{p.name}: {typeof p.value==="number"&&p.value>100?fmtK(p.value):fmtN(p.value,2)}</div>)}</div>;};
 
   const renderChart=()=>{
-    const RC=({children})=><ResponsiveContainer width="100%" height={400}>{children}</ResponsiveContainer>;
     if(view==="portfolio"){
       const data=results.map(r=>({year:r.year,Portfolio:r.totalValue}));
-      return<RC><AreaChart data={data}><defs><linearGradient id="gP" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={T.accent} stopOpacity={0.3}/><stop offset="100%" stopColor={T.accent} stopOpacity={0}/></linearGradient></defs>
+      return<ResponsiveContainer><AreaChart data={data}><defs><linearGradient id="gP" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={T.accent} stopOpacity={0.3}/><stop offset="100%" stopColor={T.accent} stopOpacity={0}/></linearGradient></defs>
         <XAxis dataKey="year" tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={{stroke:T.border}}/><YAxis tickFormatter={fmtK} tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={false}/>
-        <Tooltip content={<CTooltip/>}/><Area type="monotone" dataKey="Portfolio" stroke={T.accent} fill="url(#gP)" strokeWidth={2.5}/></AreaChart></RC>;
+        <Tooltip content={<CTooltip/>}/><Area type="monotone" dataKey="Portfolio" stroke={T.accent} fill="url(#gP)" strokeWidth={2.5}/></AreaChart></ResponsiveContainer>;
     }
     if(view==="income"){
       const data=results.map(r=>({year:r.year,Fixed:r.fixedIncome,Divest_WD:r.assets?.reduce((t,a)=>t+a.withdrawal,0)||0,Reg_WD:(r.investmentIncomeSources||[]).reduce((t,s)=>t+s.withdrawal,0),Dividends:r.dividendIncome,Other:r.otherIncome}));
-      return<RC><ComposedChart data={data}><XAxis dataKey="year" tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={{stroke:T.border}}/><YAxis tickFormatter={fmtK} tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={false}/>
+      return<ResponsiveContainer><ComposedChart data={data}><XAxis dataKey="year" tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={{stroke:T.border}}/><YAxis tickFormatter={fmtK} tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={false}/>
         <Tooltip content={<CTooltip/>}/><Legend wrapperStyle={{fontSize:11,fontFamily:FONT_MONO}}/>
-        <Bar dataKey="Fixed" stackId="a" fill={T.accent}/><Bar dataKey="Divest_WD" stackId="a" fill={T.gold}/><Bar dataKey="Reg_WD" stackId="a" fill={T.cyan}/><Bar dataKey="Dividends" stackId="a" fill={T.green}/><Bar dataKey="Other" stackId="a" fill={T.purple} radius={[3,3,0,0]}/></ComposedChart></RC>;
+        <Bar dataKey="Fixed" stackId="a" fill={T.accent}/><Bar dataKey="Divest_WD" stackId="a" fill={T.gold}/><Bar dataKey="Reg_WD" stackId="a" fill={T.cyan}/><Bar dataKey="Dividends" stackId="a" fill={T.green}/><Bar dataKey="Other" stackId="a" fill={T.purple} radius={[3,3,0,0]}/></ComposedChart></ResponsiveContainer>;
     }
     if(view==="appreciation"){
       const data=results.map((r,i)=>{const pv=i>0?results[i-1].totalValue:r.totalValue;return{year:r.year,Appreciation:Math.max(r.totalValue-pv+r.totalIncome,0),Spending:r.totalIncome};});
-      return<RC><ComposedChart data={data}><XAxis dataKey="year" tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={{stroke:T.border}}/><YAxis tickFormatter={fmtK} tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={false}/>
+      return<ResponsiveContainer><ComposedChart data={data}><XAxis dataKey="year" tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={{stroke:T.border}}/><YAxis tickFormatter={fmtK} tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={false}/>
         <Tooltip content={<CTooltip/>}/><Legend wrapperStyle={{fontSize:11,fontFamily:FONT_MONO}}/>
-        <Bar dataKey="Appreciation" fill={T.accent}/><Line dataKey="Spending" stroke={T.gold} strokeWidth={2} dot={false} strokeDasharray="6 3"/></ComposedChart></RC>;
+        <Bar dataKey="Appreciation" fill={T.accent}/><Line dataKey="Spending" stroke={T.gold} strokeWidth={2} dot={false} strokeDasharray="6 3"/></ComposedChart></ResponsiveContainer>;
     }
     if(view==="withdrawals"){
       const allAssets=[...ea,...ei];
       const data=results.map(r=>{const o={year:r.year};r.assets.forEach(a=>{o[a.name]=a.withdrawal;});(r.investmentIncomeSources||[]).forEach(s=>{o[s.name]=s.withdrawal;});return o;});
-      return<RC><LineChart data={data}><XAxis dataKey="year" tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={{stroke:T.border}}/><YAxis tickFormatter={fmtK} tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={false}/>
+      return<ResponsiveContainer><LineChart data={data}><XAxis dataKey="year" tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={{stroke:T.border}}/><YAxis tickFormatter={fmtK} tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={false}/>
         <Tooltip content={<CTooltip/>}/><Legend wrapperStyle={{fontSize:11,fontFamily:FONT_MONO}}/>
-        {allAssets.map((a,i)=><Line key={a.id} type="monotone" dataKey={a.name} stroke={CHART_COLORS[i%CHART_COLORS.length]} strokeWidth={2} dot={false}/>)}</LineChart></RC>;
+        {allAssets.map((a,i)=><Line key={a.id} type="monotone" dataKey={a.name} stroke={CHART_COLORS[i%CHART_COLORS.length]} strokeWidth={2} dot={false}/>)}</LineChart></ResponsiveContainer>;
     }
     if(view==="shares"){
       const data=results.map(r=>{const o={year:r.year};r.assets.forEach(a=>{o[a.name]=a.shares;});return o;});
-      return<RC><LineChart data={data}><XAxis dataKey="year" tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={{stroke:T.border}}/><YAxis tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={false}/>
+      return<ResponsiveContainer><LineChart data={data}><XAxis dataKey="year" tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={{stroke:T.border}}/><YAxis tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={false}/>
         <Tooltip content={<CTooltip/>}/><Legend wrapperStyle={{fontSize:11,fontFamily:FONT_MONO}}/>
-        {ea.map((a,i)=><Line key={a.id} type="monotone" dataKey={a.name} stroke={CHART_COLORS[i%CHART_COLORS.length]} strokeWidth={2} dot={false}/>)}</LineChart></RC>;
+        {ea.map((a,i)=><Line key={a.id} type="monotone" dataKey={a.name} stroke={CHART_COLORS[i%CHART_COLORS.length]} strokeWidth={2} dot={false}/>)}</LineChart></ResponsiveContainer>;
     }
     if(view==="investmentShares"){
       if(!ei.length) return<div style={{textAlign:"center",padding:60,color:T.textDim}}>No registered investment accounts enabled.</div>;
       const data=results.map(r=>{const o={year:r.year};(r.investmentIncomeSources||[]).forEach(s=>{o[s.name]=s.value;});return o;});
-      return<RC><LineChart data={data}><XAxis dataKey="year" tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={{stroke:T.border}}/><YAxis tickFormatter={fmtK} tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={false}/>
+      return<ResponsiveContainer><LineChart data={data}><XAxis dataKey="year" tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={{stroke:T.border}}/><YAxis tickFormatter={fmtK} tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={false}/>
         <Tooltip content={<CTooltip/>}/><Legend wrapperStyle={{fontSize:11,fontFamily:FONT_MONO}}/>
-        {ei.map((s,i)=><Line key={s.id} type="monotone" dataKey={s.name} stroke={CHART_COLORS[i%CHART_COLORS.length]} strokeWidth={2} dot={false}/>)}</LineChart></RC>;
+        {ei.map((s,i)=><Line key={s.id} type="monotone" dataKey={s.name} stroke={CHART_COLORS[i%CHART_COLORS.length]} strokeWidth={2} dot={false}/>)}</LineChart></ResponsiveContainer>;
     }
     if(view==="fixedAssets"){
       const eoa=plan.otherIncome.filter(s=>s.enabled&&((s.shares>0&&s.pricePerShare>0)||(s.includeIncome&&s.annualIncome>0)));
       if(!efa.length&&!eoa.length) return<div style={{textAlign:"center",padding:60,color:T.textDim}}>No fixed or other income assets enabled.</div>;
       const data=results.map(r=>{const o={year:r.year};(r.fixedAssetValues||[]).forEach(a=>{o[a.name]=a.value;});(r.otherIncomeValues||[]).forEach(a=>{o[a.name]=a.value;});return o;});
       const allLines=[...efa,...eoa];
-      return<RC><LineChart data={data}><XAxis dataKey="year" tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={{stroke:T.border}}/><YAxis tickFormatter={fmtK} tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={false}/>
+      return<ResponsiveContainer><LineChart data={data}><XAxis dataKey="year" tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={{stroke:T.border}}/><YAxis tickFormatter={fmtK} tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={false}/>
         <Tooltip content={<CTooltip/>}/><Legend wrapperStyle={{fontSize:11,fontFamily:FONT_MONO}}/>
-        {allLines.map((a,i)=><Line key={a.id} type="monotone" dataKey={a.name} stroke={CHART_COLORS[i%CHART_COLORS.length]} strokeWidth={2} dot={false}/>)}</LineChart></RC>;
+        {allLines.map((a,i)=><Line key={a.id} type="monotone" dataKey={a.name} stroke={CHART_COLORS[i%CHART_COLORS.length]} strokeWidth={2} dot={false}/>)}</LineChart></ResponsiveContainer>;
     }
-    return<div style={{textAlign:"center",padding:60,color:T.textDim}}>Select a chart view above.</div>;
   };
 
   return<div style={{display:"flex",flexDirection:"column",gap:12,width:"100%"}}><div style={{background:T.card,borderRadius:12,border:`1px solid ${T.border}`,overflow:"hidden",width:"100%"}}>
@@ -774,7 +772,7 @@ function ChartsTab({plan, results, T, baseCurrency="USD"}) {
         }}>{CHART_VIEWS.map(v=><option key={v.id} value={v.id}>{v.label}</option>)}</select>
       </div>
     </div>
-    <div style={{padding:"0 12px 16px",height:440,background:T.card,minHeight:440}}>{renderChart()}</div>
+    <div style={{padding:"0 12px 16px",height:440}}>{renderChart()}</div>
   </div></div>;
 }
 
@@ -782,11 +780,10 @@ function ChartsTab({plan, results, T, baseCurrency="USD"}) {
 // TAB: ADDITIONAL
 // ============================================================
 function AdditionalTab({plan, update, T, baseCurrency="USD", fxRate=1}) {
-  const base=baseCurrency||"USD";
+  const base=baseCurrency;
   const btEnabled=plan.bigTicketStocks.filter(s=>s.enabled&&s.shares>0&&s.price>0);
   const totalUSD=btEnabled.filter(s=>(s.currency||base)==="USD").reduce((t,s)=>t+s.shares*s.price,0);
   const totalCAD=btEnabled.filter(s=>(s.currency||base)==="CAD").reduce((t,s)=>t+s.shares*s.price,0);
-  const totalInBase=toBase(totalUSD,"USD",base,fxRate)+toBase(totalCAD,"CAD",base,fxRate);
   const total=btEnabled.reduce((t,s)=>t+s.shares*s.price,0);
   return<div style={{display:"flex",flexDirection:"column",gap:12,width:"100%"}}>
     <Card title="Notes & Plans" T={T}>
