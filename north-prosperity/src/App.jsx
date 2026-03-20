@@ -295,6 +295,11 @@ export default function RetirementPlanner() {
         input:focus,select:focus{outline:none;border-color:${T.accent}!important;}
         .np-outer{max-width:${CONTENT_MAX}px;width:100%;margin:0 auto;display:flex;flex-direction:column;}
         .np-outer>*{width:100%!important;max-width:100%!important;min-width:0!important;}
+        .info-tip{position:relative;display:inline-flex;align-items:center;margin-left:3px;cursor:help;}
+        .info-tip .info-icon{font-size:10px;width:13px;height:13px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;transition:color 0.2s;}
+        .info-tip:hover .info-icon{filter:brightness(1.3);}
+        .info-tip .info-bubble{display:none;position:fixed;width:220px;padding:10px 12px;border-radius:8px;font-size:11px;line-height:1.5;z-index:99999;pointer-events:none;font-family:'Inter',sans-serif;}
+        .info-tip:hover .info-bubble{display:block;}
         .np-disclaimer{position:fixed;bottom:0;left:0;right:0;z-index:9999;background:#0d0d1f;border-top:1px solid #2a2a4a;padding:8px 12px;}
         .np-disclaimer-text{font-family:'JetBrains Mono','SF Mono',monospace;font-size:10px;color:#555577;line-height:1.5;display:block;}
       `}</style>
@@ -855,20 +860,15 @@ function SumCard({label,value,color,T}){return<div style={{background:T.card,bor
 function CurrencyTag({currency,onChange,base,T}){
   const cur=currency||base;
   const isForeign=cur!==base;
-  const [tip,setTip]=React.useState(false);
   return<div style={{display:"flex",flexDirection:"column",alignItems:"center",minWidth:54}}>
     <label style={{fontSize:9,color:T.label,fontWeight:600,letterSpacing:0.3,marginBottom:2,fontFamily:FONT_LABEL,display:"flex",alignItems:"center",gap:2}}>
       CCY
-      <div style={{position:"relative",display:"inline-block"}}>
-        <span
-          onMouseEnter={()=>setTip(true)}
-          onMouseLeave={()=>setTip(false)}
-          onTouchStart={e=>{e.preventDefault();setTip(t=>!t);}}
-          style={{cursor:"help",color:T.accent,fontSize:9,userSelect:"none"}}>ⓘ</span>
-        {tip&&<div style={{position:"absolute",top:"50%",left:"110%",transform:"translateY(-50%)",background:"#1e2235",border:"1px solid #3a3f5c",borderRadius:8,padding:"10px 12px",width:200,fontSize:11,color:"#e2e8f0",fontFamily:FONT_LABEL,lineHeight:1.6,zIndex:9999,boxShadow:"0 8px 24px rgba(0,0,0,0.6)",whiteSpace:"normal",pointerEvents:"none"}}>
+      <span className="info-tip">
+        <span className="info-icon" style={{color:T.accent}}>ⓘ</span>
+        <span className="info-bubble" style={{background:"#1a1a3a",color:"#e2e8f0",border:"1px solid #3a3f5c",boxShadow:"0 4px 16px rgba(0,0,0,0.5)",fontFamily:FONT_LABEL}}>
           Select the currency this asset is priced in. If different from your base currency, values convert automatically using the live rate.
-        </div>}
-      </div>
+        </span>
+      </span>
     </label>
     <select value={cur} onChange={e=>onChange(e.target.value)} style={{
       padding:"2px 4px",fontSize:9,fontWeight:600,
@@ -881,7 +881,3 @@ function CurrencyTag({currency,onChange,base,T}){
     </select>
   </div>;
 }
-function Hint({children,T}){return<p style={{color:T.textDim,fontSize:12,marginBottom:10,fontFamily:FONT_LABEL,lineHeight:1.4}}>{children}</p>;}
-function Empty({T,msg}){return<p style={{color:T.textDim,textAlign:"center",padding:50,fontSize:13,fontFamily:FONT_LABEL}}>{msg||"Enable at least one asset or income source."}</p>;}
-function SaveDot({status,T}){const c=status==="saving"?T.gold:T.green;return<div style={{display:"flex",alignItems:"center",gap:4,fontSize:10,color:c,fontFamily:FONT_LABEL}}><span style={{width:5,height:5,borderRadius:"50%",background:c}}/>{status==="saving"?"Saving...":"Saved"}</div>;}
-function SmBtn({onClick,label,T,danger}){return<button onClick={onClick} style={{padding:"5px 12px",background:danger?T.red+"15":T.inputBg,color:danger?T.red:T.textMid,border:`1px solid ${danger?T.red+"30":T.border2}`,borderRadius:6,fontSize:11,cursor:"pointer",fontWeight:500,fontFamily:FONT_LABEL,whiteSpace:"nowrap"}}>{label}</button>;}
