@@ -426,7 +426,7 @@ function PlanningTab({plan, update, T, baseCurrency="USD", fxRate=null, fxError=
         </div>
       </div>
     </Card>
-    <Card title="Fixed Sources of Income" badge="Pension (DB), CPP, OAS, Social Security, GIS, Annuity, DPSP" T={T}
+    <Card title="Fixed Sources of Income" badge="Pension (DB), CPP, OAS, Social Security, GIS, Annuity" T={T}
       action={plan.fixedIncome.length<10?()=>update(d=>{d.fixedIncome.push({id:mkId(),name:"New Source",amount:0,startYear:p.startYear,indexing:0,enabled:false});return d;}):null} actionLabel="+ Add">
       <Hint T={T}>Pensions, Social Security, CPP, OAS, annuities. Set start year to defer income.</Hint>
       {plan.fixedIncome.map((s,i)=><ItemRow key={s.id} enabled={s.enabled} T={T} onToggle={()=>update(d=>{d.fixedIncome[i].enabled=!d.fixedIncome[i].enabled;return d;})} onRemove={()=>update(d=>{d.fixedIncome.splice(i,1);return d;})}>
