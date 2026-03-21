@@ -218,6 +218,24 @@ const FONT_LABEL = "'Inter','Segoe UI',sans-serif";
 const CONTENT_MAX = 1440;
 
 // ============================================================
+// DISCLAIMER FOOTER
+// ============================================================
+function DisclaimerFooter(){
+  const [expanded, setExpanded] = React.useState(false);
+  return(
+    <div className="np-disclaimer" onClick={()=>setExpanded(e=>!e)} style={{cursor:"pointer"}}>
+      <div className="np-disclaimer-text">
+        ⚠️ Not financial advice · Educational only · © 2026 North Prosperity
+        <span style={{marginLeft:6,color:"#6C8EFF",fontSize:9}}>{expanded?"▲ less":"▼ more"}</span>
+      </div>
+      {expanded&&<div className="np-disclaimer-full">
+        For educational and simulation purposes only · Past performance does not guarantee future results · Always consult a qualified financial advisor · FX conversion uses live rate as a fixed assumption
+      </div>}
+    </div>
+  );
+}
+
+// ============================================================
 // MAIN APP
 // ============================================================
 export default function RetirementPlanner() {
@@ -295,16 +313,14 @@ export default function RetirementPlanner() {
         input:focus,select:focus{outline:none;border-color:${T.accent}!important;}
         .np-outer{max-width:${CONTENT_MAX}px;width:100%;margin:0 auto;display:flex;flex-direction:column;}
         .np-outer>*{width:100%!important;max-width:100%!important;min-width:0!important;}
-        .np-disclaimer{position:fixed;bottom:0;left:0;right:0;z-index:9999;background:#0d0d1f;border-top:1px solid #2a2a4a;padding:8px 12px;}
+        .np-disclaimer{position:fixed;bottom:0;left:0;right:0;z-index:9999;background:#0d0d1f;border-top:1px solid #2a2a4a;padding:5px 12px;}
         .np-disclaimer-text{font-family:'JetBrains Mono','SF Mono',monospace;font-size:10px;color:#555577;line-height:1.5;display:block;}
+        .np-disclaimer-full{font-family:'JetBrains Mono','SF Mono',monospace;font-size:10px;color:#555577;line-height:1.5;display:block;margin-top:3px;}
         .np-infobubble{position:fixed;z-index:99999;width:240px;padding:10px 12px;border-radius:8px;font-size:11px;line-height:1.5;pointer-events:none;font-family:'JetBrains Mono','SF Mono',monospace;}
       `}</style>
 
       {/* Permanent Disclaimer Footer */}
-      <div className="np-disclaimer">
-        <div className="np-disclaimer-text">⚠️ Not financial advice · For educational and simulation purposes only · Past performance does not guarantee future results</div>
-        <div className="np-disclaimer-text">Always consult a qualified financial advisor before making investment decisions · FX conversion uses live rate as a fixed assumption · © 2026 North Prosperity</div>
-      </div>
+      <DisclaimerFooter/>
 
       <div className="np-outer">
         {/* HEADER — taller, larger fonts */}
