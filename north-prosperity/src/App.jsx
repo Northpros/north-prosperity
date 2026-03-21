@@ -300,7 +300,7 @@ export default function RetirementPlanner() {
   ];
 
   return (
-    <div style={{fontFamily:FONT_BODY,background:T.bg,minHeight:"100vh",padding:"12px 16px 120px",color:T.text,transition:"background 0.3s,color 0.3s"}}>
+    <div style={{fontFamily:FONT_BODY,background:T.bg,minHeight:"100vh",width:"100%",padding:"12px 16px 120px",color:T.text,transition:"background 0.3s,color 0.3s"}}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Lato:wght@300;400;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap');
         *{box-sizing:border-box;margin:0;padding:0;}
@@ -363,7 +363,7 @@ export default function RetirementPlanner() {
 
         {/* SUMMARY — taller cards, bigger text */}
         {results.length>0 && (
-          <div style={{display:"grid",gridTemplateColumns:"repeat(6,1fr)",gap:10,marginBottom:14}}>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:10,marginBottom:14}}>
             <SumCard label="Year 1 Income" value={fmt(y1.totalIncome,plan.params.baseCurrency||"USD")} color={T.accent} T={T}/>
             <SumCard label="Peak Income" value={fmt(peakIncome,plan.params.baseCurrency||"USD")} color={T.gold} T={T}/>
             <SumCard label="Year 1 Portfolio" value={fmtK(y1.totalValue,plan.params.baseCurrency||"USD")} color={T.green} T={T}/>
