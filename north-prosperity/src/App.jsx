@@ -720,39 +720,39 @@ function ChartsTab({plan, results, T, baseCurrency="USD"}) {
   const renderChart=()=>{
     if(view==="portfolio"){
       const data=results.map(r=>({year:r.year,Portfolio:r.totalValue}));
-      return<ResponsiveContainer><AreaChart data={data}><defs><linearGradient id="gP" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={T.accent} stopOpacity={0.3}/><stop offset="100%" stopColor={T.accent} stopOpacity={0}/></linearGradient></defs>
+      return<ResponsiveContainer width="100%" height="100%"><AreaChart data={data}><defs><linearGradient id="gP" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={T.accent} stopOpacity={0.3}/><stop offset="100%" stopColor={T.accent} stopOpacity={0}/></linearGradient></defs>
         <XAxis dataKey="year" tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={{stroke:T.border}}/><YAxis tickFormatter={fmtK} tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={false}/>
         <Tooltip content={<CTooltip/>}/><Area type="monotone" dataKey="Portfolio" stroke={T.accent} fill="url(#gP)" strokeWidth={2.5}/></AreaChart></ResponsiveContainer>;
     }
     if(view==="income"){
       const data=results.map(r=>({year:r.year,Fixed:r.fixedIncome,Divest_WD:r.assets?.reduce((t,a)=>t+a.withdrawal,0)||0,Reg_WD:(r.investmentIncomeSources||[]).reduce((t,s)=>t+s.withdrawal,0),Dividends:r.dividendIncome,Other:r.otherIncome}));
-      return<ResponsiveContainer><ComposedChart data={data}><XAxis dataKey="year" tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={{stroke:T.border}}/><YAxis tickFormatter={fmtK} tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={false}/>
+      return<ResponsiveContainer width="100%" height="100%"><ComposedChart data={data}><XAxis dataKey="year" tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={{stroke:T.border}}/><YAxis tickFormatter={fmtK} tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={false}/>
         <Tooltip content={<CTooltip/>}/><Legend wrapperStyle={{fontSize:11,fontFamily:FONT_MONO}}/>
         <Bar dataKey="Fixed" stackId="a" fill={T.accent}/><Bar dataKey="Divest_WD" stackId="a" fill={T.gold}/><Bar dataKey="Reg_WD" stackId="a" fill={T.cyan}/><Bar dataKey="Dividends" stackId="a" fill={T.green}/><Bar dataKey="Other" stackId="a" fill={T.purple} radius={[3,3,0,0]}/></ComposedChart></ResponsiveContainer>;
     }
     if(view==="appreciation"){
       const data=results.map((r,i)=>{const pv=i>0?results[i-1].totalValue:r.totalValue;return{year:r.year,Appreciation:Math.max(r.totalValue-pv+r.totalIncome,0),Spending:r.totalIncome};});
-      return<ResponsiveContainer><ComposedChart data={data}><XAxis dataKey="year" tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={{stroke:T.border}}/><YAxis tickFormatter={fmtK} tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={false}/>
+      return<ResponsiveContainer width="100%" height="100%"><ComposedChart data={data}><XAxis dataKey="year" tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={{stroke:T.border}}/><YAxis tickFormatter={fmtK} tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={false}/>
         <Tooltip content={<CTooltip/>}/><Legend wrapperStyle={{fontSize:11,fontFamily:FONT_MONO}}/>
         <Bar dataKey="Appreciation" fill={T.accent}/><Line dataKey="Spending" stroke={T.gold} strokeWidth={2} dot={false} strokeDasharray="6 3"/></ComposedChart></ResponsiveContainer>;
     }
     if(view==="withdrawals"){
       const allAssets=[...ea,...ei];
       const data=results.map(r=>{const o={year:r.year};r.assets.forEach(a=>{o[a.name]=a.withdrawal;});(r.investmentIncomeSources||[]).forEach(s=>{o[s.name]=s.withdrawal;});return o;});
-      return<ResponsiveContainer><LineChart data={data}><XAxis dataKey="year" tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={{stroke:T.border}}/><YAxis tickFormatter={fmtK} tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={false}/>
+      return<ResponsiveContainer width="100%" height="100%"><LineChart data={data}><XAxis dataKey="year" tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={{stroke:T.border}}/><YAxis tickFormatter={fmtK} tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={false}/>
         <Tooltip content={<CTooltip/>}/><Legend wrapperStyle={{fontSize:11,fontFamily:FONT_MONO}}/>
         {allAssets.map((a,i)=><Line key={a.id} type="monotone" dataKey={a.name} stroke={CHART_COLORS[i%CHART_COLORS.length]} strokeWidth={2} dot={false}/>)}</LineChart></ResponsiveContainer>;
     }
     if(view==="shares"){
       const data=results.map(r=>{const o={year:r.year};r.assets.forEach(a=>{o[a.name]=a.shares;});return o;});
-      return<ResponsiveContainer><LineChart data={data}><XAxis dataKey="year" tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={{stroke:T.border}}/><YAxis tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={false}/>
+      return<ResponsiveContainer width="100%" height="100%"><LineChart data={data}><XAxis dataKey="year" tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={{stroke:T.border}}/><YAxis tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={false}/>
         <Tooltip content={<CTooltip/>}/><Legend wrapperStyle={{fontSize:11,fontFamily:FONT_MONO}}/>
         {ea.map((a,i)=><Line key={a.id} type="monotone" dataKey={a.name} stroke={CHART_COLORS[i%CHART_COLORS.length]} strokeWidth={2} dot={false}/>)}</LineChart></ResponsiveContainer>;
     }
     if(view==="investmentShares"){
       if(!ei.length) return<div style={{textAlign:"center",padding:60,color:T.textDim}}>No registered investment accounts enabled.</div>;
       const data=results.map(r=>{const o={year:r.year};(r.investmentIncomeSources||[]).forEach(s=>{o[s.name]=s.value;});return o;});
-      return<ResponsiveContainer><LineChart data={data}><XAxis dataKey="year" tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={{stroke:T.border}}/><YAxis tickFormatter={fmtK} tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={false}/>
+      return<ResponsiveContainer width="100%" height="100%"><LineChart data={data}><XAxis dataKey="year" tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={{stroke:T.border}}/><YAxis tickFormatter={fmtK} tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={false}/>
         <Tooltip content={<CTooltip/>}/><Legend wrapperStyle={{fontSize:11,fontFamily:FONT_MONO}}/>
         {ei.map((s,i)=><Line key={s.id} type="monotone" dataKey={s.name} stroke={CHART_COLORS[i%CHART_COLORS.length]} strokeWidth={2} dot={false}/>)}</LineChart></ResponsiveContainer>;
     }
@@ -761,7 +761,7 @@ function ChartsTab({plan, results, T, baseCurrency="USD"}) {
       if(!efa.length&&!eoa.length) return<div style={{textAlign:"center",padding:60,color:T.textDim}}>No fixed or other income assets enabled.</div>;
       const data=results.map(r=>{const o={year:r.year};(r.fixedAssetValues||[]).forEach(a=>{o[a.name]=a.value;});(r.otherIncomeValues||[]).forEach(a=>{o[a.name]=a.value;});return o;});
       const allLines=[...efa,...eoa];
-      return<ResponsiveContainer><LineChart data={data}><XAxis dataKey="year" tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={{stroke:T.border}}/><YAxis tickFormatter={fmtK} tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={false}/>
+      return<ResponsiveContainer width="100%" height="100%"><LineChart data={data}><XAxis dataKey="year" tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={{stroke:T.border}}/><YAxis tickFormatter={fmtK} tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={false}/>
         <Tooltip content={<CTooltip/>}/><Legend wrapperStyle={{fontSize:11,fontFamily:FONT_MONO}}/>
         {allLines.map((a,i)=><Line key={a.id} type="monotone" dataKey={a.name} stroke={CHART_COLORS[i%CHART_COLORS.length]} strokeWidth={2} dot={false}/>)}</LineChart></ResponsiveContainer>;
     }
