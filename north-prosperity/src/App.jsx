@@ -502,8 +502,8 @@ function DivestTab({plan, update, T, baseCurrency="USD"}) {
       {plan.divestAssets.map((a,i)=><div key={a.id}>
         <ItemRow enabled={a.enabled} T={T} onToggle={()=>update(d=>{d.divestAssets[i].enabled=!d.divestAssets[i].enabled;return d;})} onRemove={()=>update(d=>{d.divestAssets.splice(i,1);return d;})}>
           <MF label="Ticker" value={a.name} w="0.8fr" onChange={v=>update(d=>{d.divestAssets[i].name=v;return d;})} T={T}/>
-          <MF label="Shares" value={a.shares} type="number" px={120} lock onChange={v=>update(d=>{d.divestAssets[i].shares=+v||0;return d;})} T={T}/>
-          <MF label="Price" value={a.pricePerShare} type="number" px={120} lock onChange={v=>update(d=>{d.divestAssets[i].pricePerShare=+v||0;return d;})} T={T}/>
+          <MF label="Shares" value={a.shares} type="number" w="0.34fr" onChange={v=>update(d=>{d.divestAssets[i].shares=+v||0;return d;})} T={T}/>
+          <MF label="Price" value={a.pricePerShare} type="number" w="0.38fr" onChange={v=>update(d=>{d.divestAssets[i].pricePerShare=+v||0;return d;})} T={T}/>
           <MF label="CAGR%" value={a.cagr} type="number" step="1" w="0.34fr" onChange={v=>update(d=>{d.divestAssets[i].cagr=+v||0;return d;})} T={T}/>
           <MF label="Yr 1-5 ↓%" value={a.cagrDecline1} type="number" step="0.1" w="0.3fr" onChange={v=>update(d=>{d.divestAssets[i].cagrDecline1=+v||0;return d;})} T={T}/>
           <MF label="Yr 6-20 ↓%" value={a.cagrDecline2} type="number" step="0.1" w="0.3fr" onChange={v=>update(d=>{d.divestAssets[i].cagrDecline2=+v||0;return d;})} T={T}/>
@@ -610,8 +610,8 @@ function FixedAssetsTab({plan, update, T, baseCurrency="USD"}) {
       {plan.fixedAssets.map((a,i)=><div key={a.id}>
         <ItemRow enabled={a.enabled} T={T} onToggle={()=>update(d=>{d.fixedAssets[i].enabled=!d.fixedAssets[i].enabled;return d;})} onRemove={()=>update(d=>{d.fixedAssets.splice(i,1);return d;})}>
           <MF label="Name" value={a.name} w="1.0fr" onChange={v=>update(d=>{d.fixedAssets[i].name=v;return d;})} T={T}/>
-          <MF label="Units" value={a.shares} type="number" px={120} lock onChange={v=>update(d=>{d.fixedAssets[i].shares=+v||0;return d;})} T={T}/>
-          <MF label="Price" value={a.pricePerShare} type="number" px={120} lock onChange={v=>update(d=>{d.fixedAssets[i].pricePerShare=+v||0;return d;})} T={T}/>
+          <MF label="Units" value={a.shares} type="number" w="0.38fr" onChange={v=>update(d=>{d.fixedAssets[i].shares=+v||0;return d;})} T={T}/>
+          <MF label="Price" value={a.pricePerShare} type="number" w="0.38fr" onChange={v=>update(d=>{d.fixedAssets[i].pricePerShare=+v||0;return d;})} T={T}/>
           <MF label="CAGR%" value={a.cagr} type="number" step="0.5" w="0.34fr" onChange={v=>update(d=>{d.fixedAssets[i].cagr=+v||0;return d;})} T={T}/>
           <MF label="Yr 1-5 ↓%" value={a.cagrDecline1!==undefined?a.cagrDecline1:(a.cagrDecline||0.1)} type="number" step="0.1" w="0.3fr" onChange={v=>update(d=>{d.fixedAssets[i].cagrDecline1=+v||0;return d;})} T={T}/>
           <MF label="Yr 6-20 ↓%" value={a.cagrDecline2!==undefined?a.cagrDecline2:((a.cagrDecline||0.1)*0.5)} type="number" step="0.1" w="0.3fr" onChange={v=>update(d=>{d.fixedAssets[i].cagrDecline2=+v||0;return d;})} T={T}/>
