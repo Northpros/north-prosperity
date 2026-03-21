@@ -297,6 +297,7 @@ export default function RetirementPlanner() {
         .np-outer>*{width:100%!important;max-width:100%!important;min-width:0!important;}
         .np-disclaimer{position:fixed;bottom:0;left:0;right:0;z-index:9999;background:#0d0d1f;border-top:1px solid #2a2a4a;padding:8px 12px;}
         .np-disclaimer-text{font-family:'JetBrains Mono','SF Mono',monospace;font-size:10px;color:#555577;line-height:1.5;display:block;}
+        .np-infobubble{position:fixed;z-index:99999;width:240px;padding:10px 12px;border-radius:8px;font-size:11px;line-height:1.5;pointer-events:none;font-family:'JetBrains Mono','SF Mono',monospace;}
       `}</style>
 
       {/* Permanent Disclaimer Footer */}
@@ -442,7 +443,7 @@ function PlanningTab({plan, update, T, baseCurrency="USD", fxRate=null, fxError=
             <button onClick={()=>setShowInvPresets(showInvPresets===i?null:i)} style={{fontSize:9,color:T.accent,background:"none",border:"none",cursor:"pointer",fontFamily:FONT_LABEL}}>CAGR % Preset</button>
           </div>
         </ItemRow>
-        {s.enabled&&s.shares>0&&s.pricePerShare>0&&<div style={{textAlign:"right",fontSize:11,color:T.gold,fontWeight:600,fontFamily:FONT_MONO,paddingRight:10,marginTop:-2,marginBottom:4}}>{fmt(s.shares*s.pricePerShare)}</div>}
+        {s.enabled&&s.shares>0&&s.pricePerShare>0&&<div style={{textAlign:"right",fontSize:11,color:T.gold,fontWeight:600,fontFamily:FONT_MONO,paddingRight:10,marginTop:-2,marginBottom:4}}>{fmt(s.shares*s.pricePerShare,s.currency||baseCurrency)}</div>}
         {showInvPresets===i&&<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(170px,1fr))",gap:6,padding:"6px 28px 10px",background:T.bg,borderRadius:8,margin:"-2px 0 6px"}}>
           {Object.entries(CAGR_PRESETS).map(([k,pr])=><button key={k} onClick={()=>applyInvPreset(i,k)} style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:8,padding:"8px 10px",cursor:"pointer",textAlign:"left"}}>
             <div style={{fontSize:11,fontWeight:600,color:T.text,fontFamily:FONT_LABEL}}>{pr.label}</div>
@@ -465,7 +466,7 @@ function PlanningTab({plan, update, T, baseCurrency="USD", fxRate=null, fxError=
         <CurrencyTag currency={s.currency||baseCurrency} base={baseCurrency} onChange={v=>update(d=>{d.otherIncome[i].currency=v;return d;})} T={T}/>
         <Chk label="Inc" checked={s.includeIncome} onChange={()=>update(d=>{d.otherIncome[i].includeIncome=!d.otherIncome[i].includeIncome;return d;})} T={T}/>
       </ItemRow>
-      {s.enabled&&s.shares>0&&s.pricePerShare>0&&<div style={{textAlign:"right",fontSize:11,color:T.gold,fontWeight:600,fontFamily:FONT_MONO,paddingRight:10,marginTop:-2,marginBottom:4}}>{fmt(s.shares*s.pricePerShare)}</div>}
+      {s.enabled&&s.shares>0&&s.pricePerShare>0&&<div style={{textAlign:"right",fontSize:11,color:T.gold,fontWeight:600,fontFamily:FONT_MONO,paddingRight:10,marginTop:-2,marginBottom:4}}>{fmt(s.shares*s.pricePerShare,s.currency||baseCurrency)}</div>}
       </React.Fragment>)}
     </Card>
     <CagrExamplesBox T={T}/>
@@ -500,7 +501,7 @@ function DivestTab({plan, update, T, baseCurrency="USD"}) {
             <button onClick={()=>setShowPresets(showPresets===i?null:i)} style={{fontSize:9,color:T.accent,background:"none",border:"none",cursor:"pointer",fontFamily:FONT_LABEL}}>CAGR % Preset</button>
           </div>
         </ItemRow>
-        {a.enabled&&a.shares>0&&a.pricePerShare>0&&<div style={{textAlign:"right",fontSize:11,color:T.gold,fontWeight:600,fontFamily:FONT_MONO,paddingRight:10,marginTop:-2,marginBottom:4}}>{fmt(a.shares*a.pricePerShare)}</div>}
+        {a.enabled&&a.shares>0&&a.pricePerShare>0&&<div style={{textAlign:"right",fontSize:11,color:T.gold,fontWeight:600,fontFamily:FONT_MONO,paddingRight:10,marginTop:-2,marginBottom:4}}>{fmt(a.shares*a.pricePerShare,a.currency||baseCurrency)}</div>}
         {showPresets===i&&<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(170px,1fr))",gap:6,padding:"6px 28px 10px",background:T.bg,borderRadius:8,margin:"-2px 0 6px"}}>
           {Object.entries(CAGR_PRESETS).map(([k,p])=><button key={k} onClick={()=>applyPreset(i,k)} style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:8,padding:"8px 10px",cursor:"pointer",textAlign:"left"}}>
             <div style={{fontSize:11,fontWeight:600,color:T.text,fontFamily:FONT_LABEL}}>{p.label}</div>
@@ -604,7 +605,7 @@ function FixedAssetsTab({plan, update, T, baseCurrency="USD"}) {
             <button onClick={()=>setShowPresets(showPresets===i?null:i)} style={{fontSize:9,color:T.accent,background:"none",border:"none",cursor:"pointer",fontFamily:FONT_LABEL}}>CAGR % Preset</button>
           </div>
         </ItemRow>
-        {a.enabled&&a.pricePerShare>0&&<div style={{textAlign:"right",fontSize:11,color:T.gold,fontWeight:600,fontFamily:FONT_MONO,paddingRight:10,marginTop:-2,marginBottom:4}}>{fmt(a.shares*a.pricePerShare)}</div>}
+        {a.enabled&&a.pricePerShare>0&&<div style={{textAlign:"right",fontSize:11,color:T.gold,fontWeight:600,fontFamily:FONT_MONO,paddingRight:10,marginTop:-2,marginBottom:4}}>{fmt(a.shares*a.pricePerShare,a.currency||baseCurrency)}</div>}
         {showPresets===i&&<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(170px,1fr))",gap:6,padding:"6px 28px 10px",background:T.bg,borderRadius:8,margin:"-2px 0 6px"}}>
           {Object.entries(CAGR_PRESETS).map(([k,p])=><button key={k} onClick={()=>applyPreset(i,k)} style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:8,padding:"8px 10px",cursor:"pointer",textAlign:"left"}}>
             <div style={{fontSize:11,fontWeight:600,color:T.text,fontFamily:FONT_LABEL}}>{p.label}</div>
@@ -805,7 +806,7 @@ function AdditionalTab({plan, update, T, baseCurrency="USD", fxRate={}}) {
         <CurrencyTag currency={s.currency||baseCurrency} base={baseCurrency} onChange={v=>update(d=>{d.bigTicketStocks[i].currency=v;return d;})} T={T}/>
         <YahooLink ticker={s.ticker} T={T}/>
       </ItemRow>
-      {s.enabled&&s.shares>0&&s.price>0&&<div style={{textAlign:"right",fontSize:11,color:T.gold,fontWeight:600,fontFamily:FONT_MONO,paddingRight:10,marginTop:-2,marginBottom:4}}>{fmt(s.shares*s.price)}</div>}
+      {s.enabled&&s.shares>0&&s.price>0&&<div style={{textAlign:"right",fontSize:11,color:T.gold,fontWeight:600,fontFamily:FONT_MONO,paddingRight:10,marginTop:-2,marginBottom:4}}>{fmt(s.shares*s.price,s.currency||baseCurrency)}</div>}
       </React.Fragment>)}</div>
       {total>0&&<div style={{background:T.summaryBg,border:`1px solid ${T.gold}20`,borderRadius:10,padding:18,marginTop:10,textAlign:"center"}}>
         <div style={{fontSize:10,color:T.textDim,fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:4,fontFamily:FONT_LABEL}}>Total Available</div>
@@ -856,10 +857,26 @@ function SumCard({label,value,color,T}){return<div style={{background:T.card,bor
 function CurrencyTag({currency,onChange,base,T}){
   const cur=currency||base;
   const isForeign=cur!==base;
+  const [tip,setTip]=useState(null);
+  const btnRef=useRef(null);
+  const handleInfo=(e)=>{
+    e.stopPropagation();
+    if(tip){setTip(null);return;}
+    const r=btnRef.current?.getBoundingClientRect();
+    if(r) setTip({top:r.bottom+6,left:Math.min(r.left,window.innerWidth-252)});
+  };
+  useEffect(()=>{
+    if(!tip)return;
+    const close=()=>setTip(null);
+    document.addEventListener("click",close);
+    document.addEventListener("touchstart",close);
+    return()=>{document.removeEventListener("click",close);document.removeEventListener("touchstart",close);};
+  },[tip]);
   return<div style={{display:"flex",flexDirection:"column",alignItems:"center",minWidth:54}}>
     <label style={{fontSize:9,color:T.label,fontWeight:600,letterSpacing:0.3,marginBottom:2,fontFamily:FONT_LABEL,display:"flex",alignItems:"center",gap:2}}>
-      CCY<span title="Select the currency this asset is priced in. If different from your base currency, values will be converted automatically using the live exchange rate." style={{cursor:"help",color:T.accent,fontSize:9}}>ⓘ</span>
+      CCY<span ref={btnRef} onClick={handleInfo} onTouchEnd={e=>{e.preventDefault();handleInfo(e);}} style={{cursor:"pointer",color:T.accent,fontSize:9,WebkitUserSelect:"none",userSelect:"none"}}>ⓘ</span>
     </label>
+    {tip&&<div className="np-infobubble" style={{top:tip.top,left:tip.left,background:T.card,color:T.text,border:`1px solid ${T.border2}`,boxShadow:"0 4px 20px rgba(0,0,0,0.5)"}}>Select the currency this asset is priced in. If different from your base currency, values will be converted automatically using the live exchange rate.</div>}
     <select value={cur} onChange={e=>onChange(e.target.value)} style={{
       padding:"2px 4px",fontSize:9,fontWeight:600,
       background:isForeign?`${T.accent}18`:T.inputBg,
