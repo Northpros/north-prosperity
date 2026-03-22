@@ -1489,7 +1489,7 @@ function SummaryTab({plan, results, T, baseCurrency="USD"}) {
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:4}}>
                 <span style={{fontSize:12,color:T.text,fontFamily:FONT_LABEL,fontWeight:600}}>{s.name}</span>
                 <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
-                  <span style={{fontSize:12,color:T.gold,fontFamily:FONT_MONO}}>{fmt(s.shares*s.pricePerShare,s.currency||bc)}</span>
+                  <span style={{fontSize:12,color:T.gold,fontFamily:FONT_MONO}}>{fmt(toBase(s.shares*s.pricePerShare,s.currency||bc,bc,{}),bc)}</span>
                   <Tag label={`${s.cagr}% CAGR`} color={T.accent}/>
                   {s.applyTax&&(s.taxRate||0)>0&&<Tag label={`${s.taxRate}% tax`} color={T.amber}/>}
                   {!s.applyTax&&<Tag label="tax-free" color={T.green}/>}
@@ -1517,7 +1517,7 @@ function SummaryTab({plan, results, T, baseCurrency="USD"}) {
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:4}}>
                 <span style={{fontSize:12,color:T.text,fontFamily:FONT_LABEL,fontWeight:600}}>{a.name} <span style={{fontSize:10,color:T.textDim}}>Divest</span></span>
                 <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
-                  <span style={{fontSize:12,color:T.gold,fontFamily:FONT_MONO}}>{fmt(a.shares*a.pricePerShare,a.currency||bc)}</span>
+                  <span style={{fontSize:12,color:T.gold,fontFamily:FONT_MONO}}>{fmt(toBase(a.shares*a.pricePerShare,a.currency||bc,bc,{}),bc)}</span>
                   <Tag label={`${a.cagr}% CAGR`} color={T.accent}/>
                   {a.applyTax&&(a.taxRate||0)>0&&<Tag label={`${a.taxRate}% cap gains`} color={T.amber}/>}
                 </div>
@@ -1529,7 +1529,7 @@ function SummaryTab({plan, results, T, baseCurrency="USD"}) {
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:4}}>
                 <span style={{fontSize:12,color:T.text,fontFamily:FONT_LABEL,fontWeight:600}}>{a.name} <span style={{fontSize:10,color:T.textDim}}>Fixed</span></span>
                 <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
-                  <span style={{fontSize:12,color:T.purple,fontFamily:FONT_MONO}}>{fmt(a.shares*a.pricePerShare,a.currency||bc)}</span>
+                  <span style={{fontSize:12,color:T.purple,fontFamily:FONT_MONO}}>{fmt(toBase(a.shares*a.pricePerShare,a.currency||bc,bc,{}),bc)}</span>
                   <Tag label={`${a.cagr}% CAGR`} color={T.accent}/>
                 </div>
               </div>
@@ -1538,9 +1538,21 @@ function SummaryTab({plan, results, T, baseCurrency="USD"}) {
         </Section>}
 
         {/* BIG TICKET */}
-        {bt.length>0&&plan.bigTicketItem&&<Section title="Big Ticket">
-          <Row label={plan.bigTicketItem} value={fmt(bt.reduce((t,s)=>t+s.shares*s.price,0),bc)} color={T.gold}/>
-        </Section>}
+        {bt.length>0&&plan.bigTicketItem&&(()=>{
+          const btTotal=bt.reduce((t,s)=>t+toBase(s.shares*s.price,s.currency||bc,bc,{}),0);
+          const btAfterTax=bt.reduce((t,s)=>{
+            const price=toBase(s.price,s.currency||bc,bc,{});
+            const cb=toBase(s.costBasis||0,s.currency||bc,bc,{});
+            const gain=Math.max(0,price-cb);
+            const tax=(s.applyTax&&(s.taxRate||0)>0)?s.shares*gain*(s.taxRate/100):0;
+            return t+(s.shares*price)-tax;
+          },0);
+          const btHasTax=bt.some(s=>s.applyTax&&(s.taxRate||0)>0);
+          return <Section title="Big Ticket">
+            <Row label={`${plan.bigTicketItem} — Pre-Tax`} value={fmt(btTotal,bc)} color={T.gold}/>
+            {btHasTax&&<Row label={`${plan.bigTicketItem} — After-Tax`} value={fmt(btAfterTax,bc)} color={T.green}/>}
+          </Section>;
+        })()}
 
         {/* KEY OUTCOMES */}
         {results.length>0&&<Section title="Key Outcomes">
