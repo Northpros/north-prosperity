@@ -634,7 +634,13 @@ export default function RetirementPlanner() {
           return(
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:10,marginBottom:14}}>
             <SumCard label="Year 1 Gross" value={fmt(y1.totalIncome,bc)} color={T.gold} T={T}/>
-            {anyTax&&<SumCard label="Year 1 Net" value={fmt(y1.netIncome??y1.totalIncome,bc)} color={T.green} T={T}/>}
+            <SumCard
+              label="Year 1 Net"
+              value={fmt(y1.netIncome??y1.totalIncome,bc)}
+              color={anyTax?T.green:T.textDim}
+              note={anyTax?null:"no tax configured"}
+              T={T}
+            />
             <SumCard label="Year 1 Portfolio" value={fmtK(y1.totalValue,bc)} color={T.accent} T={T}/>
             <SumCard label="Peak Portfolio" value={fmtK(peakValue,bc)} color={T.purple} T={T}/>
             <SumCard label="Final Income" value={fmt(yL.totalIncome,bc)} color={T.cyan} T={T}/>
@@ -1324,9 +1330,11 @@ function MF({label,value,onChange,type="text",step,w="1fr",lock=false,px,cls,T})
 function Chk({label,checked,onChange,T}){return<div style={{display:"flex",flexDirection:"column",alignItems:"center",minWidth:32}}><label style={{fontSize:9,color:T.label,fontWeight:600,letterSpacing:0.3,marginBottom:2,fontFamily:FONT_LABEL}}>{label}</label>
   <input type="checkbox" checked={checked} onChange={onChange} style={{width:14,height:14,cursor:"pointer",accentColor:T.accent}}/></div>;}
 
-function SumCard({label,value,color,T}){return<div style={{background:T.card,borderRadius:10,padding:"14px 16px",textAlign:"center",border:`1px solid ${T.border}`,borderLeft:`3px solid ${color}`,minHeight:72}}>
+function SumCard({label,value,color,note,T}){return<div style={{background:T.card,borderRadius:10,padding:"14px 16px",textAlign:"center",border:`1px solid ${T.border}`,borderLeft:`3px solid ${color}`,minHeight:72}}>
   <div style={{fontSize:10,color:T.textDim,fontWeight:600,textTransform:"uppercase",letterSpacing:0.8,marginBottom:5,fontFamily:FONT_LABEL}}>{label}</div>
-  <div style={{fontSize:20,fontWeight:700,color,fontFamily:FONT_DISPLAY,lineHeight:1.2}}>{value}</div></div>;}
+  <div style={{fontSize:20,fontWeight:700,color,fontFamily:FONT_DISPLAY,lineHeight:1.2}}>{value}</div>
+  {note&&<div style={{fontSize:9,color:T.textDim,fontFamily:FONT_LABEL,marginTop:4,letterSpacing:0.3}}>{note}</div>}
+</div>;}
 
 function CurrencyTag({currency,onChange,base,T}){
   const cur=currency||base;
