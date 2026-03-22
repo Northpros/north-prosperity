@@ -977,6 +977,76 @@ function FixedAssetsTab({plan, update, T, baseCurrency="USD"}) {
 }
 
 // ============================================================
+// NET INCOME SUMMARY CARD
+// ============================================================
+function NetIncomeSummary({results, T, bc}) {
+  const th={padding:"7px 10px",textAlign:"right",fontSize:10,fontWeight:600,whiteSpace:"nowrap",fontFamily:FONT_MONO};
+  const td={padding:"5px 10px",textAlign:"right",fontSize:11,whiteSpace:"nowrap",fontFamily:FONT_MONO};
+  const totGross=results.reduce((t,r)=>t+r.totalIncome,0);
+  const totTax=results.reduce((t,r)=>t+(r.totalTax||0),0);
+  const totNet=results.reduce((t,r)=>t+(r.netIncome??r.totalIncome),0);
+  return(
+    <div style={{background:T.card,borderRadius:12,border:`1px solid ${T.border}`,padding:"16px 20px",width:"100%",marginTop:0}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,flexWrap:"wrap",gap:8}}>
+        <h2 style={{fontFamily:FONT_DISPLAY,fontSize:17,color:T.text,margin:0}}>Net Income Summary</h2>
+        <div style={{display:"flex",gap:20,flexWrap:"wrap"}}>
+          <div style={{textAlign:"center"}}>
+            <div style={{fontSize:9,color:T.textDim,fontWeight:600,textTransform:"uppercase",letterSpacing:0.8,fontFamily:FONT_LABEL}}>Lifetime Gross</div>
+            <div style={{fontSize:16,fontWeight:700,color:T.gold,fontFamily:FONT_DISPLAY}}>{fmtK(totGross,bc)}</div>
+          </div>
+          <div style={{textAlign:"center"}}>
+            <div style={{fontSize:9,color:T.textDim,fontWeight:600,textTransform:"uppercase",letterSpacing:0.8,fontFamily:FONT_LABEL}}>Lifetime Tax</div>
+            <div style={{fontSize:16,fontWeight:700,color:T.amber,fontFamily:FONT_DISPLAY}}>{fmtK(totTax,bc)}</div>
+          </div>
+          <div style={{textAlign:"center"}}>
+            <div style={{fontSize:9,color:T.textDim,fontWeight:600,textTransform:"uppercase",letterSpacing:0.8,fontFamily:FONT_LABEL}}>Lifetime Net</div>
+            <div style={{fontSize:16,fontWeight:700,color:T.green,fontFamily:FONT_DISPLAY}}>{fmtK(totNet,bc)}</div>
+          </div>
+          <div style={{textAlign:"center"}}>
+            <div style={{fontSize:9,color:T.textDim,fontWeight:600,textTransform:"uppercase",letterSpacing:0.8,fontFamily:FONT_LABEL}}>Avg Tax Rate</div>
+            <div style={{fontSize:16,fontWeight:700,color:T.amber,fontFamily:FONT_DISPLAY}}>{totGross>0?((totTax/totGross)*100).toFixed(1):0}%</div>
+          </div>
+        </div>
+      </div>
+      <div style={{overflowX:"auto",overflowY:"auto",maxHeight:"40vh"}}>
+        <table style={{width:"100%",borderCollapse:"collapse",minWidth:380}}>
+          <thead style={{position:"sticky",top:0,zIndex:2}}>
+            <tr style={{background:"#1a1a3a"}}>
+              <th style={{...th,textAlign:"left",position:"sticky",left:0,zIndex:3,background:"#1a1a3a"}}>Year</th>
+              <th style={th}>Age</th>
+              <th style={{...th,color:T.gold}}>Gross Income</th>
+              <th style={{...th,color:T.amber}}>Tax Paid</th>
+              <th style={{...th,color:T.amber}}>Tax Rate</th>
+              <th style={{...th,color:T.green}}>Net Income</th>
+            </tr>
+          </thead>
+          <tbody>
+            {results.map((r,i)=>(
+              <tr key={i} style={{background:i%2?T.rowAlt:"transparent",borderBottom:`1px solid ${T.border}`}}>
+                <td style={{...td,position:"sticky",left:0,zIndex:1,background:i%2?T.rowAlt:T.card,fontWeight:600,textAlign:"left",color:T.text}}>{r.year}</td>
+                <td style={{...td,color:T.textMid}}>{r.age}</td>
+                <td style={{...td,color:T.gold,fontWeight:600}}>{fmt(r.totalIncome,bc)}</td>
+                <td style={{...td,color:(r.totalTax||0)>0?T.amber:T.textDim}}>{(r.totalTax||0)>0?fmt(r.totalTax,bc):"—"}</td>
+                <td style={{...td,color:(r.totalTax||0)>0?T.amber:T.textDim}}>{r.totalIncome>0&&(r.totalTax||0)>0?((r.totalTax/r.totalIncome)*100).toFixed(1)+"%":"—"}</td>
+                <td style={{...td,color:T.green,fontWeight:700}}>{fmt(r.netIncome??r.totalIncome,bc)}</td>
+              </tr>
+            ))}
+            <tr style={{background:T.summaryBg,borderTop:`2px solid ${T.border2}`}}>
+              <td style={{...td,position:"sticky",left:0,background:T.summaryBg,fontWeight:700,textAlign:"left",color:T.text,fontSize:11}}>TOTAL</td>
+              <td style={td}/>
+              <td style={{...td,color:T.gold,fontWeight:700}}>{fmt(totGross,bc)}</td>
+              <td style={{...td,color:T.amber,fontWeight:700}}>{fmt(totTax,bc)}</td>
+              <td style={{...td,color:T.amber,fontWeight:700}}>{totGross>0?((totTax/totGross)*100).toFixed(1)+"%":"—"}</td>
+              <td style={{...td,color:T.green,fontWeight:700}}>{fmt(totNet,bc)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
 // TAB: PROJECTIONS (frozen year column)
 // ============================================================
 function ProjectionsTab({plan, results, T, baseCurrency="USD"}) {
@@ -1026,7 +1096,9 @@ function ProjectionsTab({plan, results, T, baseCurrency="USD"}) {
         </tr>)}</tbody>
       </table>
     </div>
-  </Card></div>;
+  </Card>
+  {results.some(r=>(r.totalTax||0)>0)&&<NetIncomeSummary results={results} T={T} bc={bc}/>}
+  </div>;
 }
 
 // ============================================================
