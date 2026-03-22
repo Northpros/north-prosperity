@@ -672,7 +672,7 @@ export default function RetirementPlanner() {
           {tab==="withdrawals" && <WithdrawalTab plan={plan} results={results} T={T} baseCurrency={plan.params.baseCurrency||"USD"}/>}
           {tab==="charts" && <ChartsTab plan={plan} results={results} T={T} baseCurrency={plan.params.baseCurrency||"USD"}/>}
           {tab==="additional" && <AdditionalTab plan={plan} update={update} T={T} baseCurrency={plan.params.baseCurrency||"USD"} fxRate={fxRate||{}}/>}
-          {tab==="summary" && <SummaryTab plan={plan} results={results} T={T} baseCurrency={plan.params.baseCurrency||"USD"}/>}
+          {tab==="summary" && <SummaryTab plan={plan} results={results} T={T} baseCurrency={plan.params.baseCurrency||"USD"} fxRate={fxRate||{}}/>}
         </div>
       </div>
     </div>
@@ -1419,7 +1419,7 @@ function SmBtn({onClick,label,T,danger}){return<button onClick={onClick} style={
 // ============================================================
 // TAB: SUMMARY
 // ============================================================
-function SummaryTab({plan, results, T, baseCurrency="USD"}) {
+function SummaryTab({plan, results, T, baseCurrency="USD", fxRate={}}) {
   const p = plan.params;
   const bc = baseCurrency||"USD";
   const y1 = results[0]||{};
@@ -1539,10 +1539,10 @@ function SummaryTab({plan, results, T, baseCurrency="USD"}) {
 
         {/* BIG TICKET */}
         {bt.length>0&&plan.bigTicketItem&&(()=>{
-          const btTotal=bt.reduce((t,s)=>t+toBase(s.shares*s.price,s.currency||bc,bc,{}),0);
+          const btTotal=bt.reduce((t,s)=>t+toBase(s.shares*s.price,s.currency||bc,bc,fxRate),0);
           const btAfterTax=bt.reduce((t,s)=>{
-            const price=toBase(s.price,s.currency||bc,bc,{});
-            const cb=toBase(s.costBasis||0,s.currency||bc,bc,{});
+            const price=toBase(s.price,s.currency||bc,bc,fxRate);
+            const cb=toBase(s.costBasis||0,s.currency||bc,bc,fxRate);
             const gain=Math.max(0,price-cb);
             const tax=(s.applyTax&&(s.taxRate||0)>0)?s.shares*gain*(s.taxRate/100):0;
             return t+(s.shares*price)-tax;
