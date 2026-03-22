@@ -5,11 +5,11 @@ import {
 } from "recharts";
 
 // ============================================================
-// NORTH PROSPERITY RETIREMENT PLANNER — v2.3 Phase 1
-// Phase 1: Tax data model + calculation engine + tax sub-row UI
-// Per-asset effective tax rates, cap gains with cost basis,
-// Apply Tax checkbox, % Tax toggle button (amber when active),
-// ⓘ info bubble on all tax fields
+// NORTH PROSPERITY RETIREMENT PLANNER — v2.3 Phase 2
+// Phase 1: Tax engine + sub-row UI, cap gains, cost basis
+// Phase 2: Revised summary cards (6, new order/colors),
+//   notional gain tax ⓘ bubble, Year 1 Net only when tax active,
+//   2 new charts (Gross vs Net Income, Annual Tax Paid)
 // ============================================================
 
 // ── Formatting ────────────────────────────────────────────────
@@ -461,9 +461,32 @@ function TaxSubRowCapGains({taxRate, applyTax, costBasis, onTaxRate, onApplyTax,
   );
 }
 
-// ============================================================
-// DISCLAIMER FOOTER
-// ============================================================
+// Notional gain tax ⓘ — inline info bubble
+function NotionalGainInfo({T}) {
+  const [tip, setTip] = useState(null);
+  const btnRef = useRef(null);
+  const handleInfo = (e) => {
+    e.stopPropagation();
+    if(tip){setTip(null);return;}
+    const r = btnRef.current?.getBoundingClientRect();
+    if(r) setTip({top:r.bottom+6, left:Math.min(r.left, window.innerWidth-272)});
+  };
+  useEffect(()=>{
+    if(!tip)return;
+    const close=()=>setTip(null);
+    document.addEventListener("click",close);
+    document.addEventListener("touchstart",close);
+    return()=>{document.removeEventListener("click",close);document.removeEventListener("touchstart",close);};
+  },[tip]);
+  return (
+    <span ref={btnRef} onClick={handleInfo} onTouchEnd={e=>{e.preventDefault();handleInfo(e);}}
+      style={{cursor:"pointer",color:T.accent,fontSize:9,WebkitUserSelect:"none",userSelect:"none",marginLeft:3}}>ⓘ
+      {tip&&<div style={{top:tip.top,left:tip.left,background:T.card,color:T.text,border:`1px solid ${T.border2}`,boxShadow:"0 4px 20px rgba(0,0,0,0.5)",zIndex:99999,position:"fixed",width:260,padding:"10px 12px",borderRadius:8,fontSize:11,lineHeight:1.5,fontFamily:FONT_MONO,pointerEvents:"none"}}>
+        This is the estimated capital gains tax if you sold your entire current position today at the price entered. It is a snapshot only — not a real tax bill. The projection engine charges tax year by year as shares are actually sold, using the projected price at time of sale. This figure will grow over time as the share price appreciates.
+      </div>}
+    </span>
+  );
+}
 function DisclaimerFooter(){
   const [expanded, setExpanded] = React.useState(false);
   return(
@@ -605,17 +628,20 @@ export default function RetirementPlanner() {
         </div>
 
         {/* SUMMARY CARDS */}
-        {results.length>0 && (
+        {results.length>0 && (()=>{
+          const bc=plan.params.baseCurrency||"USD";
+          const anyTax=results.some(r=>(r.totalTax||0)>0);
+          return(
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:10,marginBottom:14}}>
-            <SumCard label="Year 1 Gross" value={fmt(y1.totalIncome,plan.params.baseCurrency||"USD")} color={T.accent} T={T}/>
-            <SumCard label="Year 1 Net" value={fmt(y1.netIncome??y1.totalIncome,plan.params.baseCurrency||"USD")} color={T.green} T={T}/>
-            <SumCard label="Peak Income" value={fmt(peakIncome,plan.params.baseCurrency||"USD")} color={T.gold} T={T}/>
-            <SumCard label="Year 1 Portfolio" value={fmtK(y1.totalValue,plan.params.baseCurrency||"USD")} color={T.green} T={T}/>
-            <SumCard label="Peak Portfolio" value={fmtK(peakValue,plan.params.baseCurrency||"USD")} color={T.purple} T={T}/>
-            <SumCard label="Final Income" value={fmt(yL.totalIncome,plan.params.baseCurrency||"USD")} color={T.cyan} T={T}/>
-            <SumCard label="Final Portfolio" value={fmtK(yL.totalValue,plan.params.baseCurrency||"USD")} color={T.accent} T={T}/>
+            <SumCard label="Year 1 Gross" value={fmt(y1.totalIncome,bc)} color={T.gold} T={T}/>
+            {anyTax&&<SumCard label="Year 1 Net" value={fmt(y1.netIncome??y1.totalIncome,bc)} color={T.green} T={T}/>}
+            <SumCard label="Year 1 Portfolio" value={fmtK(y1.totalValue,bc)} color={T.accent} T={T}/>
+            <SumCard label="Peak Portfolio" value={fmtK(peakValue,bc)} color={T.purple} T={T}/>
+            <SumCard label="Final Income" value={fmt(yL.totalIncome,bc)} color={T.cyan} T={T}/>
+            <SumCard label="Final Portfolio" value={fmtK(yL.totalValue,bc)} color={T.amber} T={T}/>
           </div>
-        )}
+          );
+        })()}
 
         {/* TABS */}
         <div style={{display:"flex",gap:2,marginBottom:14,flexWrap:"wrap",borderBottom:`1px solid ${T.border}`}}>
@@ -816,11 +842,12 @@ function DivestTab({plan, update, T, baseCurrency="USD"}) {
             onCostBasis={v=>update(d=>{d.divestAssets[i].costBasis=v;return d;})}
             T={T}
           />}
-          {a.enabled&&a.shares>0&&a.pricePerShare>0&&<div style={{textAlign:"right",fontSize:11,fontFamily:FONT_MONO,paddingRight:10,marginTop:2,marginBottom:4,display:"flex",justifyContent:"flex-end",gap:14,flexWrap:"wrap"}}>
+          {a.enabled&&a.shares>0&&a.pricePerShare>0&&<div style={{textAlign:"right",fontSize:11,fontFamily:FONT_MONO,paddingRight:10,marginTop:2,marginBottom:4,display:"flex",justifyContent:"flex-end",gap:14,flexWrap:"wrap",alignItems:"center"}}>
             <span style={{color:T.gold,fontWeight:600}}>{fmt(a.shares*a.pricePerShare,a.currency||baseCurrency)}</span>
             {a.applyTax&&(a.taxRate||0)>0&&(a.costBasis||0)>0&&(
-              <span style={{color:T.amber,fontSize:10}}>
+              <span style={{color:T.amber,fontSize:10,display:"flex",alignItems:"center"}}>
                 Notional gain tax: {fmt(a.shares*Math.max(0,a.pricePerShare-(a.costBasis||0))*(a.taxRate/100),a.currency||baseCurrency)}
+                <NotionalGainInfo T={T}/>
               </span>
             )}
           </div>}
@@ -920,11 +947,12 @@ function FixedAssetsTab({plan, update, T, baseCurrency="USD"}) {
             onCostBasis={v=>update(d=>{d.fixedAssets[i].costBasis=v;return d;})}
             T={T}
           />}
-          {a.enabled&&a.pricePerShare>0&&<div style={{textAlign:"right",fontSize:11,fontFamily:FONT_MONO,paddingRight:10,marginTop:2,marginBottom:4,display:"flex",justifyContent:"flex-end",gap:14,flexWrap:"wrap"}}>
+          {a.enabled&&a.pricePerShare>0&&<div style={{textAlign:"right",fontSize:11,fontFamily:FONT_MONO,paddingRight:10,marginTop:2,marginBottom:4,display:"flex",justifyContent:"flex-end",gap:14,flexWrap:"wrap",alignItems:"center"}}>
             <span style={{color:T.gold,fontWeight:600}}>{fmt(a.shares*a.pricePerShare,a.currency||baseCurrency)}</span>
             {a.applyTax&&(a.taxRate||0)>0&&(a.costBasis||0)>0&&(
-              <span style={{color:T.amber,fontSize:10}}>
+              <span style={{color:T.amber,fontSize:10,display:"flex",alignItems:"center"}}>
                 Notional gain tax: {fmt(a.shares*Math.max(0,a.pricePerShare-(a.costBasis||0))*(a.taxRate/100),a.currency||baseCurrency)}
+                <NotionalGainInfo T={T}/>
               </span>
             )}
           </div>}
@@ -1070,6 +1098,8 @@ function WithdrawalTab({plan, results, T, baseCurrency="USD"}) {
 const CHART_VIEWS=[
   {id:"portfolio",label:"Total Portfolio Value"},
   {id:"income",label:"Annual Income (Stacked)"},
+  {id:"grossNet",label:"Gross vs Net Income"},
+  {id:"taxPaid",label:"Annual Tax Paid"},
   {id:"appreciation",label:"Growth vs Spending"},
   {id:"withdrawals",label:"Withdrawals by Asset"},
   {id:"shares",label:"Remaining Shares (Divest)"},
@@ -1083,7 +1113,18 @@ function ChartsTab({plan, results, T, baseCurrency="USD"}) {
   const ei=plan.investmentIncome.filter(s=>s.enabled&&s.shares>0&&s.pricePerShare>0);
   const efa=plan.fixedAssets.filter(a=>a.enabled&&a.shares>0&&a.pricePerShare>0);
   if(!results.length) return <div style={{width:"100%"}}><Card title="Charts" T={T}><Empty T={T}/></Card></div>;
-  const desc={portfolio:"Total portfolio value over time (all assets).",income:"Stacked income breakdown from all sources.",appreciation:"Portfolio appreciation vs total withdrawals each year.",withdrawals:"Annual withdrawal amount from each divest and registered account.",shares:"Remaining share count as divest assets are sold down.",investmentShares:"Registered investment account values over time.",fixedAssets:"Fixed asset and other income source appreciation over the projection."};
+  const desc={
+    portfolio:"Total portfolio value over time (all assets).",
+    income:"Stacked income breakdown from all sources.",
+    grossNet:"Gross income vs net income after tax — shows the tax drag growing over time as your portfolio appreciates.",
+    taxPaid:"Annual tax paid across all sources — grows as share prices rise and gains increase each year.",
+    appreciation:"Portfolio appreciation vs total withdrawals each year.",
+    withdrawals:"Annual withdrawal amount from each divest and registered account.",
+    shares:"Remaining share count as divest assets are sold down.",
+    investmentShares:"Registered investment account values over time.",
+    fixedAssets:"Fixed asset and other income source appreciation over the projection.",
+  };
+  const hasTaxData=results.some(r=>(r.totalTax||0)>0);
   const CTooltip=({active,payload,label})=>{if(!active||!payload?.length)return null;return<div style={{background:"#0d0d1f",border:"1px solid #2a2a4a",borderRadius:8,padding:"10px 14px",fontSize:11,fontFamily:FONT_MONO}}><div style={{color:"#888",marginBottom:4}}>{label}</div>{payload.map((p,i)=><div key={i} style={{color:p.color,marginBottom:2}}>{p.name}: {typeof p.value==="number"&&p.value>100?fmtK(p.value):fmtN(p.value,2)}</div>)}</div>;};
 
   const renderChart=()=>{
@@ -1099,7 +1140,35 @@ function ChartsTab({plan, results, T, baseCurrency="USD"}) {
         <Tooltip content={<CTooltip/>}/><Legend wrapperStyle={{fontSize:11,fontFamily:FONT_MONO}}/>
         <Bar dataKey="Fixed" stackId="a" fill={T.accent}/><Bar dataKey="Divest_WD" stackId="a" fill={T.gold}/><Bar dataKey="Reg_WD" stackId="a" fill={T.cyan}/><Bar dataKey="Dividends" stackId="a" fill={T.green}/><Bar dataKey="Other" stackId="a" fill={T.purple} radius={[3,3,0,0]}/></ComposedChart></ResponsiveContainer>;
     }
-    if(view==="appreciation"){
+    if(view==="grossNet"){
+      if(!hasTaxData) return<div style={{textAlign:"center",padding:60,color:T.textDim,fontFamily:FONT_LABEL,fontSize:13}}>No tax applied yet. Enable Apply Tax on at least one income source or asset to see Gross vs Net.</div>;
+      const data=results.map(r=>({year:r.year,"Gross Income":r.totalIncome,"Net Income":r.netIncome??r.totalIncome}));
+      return<ResponsiveContainer width="100%" height="100%">
+        <ComposedChart data={data}>
+          <defs>
+            <linearGradient id="gGross" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={T.gold} stopOpacity={0.15}/><stop offset="100%" stopColor={T.gold} stopOpacity={0}/></linearGradient>
+            <linearGradient id="gNet" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={T.green} stopOpacity={0.2}/><stop offset="100%" stopColor={T.green} stopOpacity={0}/></linearGradient>
+          </defs>
+          <XAxis dataKey="year" tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={{stroke:T.border}}/>
+          <YAxis tickFormatter={fmtK} tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={false}/>
+          <Tooltip content={<CTooltip/>}/><Legend wrapperStyle={{fontSize:11,fontFamily:FONT_MONO}}/>
+          <Area type="monotone" dataKey="Gross Income" stroke={T.gold} fill="url(#gGross)" strokeWidth={2} strokeDasharray="6 3" dot={false}/>
+          <Area type="monotone" dataKey="Net Income" stroke={T.green} fill="url(#gNet)" strokeWidth={2.5} dot={false}/>
+        </ComposedChart>
+      </ResponsiveContainer>;
+    }
+    if(view==="taxPaid"){
+      if(!hasTaxData) return<div style={{textAlign:"center",padding:60,color:T.textDim,fontFamily:FONT_LABEL,fontSize:13}}>No tax applied yet. Enable Apply Tax on at least one income source or asset to see Annual Tax Paid.</div>;
+      const data=results.map(r=>({year:r.year,"Tax Paid":r.totalTax||0}));
+      return<ResponsiveContainer width="100%" height="100%">
+        <BarChart data={data}>
+          <XAxis dataKey="year" tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={{stroke:T.border}}/>
+          <YAxis tickFormatter={fmtK} tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={false}/>
+          <Tooltip content={<CTooltip/>}/>
+          <Bar dataKey="Tax Paid" fill={T.amber} radius={[3,3,0,0]}/>
+        </BarChart>
+      </ResponsiveContainer>;
+    }
       const data=results.map((r,i)=>{const pv=i>0?results[i-1].totalValue:r.totalValue;return{year:r.year,Appreciation:Math.max(r.totalValue-pv+r.totalIncome,0),Spending:r.totalIncome};});
       return<ResponsiveContainer width="100%" height="100%"><ComposedChart data={data}><XAxis dataKey="year" tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={{stroke:T.border}}/><YAxis tickFormatter={fmtK} tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={false}/>
         <Tooltip content={<CTooltip/>}/><Legend wrapperStyle={{fontSize:11,fontFamily:FONT_MONO}}/>
@@ -1296,4 +1365,4 @@ function Hint({children,T}){return<p style={{color:T.textDim,fontSize:12,marginB
 function Empty({T,msg}){return<p style={{color:T.textDim,textAlign:"center",padding:50,fontSize:13,fontFamily:FONT_LABEL}}>{msg||"Enable at least one asset or income source."}</p>;}
 function SaveDot({status,T}){const c=status==="saving"?T.gold:T.green;return<div style={{display:"flex",alignItems:"center",gap:4,fontSize:10,color:c,fontFamily:FONT_LABEL}}><span style={{width:5,height:5,borderRadius:"50%",background:c}}/>{status==="saving"?"Saving...":"Saved"}</div>;}
 function SmBtn({onClick,label,T,danger}){return<button onClick={onClick} style={{padding:"5px 12px",background:danger?T.red+"15":T.inputBg,color:danger?T.red:T.textMid,border:`1px solid ${danger?T.red+"30":T.border2}`,borderRadius:6,fontSize:11,cursor:"pointer",fontWeight:500,fontFamily:FONT_LABEL,whiteSpace:"nowrap"}}>{label}</button>;}
-// v2.3 Phase 1 — Tax engine + UI complete
+// v2.3 Phase 2 — Summary cards, notional gain ⓘ, Gross vs Net + Tax Paid charts
