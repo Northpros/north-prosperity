@@ -1417,6 +1417,28 @@ function Empty({T,msg}){return<p style={{color:T.textDim,textAlign:"center",padd
 function SaveDot({status,T}){const c=status==="saving"?T.gold:T.green;return<div style={{display:"flex",alignItems:"center",gap:4,fontSize:10,color:c,fontFamily:FONT_LABEL}}><span style={{width:5,height:5,borderRadius:"50%",background:c}}/>{status==="saving"?"Saving...":"Saved"}</div>;}
 function SmBtn({onClick,label,T,danger}){return<button onClick={onClick} style={{padding:"5px 12px",background:danger?T.red+"15":T.inputBg,color:danger?T.red:T.textMid,border:`1px solid ${danger?T.red+"30":T.border2}`,borderRadius:6,fontSize:11,cursor:"pointer",fontWeight:500,fontFamily:FONT_LABEL,whiteSpace:"nowrap"}}>{label}</button>;}
 // ============================================================
+// BIG TICKET SUMMARY HELPER — avoids IIFE in JSX (iOS compat)
+// ============================================================
+function BigTicketSummary({bt, bigTicketItem, bc, fxRate, T, Row, Section}) {
+  const rates = fxRate||{};
+  const btTotal = bt.reduce((t,s)=>t+toBase(s.shares*s.price,s.currency||bc,bc,rates),0);
+  const btAfterTax = bt.reduce((t,s)=>{
+    const price=toBase(s.price,s.currency||bc,bc,rates);
+    const cb=toBase(s.costBasis||0,s.currency||bc,bc,rates);
+    const gain=Math.max(0,price-cb);
+    const tax=(s.applyTax&&(s.taxRate||0)>0)?s.shares*gain*(s.taxRate/100):0;
+    return t+(s.shares*price)-tax;
+  },0);
+  const btHasTax = bt.some(s=>s.applyTax&&(s.taxRate||0)>0);
+  return (
+    <Section title="Big Ticket">
+      <Row label={`${bigTicketItem} — Pre-Tax`} value={fmt(btTotal,bc)} color={T.gold}/>
+      {btHasTax&&<Row label={`${bigTicketItem} — After-Tax`} value={fmt(btAfterTax,bc)} color={T.green}/>}
+    </Section>
+  );
+}
+
+// ============================================================
 // TAB: SUMMARY
 // ============================================================
 function SummaryTab({plan, results, T, baseCurrency="USD", fxRate={}}) {
@@ -1538,21 +1560,7 @@ function SummaryTab({plan, results, T, baseCurrency="USD", fxRate={}}) {
         </Section>}
 
         {/* BIG TICKET */}
-        {bt.length>0&&plan.bigTicketItem&&(()=>{
-          const btTotal=bt.reduce((t,s)=>t+toBase(s.shares*s.price,s.currency||bc,bc,fxRate),0);
-          const btAfterTax=bt.reduce((t,s)=>{
-            const price=toBase(s.price,s.currency||bc,bc,fxRate);
-            const cb=toBase(s.costBasis||0,s.currency||bc,bc,fxRate);
-            const gain=Math.max(0,price-cb);
-            const tax=(s.applyTax&&(s.taxRate||0)>0)?s.shares*gain*(s.taxRate/100):0;
-            return t+(s.shares*price)-tax;
-          },0);
-          const btHasTax=bt.some(s=>s.applyTax&&(s.taxRate||0)>0);
-          return <Section title="Big Ticket">
-            <Row label={`${plan.bigTicketItem} — Pre-Tax`} value={fmt(btTotal,bc)} color={T.gold}/>
-            {btHasTax&&<Row label={`${plan.bigTicketItem} — After-Tax`} value={fmt(btAfterTax,bc)} color={T.green}/>}
-          </Section>;
-        })()}
+        {bt.length>0&&plan.bigTicketItem&&<BigTicketSummary bt={bt} bigTicketItem={plan.bigTicketItem} bc={bc} fxRate={fxRate} T={T} Row={Row} Section={Section}/>}
 
         {/* KEY OUTCOMES */}
         {results.length>0&&<Section title="Key Outcomes">
