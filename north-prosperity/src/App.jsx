@@ -1489,7 +1489,7 @@ function SummaryTab({plan, results, T, baseCurrency="USD"}) {
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:4}}>
                 <span style={{fontSize:12,color:T.text,fontFamily:FONT_LABEL,fontWeight:600}}>{s.name}</span>
                 <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
-                  <span style={{fontSize:12,color:T.gold,fontFamily:FONT_MONO}}>{fmt(toBase(s.shares*s.pricePerShare,s.currency||bc,bc,{}),bc)}</span>
+                  <span style={{fontSize:12,color:T.gold,fontFamily:FONT_MONO}}>{fmt(s.shares*s.pricePerShare,s.currency||bc)}</span>
                   <Tag label={`${s.cagr}% CAGR`} color={T.accent}/>
                   {s.applyTax&&(s.taxRate||0)>0&&<Tag label={`${s.taxRate}% tax`} color={T.amber}/>}
                   {!s.applyTax&&<Tag label="tax-free" color={T.green}/>}
@@ -1517,7 +1517,7 @@ function SummaryTab({plan, results, T, baseCurrency="USD"}) {
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:4}}>
                 <span style={{fontSize:12,color:T.text,fontFamily:FONT_LABEL,fontWeight:600}}>{a.name} <span style={{fontSize:10,color:T.textDim}}>Divest</span></span>
                 <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
-                  <span style={{fontSize:12,color:T.gold,fontFamily:FONT_MONO}}>{fmt(toBase(a.shares*a.pricePerShare,a.currency||bc,bc,{}),bc)}</span>
+                  <span style={{fontSize:12,color:T.gold,fontFamily:FONT_MONO}}>{fmt(a.shares*a.pricePerShare,a.currency||bc)}</span>
                   <Tag label={`${a.cagr}% CAGR`} color={T.accent}/>
                   {a.applyTax&&(a.taxRate||0)>0&&<Tag label={`${a.taxRate}% cap gains`} color={T.amber}/>}
                 </div>
@@ -1529,7 +1529,7 @@ function SummaryTab({plan, results, T, baseCurrency="USD"}) {
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:4}}>
                 <span style={{fontSize:12,color:T.text,fontFamily:FONT_LABEL,fontWeight:600}}>{a.name} <span style={{fontSize:10,color:T.textDim}}>Fixed</span></span>
                 <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
-                  <span style={{fontSize:12,color:T.purple,fontFamily:FONT_MONO}}>{fmt(toBase(a.shares*a.pricePerShare,a.currency||bc,bc,{}),bc)}</span>
+                  <span style={{fontSize:12,color:T.purple,fontFamily:FONT_MONO}}>{fmt(a.shares*a.pricePerShare,a.currency||bc)}</span>
                   <Tag label={`${a.cagr}% CAGR`} color={T.accent}/>
                 </div>
               </div>
