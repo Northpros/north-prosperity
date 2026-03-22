@@ -1289,8 +1289,8 @@ function AdditionalTab({plan, update, T, baseCurrency="USD", fxRate={}}) {
 
   return<div style={{display:"flex",flexDirection:"column",gap:12,width:"100%"}}>
     <Card title="Notes & Plans" T={T}>
-      <textarea value={plan.notes||""} onChange={e=>update(d=>{d.notes=e.target.value;return d;})} placeholder="Emergency fund, healthcare, estate planning, tax strategies..."
-        style={{width:"100%",minHeight:70,padding:14,background:T.inputBg,border:`1px solid ${T.border}`,borderRadius:8,fontFamily:FONT_LABEL,fontSize:13,color:T.text,resize:"vertical",outline:"none"}}/>
+      <textarea value={plan.notes||""} onChange={e=>{e.target.style.height="auto";e.target.style.height=e.target.scrollHeight+"px";update(d=>{d.notes=e.target.value;return d;});}} placeholder="Emergency fund, healthcare, estate planning, tax strategies..."
+        style={{width:"100%",minHeight:70,padding:14,background:T.inputBg,border:`1px solid ${T.border}`,borderRadius:8,fontFamily:FONT_LABEL,fontSize:13,color:T.text,resize:"none",outline:"none",overflow:"hidden"}}/>
     </Card>
     <Card title="Big Ticket Calculator" T={T} action={plan.bigTicketStocks.length<10?()=>update(d=>{d.bigTicketStocks.push({id:mkId(),ticker:"",shares:0,price:0,enabled:false,taxRate:0,applyTax:false,costBasis:0});return d;}):null} actionLabel="+ Add">
       <Field label="Saving for?" value={plan.bigTicketItem||""} onChange={v=>update(d=>{d.bigTicketItem=v;return d;})} T={T} placeholder="e.g., Bucket list item"/>
@@ -1317,17 +1317,17 @@ function AdditionalTab({plan, update, T, baseCurrency="USD", fxRate={}}) {
         </React.Fragment>;
       })}</div>
       {totalInBase>0&&<div style={{background:T.summaryBg,border:`1px solid ${T.gold}20`,borderRadius:10,padding:"14px 20px",marginTop:10}}>
-        <div style={{display:"flex",alignItems:"center",gap:32,flexWrap:"wrap"}}>
-          <div>
+        <div style={{display:"flex",alignItems:"center",gap:32,flexWrap:"wrap",justifyContent:"center"}}>
+          <div style={{textAlign:"center"}}>
             <div style={{fontSize:9,color:T.gold,fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:3,fontFamily:FONT_LABEL}}>Total Available {hasTax?"(Pre-Tax)":""}</div>
             <div style={{fontFamily:FONT_DISPLAY,fontSize:22,fontWeight:700,color:T.gold}}>{fmt(totalInBase,base)}</div>
           </div>
           {hasTax&&<>
-            <div>
+            <div style={{textAlign:"center"}}>
               <div style={{fontSize:9,color:T.amber,fontWeight:600,textTransform:"uppercase",letterSpacing:0.8,marginBottom:3,fontFamily:FONT_LABEL}}>Est. Cap Gains Tax</div>
               <div style={{fontSize:18,fontWeight:700,color:T.amber,fontFamily:FONT_DISPLAY}}>{fmt(totalTaxBT,base)}</div>
             </div>
-            <div>
+            <div style={{textAlign:"center"}}>
               <div style={{fontSize:9,color:T.green,fontWeight:600,textTransform:"uppercase",letterSpacing:0.8,marginBottom:3,fontFamily:FONT_LABEL}}>After-Tax Proceeds</div>
               <div style={{fontSize:22,fontWeight:700,color:T.green,fontFamily:FONT_DISPLAY}}>{fmt(afterTaxInBase,base)}</div>
             </div>
