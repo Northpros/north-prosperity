@@ -5,12 +5,41 @@ import {
 } from "recharts";
 
 // ============================================================
-// NORTH PROSPERITY RETIREMENT PLANNER — v2.3 Phase 2
+// NORTH PROSPERITY RETIREMENT PLANNER — v2.4
 // Phase 1: Tax engine + sub-row UI, cap gains, cost basis
 // Phase 2: Revised summary cards (6, new order/colors),
 //   notional gain tax ⓘ bubble, Year 1 Net only when tax active,
 //   2 new charts (Gross vs Net Income, Annual Tax Paid)
+// Phase 3: Pre-retirement price compounding — priceEnteredYear
+//   stamp per asset; engine compounds today's price forward to
+//   retirement start using full 3-phase CAGR+decline curve.
 // ============================================================
+
+// Current year — used for price stamp and pre-retirement compounding
+const CURRENT_YEAR = new Date().getFullYear();
+
+// Pre-retirement start price calculator
+// Compounds pricePerShare from priceEnteredYear → startYear
+// using the same 3-phase decline curve as the main engine.
+// Returns the estimated price at retirement start date.
+function calcStartPrice(pricePerShare, cagr, d1, d2, d3, floor, priceEnteredYear, startYear) {
+  const yearsToRetirement = Math.max(0, startYear - (priceEnteredYear || CURRENT_YEAR));
+  if (yearsToRetirement === 0) return pricePerShare;
+  const sc = (cagr || 0) / 100;
+  const dd1 = (d1 || 0) / 100, dd2 = (d2 || 0) / 100, dd3 = (d3 || 0) / 100;
+  const floorRate = (floor || 0) / 100;
+  const p2s = sc - 5 * dd1, p3s = p2s - 15 * dd2;
+  let price = pricePerShare;
+  for (let y = 1; y <= yearsToRetirement; y++) {
+    let yc;
+    if (y <= 5) yc = sc - y * dd1;
+    else if (y <= 20) yc = p2s - (y - 5) * dd2;
+    else yc = p3s - (y - 20) * dd3;
+    yc = Math.max(yc, floorRate);
+    price = price * (1 + yc);
+  }
+  return Math.round(price);
+}
 
 // ── Formatting ────────────────────────────────────────────────
 const CURRENCIES=[
@@ -72,21 +101,21 @@ const mkId = () => Date.now() + Math.random();
 const DEFAULT_PLAN = {
   params: { personName:"", ageAtStart:60, inflationRate:3, startYear:2030, projectionYears:30, baseCurrency:"USD" },
   divestAssets: [
-    {id:1,name:"Asset 1",note:"",shares:0,pricePerShare:0,cagr:10,cagrDecline1:0.5,cagrDecline2:0.3,cagrDecline3:0.1,dividendPercent:0,includeDividend:false,autoCalc:true,enabled:false,taxRate:0,applyTax:false,costBasis:0},
-    {id:2,name:"Asset 2",note:"",shares:0,pricePerShare:0,cagr:10,cagrDecline1:0.5,cagrDecline2:0.3,cagrDecline3:0.1,dividendPercent:0,includeDividend:false,autoCalc:true,enabled:false,taxRate:0,applyTax:false,costBasis:0},
+    {id:1,name:"Asset 1",note:"",shares:0,pricePerShare:0,priceEnteredYear:CURRENT_YEAR,cagr:10,cagrDecline1:0.5,cagrDecline2:0.3,cagrDecline3:0.1,dividendPercent:0,includeDividend:false,autoCalc:true,enabled:false,taxRate:0,applyTax:false,costBasis:0},
+    {id:2,name:"Asset 2",note:"",shares:0,pricePerShare:0,priceEnteredYear:CURRENT_YEAR,cagr:10,cagrDecline1:0.5,cagrDecline2:0.3,cagrDecline3:0.1,dividendPercent:0,includeDividend:false,autoCalc:true,enabled:false,taxRate:0,applyTax:false,costBasis:0},
   ],
   fixedIncome: [
     {id:1,name:"Pension",amount:0,startYear:2030,indexing:0,enabled:false,taxRate:0,applyTax:false},
     {id:2,name:"Social Security",amount:0,startYear:2030,indexing:2,enabled:false,taxRate:0,applyTax:false},
   ],
   investmentIncome: [
-    {id:1,name:"401k",note:"",shares:0,pricePerShare:0,cagr:7,cagrDecline1:0.3,cagrDecline2:0.2,cagrDecline3:0.1,dividendPercent:0,includeDividend:false,autoCalc:true,enabled:false,taxRate:0,applyTax:false},
+    {id:1,name:"401k",note:"",shares:0,pricePerShare:0,priceEnteredYear:CURRENT_YEAR,cagr:7,cagrDecline1:0.3,cagrDecline2:0.2,cagrDecline3:0.1,dividendPercent:0,includeDividend:false,autoCalc:true,enabled:false,taxRate:0,applyTax:false},
   ],
   otherIncome: [
     {id:1,name:"Business Income",note:"",shares:1,pricePerShare:0,cagr:3,cagrDecline:0.1,annualIncome:0,includeIncome:false,enabled:false,taxRate:0,applyTax:false},
   ],
   fixedAssets: [
-    {id:1,name:"Primary Residence",note:"",shares:1,pricePerShare:0,cagr:3,cagrDecline1:0.1,cagrDecline2:0.05,cagrDecline3:0.02,enabled:false,taxRate:0,applyTax:false,costBasis:0},
+    {id:1,name:"Primary Residence",note:"",shares:1,pricePerShare:0,priceEnteredYear:CURRENT_YEAR,cagr:3,cagrDecline1:0.1,cagrDecline2:0.05,cagrDecline3:0.02,enabled:false,taxRate:0,applyTax:false,costBasis:0},
   ],
   bigTicketStocks: [{id:1,ticker:"",shares:0,price:0,enabled:false,taxRate:0,applyTax:false,costBasis:0}],
   bigTicketItem: "",
@@ -124,7 +153,8 @@ function runProjection(plan, fxRates={}) {
 
   const dp = ea.map(a=>{
     const mult = build3Phase(a.cagr, a.cagrDecline1, a.cagrDecline2, a.cagrDecline3, a.cagrFloor||0);
-    const bp=toBase(a.pricePerShare,a.currency||base,base,rates);
+    const rawBp=toBase(a.pricePerShare,a.currency||base,base,rates);
+    const bp=calcStartPrice(rawBp,a.cagr,a.cagrDecline1,a.cagrDecline2,a.cagrDecline3,a.cagrFloor||0,a.priceEnteredYear||CURRENT_YEAR,sy);
     return mult.map(m=>Math.round(bp*m));
   });
   const ip = ei.map(s=>{
@@ -132,7 +162,8 @@ function runProjection(plan, fxRates={}) {
     const d2=s.cagrDecline2!==undefined?s.cagrDecline2:((s.cagrDecline||0.3)*0.6);
     const d3=s.cagrDecline3!==undefined?s.cagrDecline3:((s.cagrDecline||0.3)*0.3);
     const mult = build3Phase(s.cagr, d1, d2, d3, s.cagrFloor||0);
-    const bp=toBase(s.pricePerShare,s.currency||base,base,rates);
+    const rawBp=toBase(s.pricePerShare,s.currency||base,base,rates);
+    const bp=calcStartPrice(rawBp,s.cagr,d1,d2,d3,s.cagrFloor||0,s.priceEnteredYear||CURRENT_YEAR,sy);
     return mult.map(m=>Math.round(bp*m));
   });
   const fap = efa.map(a=>{
@@ -140,7 +171,8 @@ function runProjection(plan, fxRates={}) {
     const d2=a.cagrDecline2!==undefined?a.cagrDecline2:((a.cagrDecline||0.1)*0.5);
     const d3=a.cagrDecline3!==undefined?a.cagrDecline3:((a.cagrDecline||0.1)*0.2);
     const mult = build3Phase(a.cagr, d1, d2, d3, a.cagrFloor||0);
-    const bp=toBase(a.pricePerShare,a.currency||base,base,rates);
+    const rawBp=toBase(a.pricePerShare,a.currency||base,base,rates);
+    const bp=calcStartPrice(rawBp,a.cagr,d1,d2,d3,a.cagrFloor||0,a.priceEnteredYear||CURRENT_YEAR,sy);
     return mult.map(m=>Math.round(bp*m));
   });
   const op = eo.map(s=>{
@@ -269,17 +301,17 @@ const save = (plan) => { try{localStorage.setItem(STORAGE_KEY,JSON.stringify(pla
 function migratePlan(d) {
   const taxDefaults = {taxRate:0,applyTax:false};
   const capGainsDefaults = {taxRate:0,applyTax:false,costBasis:0};
-  d.divestAssets=(d.divestAssets||[]).map(a=>({dividendPercent:0,includeDividend:false,cagrFloor:0,...capGainsDefaults,...a}));
+  d.divestAssets=(d.divestAssets||[]).map(a=>({dividendPercent:0,includeDividend:false,cagrFloor:0,priceEnteredYear:CURRENT_YEAR,...capGainsDefaults,...a}));
   d.fixedIncome=(d.fixedIncome||[]).map(s=>({...taxDefaults,...s}));
   d.investmentIncome=(d.investmentIncome||[]).map(s=>({
-    dividendPercent:0,includeDividend:false,cagrFloor:0,
+    dividendPercent:0,includeDividend:false,cagrFloor:0,priceEnteredYear:CURRENT_YEAR,
     cagrDecline1:s.cagrDecline1!==undefined?s.cagrDecline1:0.3,
     cagrDecline2:s.cagrDecline2!==undefined?s.cagrDecline2:0.2,
     cagrDecline3:s.cagrDecline3!==undefined?s.cagrDecline3:0.1,
     ...taxDefaults,...s
   }));
   d.fixedAssets=(d.fixedAssets||[]).map(a=>({
-    cagrFloor:0,
+    cagrFloor:0,priceEnteredYear:CURRENT_YEAR,
     cagrDecline1:a.cagrDecline1!==undefined?a.cagrDecline1:0.1,
     cagrDecline2:a.cagrDecline2!==undefined?a.cagrDecline2:0.05,
     cagrDecline3:a.cagrDecline3!==undefined?a.cagrDecline3:0.02,
@@ -487,6 +519,43 @@ function NotionalGainInfo({T}) {
         This is the estimated capital gains tax if you sold your entire current position today at the price entered. It is a snapshot only — not a real tax bill. The projection engine charges tax year by year as shares are actually sold, using the projected price at time of sale. This figure will grow over time as the share price appreciates.
       </div>}
     </span>
+  );
+}
+// Start price label — shown under Price field when pre-retirement compounding applies
+function StartPriceLabel({pricePerShare, cagr, d1, d2, d3, floor, priceEnteredYear, startYear, currency, T}) {
+  const [tip, setTip] = useState(null);
+  const btnRef = useRef(null);
+  const yearsToRet = Math.max(0, startYear - (priceEnteredYear || CURRENT_YEAR));
+  if (!pricePerShare || pricePerShare <= 0 || yearsToRet <= 0) return null;
+  const startPx = calcStartPrice(pricePerShare, cagr, d1, d2, d3, floor, priceEnteredYear || CURRENT_YEAR, startYear);
+  const handleInfo = (e) => {
+    e.stopPropagation();
+    if(tip){setTip(null);return;}
+    const r = btnRef.current?.getBoundingClientRect();
+    if(r) setTip({top:r.bottom+6, left:Math.min(r.left, window.innerWidth-280)});
+  };
+  useEffect(()=>{
+    if(!tip)return;
+    const close=()=>setTip(null);
+    document.addEventListener("click",close);
+    document.addEventListener("touchstart",close);
+    return()=>{document.removeEventListener("click",close);document.removeEventListener("touchstart",close);};
+  },[tip]);
+  return (
+    <div style={{display:"flex",alignItems:"center",gap:3,marginTop:2}}>
+      <span style={{fontSize:9,color:T.cyan,fontFamily:FONT_MONO,whiteSpace:"nowrap"}}>
+        Est. @ {startYear}: {fmt(startPx, currency||"USD")}
+      </span>
+      <span ref={btnRef} onClick={handleInfo} onTouchEnd={e=>{e.preventDefault();handleInfo(e);}}
+        style={{cursor:"pointer",color:T.cyan,fontSize:9,WebkitUserSelect:"none",userSelect:"none",opacity:0.7}}>ⓘ
+        {tip&&<div style={{top:tip.top,left:tip.left,background:T.card,color:T.text,border:`1px solid ${T.border2}`,boxShadow:"0 4px 20px rgba(0,0,0,0.5)",zIndex:99999,position:"fixed",width:270,padding:"10px 12px",borderRadius:8,fontSize:11,lineHeight:1.6,fontFamily:FONT_MONO,pointerEvents:"none"}}>
+          <strong style={{color:T.cyan}}>Today's price: {fmt(pricePerShare,currency||"USD")}</strong><br/>
+          Entered: {priceEnteredYear||CURRENT_YEAR} · Retirement: {startYear}<br/>
+          Years of pre-retirement growth: {yearsToRet}<br/><br/>
+          The engine compounds your today's price forward using the same CAGR + decline curve, so projections start from a realistic retirement-date baseline — not today's price. Update the price field any time to refresh this estimate.
+        </div>}
+      </span>
+    </div>
   );
 }
 function DisclaimerFooter(){
@@ -737,15 +806,18 @@ function PlanningTab({plan, update, T, baseCurrency="USD", fxRate=null, fxError=
 
     {/* TAX DEFERRED SOURCES */}
     <Card title="Tax Deferred Sources of Income" badge="RRSP, TFSA, RRIF, 401(k), IRA, ISA, SIPP, Super, KiwiSaver, Pillar 3a, Afore" T={T}
-      action={plan.investmentIncome.length<10?()=>update(d=>{d.investmentIncome.push({id:mkId(),name:"New Investment",note:"",shares:0,pricePerShare:0,cagr:7,cagrDecline1:0.3,cagrDecline2:0.2,cagrDecline3:0.1,dividendPercent:0,includeDividend:false,autoCalc:true,enabled:false,taxRate:0,applyTax:false});return d;}):null} actionLabel="+ Add">
-      <Hint T={T}>Tax-deferred accounts worldwide. Amort/Sell draws balance to $0 by end of term. Div pays dividends from remaining balance. Three-phase CAGR decline: Yr 1-5, Yr 6-20, Yr 21+. Tax treatment varies — use % Tax to configure per account.</Hint>
+      action={plan.investmentIncome.length<10?()=>update(d=>{d.investmentIncome.push({id:mkId(),name:"New Investment",note:"",shares:0,pricePerShare:0,priceEnteredYear:CURRENT_YEAR,cagr:7,cagrDecline1:0.3,cagrDecline2:0.2,cagrDecline3:0.1,dividendPercent:0,includeDividend:false,autoCalc:true,enabled:false,taxRate:0,applyTax:false});return d;}):null} actionLabel="+ Add">
+      <Hint T={T}>Enter today's price — the engine compounds it to your retirement start date using your CAGR + decline curve. Amort/Sell draws balance to $0 by end of term. Div pays dividends from remaining balance. Three-phase CAGR decline: Yr 1-5, Yr 6-20, Yr 21+. Tax treatment varies — use % Tax to configure per account.</Hint>
       {plan.investmentIncome.map((s,i)=>{
         const tk=`ii_${i}`;
         return <div key={s.id}>
           <ItemRow enabled={s.enabled} T={T} onToggle={()=>update(d=>{d.investmentIncome[i].enabled=!d.investmentIncome[i].enabled;return d;})} onRemove={()=>update(d=>{d.investmentIncome.splice(i,1);return d;})}>
             <MF label="Name" value={s.name} w="1.0fr" onChange={v=>update(d=>{d.investmentIncome[i].name=v;return d;})} T={T}/>
             <MF label="Shares" cls="mf-sm" value={s.shares} type="number" w="0.25fr" onChange={v=>update(d=>{d.investmentIncome[i].shares=+v||0;return d;})} T={T}/>
-            <MF label="Price" cls="mf-md" value={s.pricePerShare} type="number" w="0.4fr" onChange={v=>update(d=>{d.investmentIncome[i].pricePerShare=+v||0;return d;})} T={T}/>
+            <div style={{minWidth:30,flex:"0.4fr"}}>
+              <MF label="Today's Price" cls="mf-md" value={s.pricePerShare} type="number" w="100%" onChange={v=>update(d=>{d.investmentIncome[i].pricePerShare=+v||0;d.investmentIncome[i].priceEnteredYear=CURRENT_YEAR;return d;})} T={T}/>
+              <StartPriceLabel pricePerShare={s.pricePerShare} cagr={s.cagr} d1={s.cagrDecline1!==undefined?s.cagrDecline1:0.3} d2={s.cagrDecline2!==undefined?s.cagrDecline2:0.2} d3={s.cagrDecline3!==undefined?s.cagrDecline3:0.1} floor={s.cagrFloor||0} priceEnteredYear={s.priceEnteredYear||CURRENT_YEAR} startYear={plan.params.startYear} currency={s.currency||baseCurrency} T={T}/>
+            </div>
             <MF label="CAGR%" cls="mf-xs" value={s.cagr} type="number" step="0.5" w="0.22fr" onChange={v=>update(d=>{d.investmentIncome[i].cagr=+v||0;return d;})} T={T}/>
             <MF label="Yr 1-5 ↓%" cls="mf-xs" value={s.cagrDecline1!==undefined?s.cagrDecline1:(s.cagrDecline||0.3)} type="number" step="0.1" w="0.22fr" onChange={v=>update(d=>{d.investmentIncome[i].cagrDecline1=+v||0;return d;})} T={T}/>
             <MF label="Yr 6-20 ↓%" cls="mf-xs" value={s.cagrDecline2!==undefined?s.cagrDecline2:((s.cagrDecline||0.3)*0.6)} type="number" step="0.1" w="0.22fr" onChange={v=>update(d=>{d.investmentIncome[i].cagrDecline2=+v||0;return d;})} T={T}/>
@@ -821,15 +893,18 @@ function DivestTab({plan, update, T, baseCurrency="USD"}) {
 
   return <div style={{display:"flex",flexDirection:"column",gap:12,width:"100%"}}>
     <Card title="Investment Assets to Divest" badge="Max 20" T={T}
-      action={plan.divestAssets.length<20?()=>update(d=>{d.divestAssets.push({id:mkId(),name:`Asset ${d.divestAssets.length+1}`,note:"",shares:0,pricePerShare:0,cagr:10,cagrDecline1:0.5,cagrDecline2:0.3,cagrDecline3:0.1,dividendPercent:0,includeDividend:false,autoCalc:true,enabled:false,taxRate:0,applyTax:false,costBasis:0});return d;}):null} actionLabel="+ Add Asset">
-      <Hint T={T}>Unregistered assets sold on an amortization schedule to $0 by end of term. Three-phase CAGR decline: Yr 1-5, Yr 6-20, Yr 21+. Use % Tax to set cap gains rate and cost basis.</Hint>
+      action={plan.divestAssets.length<20?()=>update(d=>{d.divestAssets.push({id:mkId(),name:`Asset ${d.divestAssets.length+1}`,note:"",shares:0,pricePerShare:0,priceEnteredYear:CURRENT_YEAR,cagr:10,cagrDecline1:0.5,cagrDecline2:0.3,cagrDecline3:0.1,dividendPercent:0,includeDividend:false,autoCalc:true,enabled:false,taxRate:0,applyTax:false,costBasis:0});return d;}):null} actionLabel="+ Add Asset">
+      <Hint T={T}>Enter today's price — the engine automatically compounds it forward to your retirement start date using your CAGR + decline curve. Three-phase decline: Yr 1-5, Yr 6-20, Yr 21+. Use % Tax to set cap gains rate and cost basis.</Hint>
       {plan.divestAssets.map((a,i)=>{
         const tk=`da_${i}`;
         return <div key={a.id}>
           <ItemRow enabled={a.enabled} T={T} onToggle={()=>update(d=>{d.divestAssets[i].enabled=!d.divestAssets[i].enabled;return d;})} onRemove={()=>update(d=>{d.divestAssets.splice(i,1);return d;})}>
             <MF label="Ticker" value={a.name} w="0.7fr" onChange={v=>update(d=>{d.divestAssets[i].name=v;return d;})} T={T}/>
             <MF label="Shares" cls="mf-sm" value={a.shares} type="number" w="0.25fr" onChange={v=>update(d=>{d.divestAssets[i].shares=+v||0;return d;})} T={T}/>
-            <MF label="Price" cls="mf-md" value={a.pricePerShare} type="number" w="0.4fr" onChange={v=>update(d=>{d.divestAssets[i].pricePerShare=+v||0;return d;})} T={T}/>
+            <div style={{minWidth:30,flex:"0.4fr"}}>
+              <MF label="Today's Price" cls="mf-md" value={a.pricePerShare} type="number" w="100%" onChange={v=>update(d=>{d.divestAssets[i].pricePerShare=+v||0;d.divestAssets[i].priceEnteredYear=CURRENT_YEAR;return d;})} T={T}/>
+              <StartPriceLabel pricePerShare={a.pricePerShare} cagr={a.cagr} d1={a.cagrDecline1} d2={a.cagrDecline2} d3={a.cagrDecline3} floor={a.cagrFloor||0} priceEnteredYear={a.priceEnteredYear||CURRENT_YEAR} startYear={plan.params.startYear} currency={a.currency||baseCurrency} T={T}/>
+            </div>
             <MF label="CAGR%" cls="mf-xs" value={a.cagr} type="number" step="1" w="0.22fr" onChange={v=>update(d=>{d.divestAssets[i].cagr=+v||0;return d;})} T={T}/>
             <MF label="Yr 1-5 ↓%" cls="mf-xs" value={a.cagrDecline1} type="number" step="0.1" w="0.22fr" onChange={v=>update(d=>{d.divestAssets[i].cagrDecline1=+v||0;return d;})} T={T}/>
             <MF label="Yr 6-20 ↓%" cls="mf-xs" value={a.cagrDecline2} type="number" step="0.1" w="0.22fr" onChange={v=>update(d=>{d.divestAssets[i].cagrDecline2=+v||0;return d;})} T={T}/>
@@ -933,15 +1008,18 @@ function FixedAssetsTab({plan, update, T, baseCurrency="USD"}) {
 
   return <div style={{display:"flex",flexDirection:"column",gap:12,width:"100%"}}>
     <Card title="Fixed Assets (Non-Income)" badge="Real Estate, Precious Metals, Collectibles, Hard Assets" T={T}
-      action={plan.fixedAssets.length<10?()=>update(d=>{d.fixedAssets.push({id:mkId(),name:"New Asset",note:"",shares:1,pricePerShare:0,cagr:3,cagrDecline1:0.1,cagrDecline2:0.05,cagrDecline3:0.02,enabled:false,taxRate:0,applyTax:false,costBasis:0});return d;}):null} actionLabel="+ Add">
-      <Hint T={T}>Assets that grow in value but don't generate income. Three-phase CAGR decline: Yr 1-5, Yr 6-20, Yr 21+. Use % Tax for notional cap gains on sale.</Hint>
+      action={plan.fixedAssets.length<10?()=>update(d=>{d.fixedAssets.push({id:mkId(),name:"New Asset",note:"",shares:1,pricePerShare:0,priceEnteredYear:CURRENT_YEAR,cagr:3,cagrDecline1:0.1,cagrDecline2:0.05,cagrDecline3:0.02,enabled:false,taxRate:0,applyTax:false,costBasis:0});return d;}):null} actionLabel="+ Add">
+      <Hint T={T}>Enter today's price — the engine compounds it to your retirement start date. Assets that grow in value but don't generate income. Three-phase CAGR decline: Yr 1-5, Yr 6-20, Yr 21+. Use % Tax for notional cap gains on sale.</Hint>
       {plan.fixedAssets.map((a,i)=>{
         const tk=`fa_${i}`;
         return <div key={a.id}>
           <ItemRow enabled={a.enabled} T={T} onToggle={()=>update(d=>{d.fixedAssets[i].enabled=!d.fixedAssets[i].enabled;return d;})} onRemove={()=>update(d=>{d.fixedAssets.splice(i,1);return d;})}>
             <MF label="Name" value={a.name} w="1.0fr" onChange={v=>update(d=>{d.fixedAssets[i].name=v;return d;})} T={T}/>
             <MF label="Units" cls="mf-sm" value={a.shares} type="number" w="0.25fr" onChange={v=>update(d=>{d.fixedAssets[i].shares=+v||0;return d;})} T={T}/>
-            <MF label="Price" cls="mf-md" value={a.pricePerShare} type="number" w="0.4fr" onChange={v=>update(d=>{d.fixedAssets[i].pricePerShare=+v||0;return d;})} T={T}/>
+            <div style={{minWidth:30,flex:"0.4fr"}}>
+              <MF label="Today's Price" cls="mf-md" value={a.pricePerShare} type="number" w="100%" onChange={v=>update(d=>{d.fixedAssets[i].pricePerShare=+v||0;d.fixedAssets[i].priceEnteredYear=CURRENT_YEAR;return d;})} T={T}/>
+              <StartPriceLabel pricePerShare={a.pricePerShare} cagr={a.cagr} d1={a.cagrDecline1!==undefined?a.cagrDecline1:0.1} d2={a.cagrDecline2!==undefined?a.cagrDecline2:0.05} d3={a.cagrDecline3!==undefined?a.cagrDecline3:0.02} floor={a.cagrFloor||0} priceEnteredYear={a.priceEnteredYear||CURRENT_YEAR} startYear={plan.params.startYear} currency={a.currency||baseCurrency} T={T}/>
+            </div>
             <MF label="CAGR%" cls="mf-xs" value={a.cagr} type="number" step="0.5" w="0.22fr" onChange={v=>update(d=>{d.fixedAssets[i].cagr=+v||0;return d;})} T={T}/>
             <MF label="Yr 1-5 ↓%" cls="mf-xs" value={a.cagrDecline1!==undefined?a.cagrDecline1:(a.cagrDecline||0.1)} type="number" step="0.1" w="0.22fr" onChange={v=>update(d=>{d.fixedAssets[i].cagrDecline1=+v||0;return d;})} T={T}/>
             <MF label="Yr 6-20 ↓%" cls="mf-xs" value={a.cagrDecline2!==undefined?a.cagrDecline2:((a.cagrDecline||0.1)*0.5)} type="number" step="0.1" w="0.22fr" onChange={v=>update(d=>{d.fixedAssets[i].cagrDecline2=+v||0;return d;})} T={T}/>
@@ -1585,4 +1663,4 @@ function SummaryTab({plan, results, T, baseCurrency="USD", fxRate={}}) {
   );
 }
 
-// v2.3 — Summary tab, numbered tabs, CAGR presets with floors
+// v2.4 — Pre-retirement price compounding: priceEnteredYear stamp, calcStartPrice engine, Est. @ retirement UI label
