@@ -595,7 +595,7 @@ export default function RetirementPlanner() {
   const triggerSave = useCallback((np)=>{
     setSaveStatus("saving");
     if(saveTimer.current)clearTimeout(saveTimer.current);
-    saveTimer.current=setTimeout(()=>{save(np);setSaveStatus("saved");},600);
+    saveTimer.current=setTimeout(()=>{save(np);setSaveStatus("saved");},100);
   },[]);
 
   const update = useCallback((fn)=>{
@@ -627,12 +627,17 @@ export default function RetirementPlanner() {
       input.style.display="none";
       input.onchange=e=>{
         const f=e.target.files[0];
-        input.value=""; // reset so same file can be re-imported
+        input.value="";
         if(!f)return;
         const r=new FileReader();
         r.onload=ev=>{try{const d=JSON.parse(ev.target.result);if(d.params&&d.divestAssets){
           const migrated=migratePlan(d);
-          setPlan(migrated);save(migrated);alert(`Loaded: ${migrated.params.personName||"plan"}`);
+          // Cancel any pending save timer so it can't overwrite the import
+          if(saveTimer.current)clearTimeout(saveTimer.current);
+          setPlan(migrated);
+          // Defer save slightly to let setPlan settle
+          setTimeout(()=>{save(migrated);setSaveStatus("saved");},100);
+          alert(`Loaded: ${migrated.params.personName||"plan"}`);
         }else alert("Invalid file.");}catch{alert("Could not read file.");}};
         r.readAsText(f);
       };
