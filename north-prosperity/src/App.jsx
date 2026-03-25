@@ -185,11 +185,13 @@ function runProjection(plan, fxRates={}) {
 
   const aw = ea.map((a,i)=>{
     if(!a.autoCalc)return 0; let sr=0;
-    for(let y=0;y<totalYears;y++){const yf=(fracYear>0&&y===totalYears-1)?fracYear:1;sr+=yf*Math.pow(1+inf,y)/dp[i][y];}return a.shares/sr;
+    for(let y=0;y<totalYears;y++){const yf=(fracYear>0&&y===totalYears-1)?fracYear:1;const px=dp[i][y];if(!px||px<=0)return 0;sr+=yf*Math.pow(1+inf,y)/px;}
+    return sr>0?a.shares/sr:0;
   });
   const iw = ei.map((s,i)=>{
     if(!s.autoCalc)return 0; let sr=0;
-    for(let y=0;y<totalYears;y++){const yf=(fracYear>0&&y===totalYears-1)?fracYear:1;sr+=yf*Math.pow(1+inf,y)/ip[i][y];}return s.shares/sr;
+    for(let y=0;y<totalYears;y++){const yf=(fracYear>0&&y===totalYears-1)?fracYear:1;const px=ip[i][y];if(!px||px<=0)return 0;sr+=yf*Math.pow(1+inf,y)/px;}
+    return sr>0?s.shares/sr:0;
   });
 
   const ds = ea.map((a,i)=>({rem:a.shares,bw:Math.round(aw[i])}));
@@ -529,7 +531,7 @@ function StartPriceLabel({pricePerShare, cagr, d1, d2, d3, floor, priceEnteredYe
   const [tip, setTip] = useState(null);
   const btnRef = useRef(null);
   const yearsToRet = Math.max(0, startYear - (priceEnteredYear || CURRENT_YEAR));
-  if (!pricePerShare || pricePerShare <= 0 || yearsToRet <= 0) return null;
+  if (!pricePerShare || pricePerShare <= 0 || !isFinite(pricePerShare) || pricePerShare < 0.01 || yearsToRet <= 0) return null;
   const startPx = calcStartPrice(pricePerShare, cagr, d1, d2, d3, floor, priceEnteredYear || CURRENT_YEAR, startYear);
   const handleInfo = (e) => {
     e.stopPropagation();
@@ -753,6 +755,29 @@ export default function RetirementPlanner() {
   );
 }
 
+// Start year field — free typing, only commits valid 4-digit year on blur/Enter
+function StartYearField({value, onCommit, T}) {
+  const [local, setLocal] = useState(String(value));
+  useEffect(()=>setLocal(String(value)),[value]);
+  const commit = () => {
+    const y = parseInt(local, 10);
+    if (isFinite(y) && y >= 2000 && y <= 2150) onCommit(String(y));
+    else setLocal(String(value)); // revert if invalid
+  };
+  return (
+    <div>
+      <label style={{fontSize:10,color:T.label,fontWeight:600,textTransform:"uppercase",letterSpacing:0.5,display:"block",marginBottom:3,fontFamily:FONT_LABEL}}>Start Year</label>
+      <input type="number" value={local}
+        onChange={e=>setLocal(e.target.value)}
+        onBlur={commit}
+        onKeyDown={e=>{if(e.key==="Enter")commit();}}
+        onFocus={e=>e.target.select()}
+        style={{width:"100%",padding:"7px 10px",background:T.inputBg,border:`1px solid ${T.border2}`,borderRadius:6,fontSize:13,color:T.text,fontFamily:FONT_LABEL}}
+      />
+    </div>
+  );
+}
+
 // ============================================================
 // TAB: PLANNING
 // ============================================================
@@ -765,8 +790,8 @@ function PlanningTab({plan, update, T, baseCurrency="USD", fxRate=null, fxError=
   const toggleTax = (key) => setShowTax(prev=>({...prev,[key]:!prev[key]}));
   const onStartYear = (v) => {
     const y = parseInt(v, 10);
-    if (!v || String(v).length < 4 || !isFinite(y)) return;
-    if (y >= CURRENT_YEAR && y <= 2150) up("startYear", y);
+    if (!isFinite(y) || y < 2000 || y > 2150) return;
+    up("startYear", y);
   };
 
   return <div style={{display:"flex",flexDirection:"column",gap:12,width:"100%"}}>
@@ -775,7 +800,7 @@ function PlanningTab({plan, update, T, baseCurrency="USD", fxRate=null, fxError=
         <Field label="Person / Couple" value={p.personName} onChange={v=>up("personName",v)} T={T}/>
         <Field label="Age at Start" value={p.ageAtStart} type="number" onChange={v=>up("ageAtStart",+v||60)} T={T}/>
         <Field label="Inflation %" value={p.inflationRate} type="number" step="0.5" onChange={v=>up("inflationRate",+v||0)} T={T}/>
-        <Field label="Start Year" value={p.startYear} type="number" onChange={onStartYear} T={T}/>
+        <StartYearField value={p.startYear} onCommit={onStartYear} T={T}/>
         <Field label="Projection Years" value={p.projectionYears} type="number" step="0.25" onChange={v=>up("projectionYears",Math.min(parseFloat(v)||30,60))} T={T}/>
         <div><label style={{fontSize:10,color:T.label,fontWeight:600,textTransform:"uppercase",letterSpacing:0.5,display:"block",marginBottom:3,fontFamily:FONT_LABEL}}>Base Currency</label>
         <select value={p.baseCurrency||"USD"} onChange={e=>up("baseCurrency",e.target.value)} style={{width:"100%",padding:"7px 10px",background:T.inputBg,border:`1px solid ${T.border2}`,borderRadius:6,fontSize:13,color:T.text,fontFamily:FONT_LABEL}}>
