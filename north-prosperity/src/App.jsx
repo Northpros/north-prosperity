@@ -23,7 +23,9 @@ const CURRENT_YEAR = new Date().getFullYear();
 // using the same 3-phase decline curve as the main engine.
 // Returns the estimated price at retirement start date.
 function calcStartPrice(pricePerShare, cagr, d1, d2, d3, floor, priceEnteredYear, startYear) {
-  const yearsToRetirement = Math.max(0, startYear - (priceEnteredYear || CURRENT_YEAR));
+  if (!pricePerShare || !isFinite(pricePerShare) || pricePerShare <= 0) return 0;
+  if (!startYear || !isFinite(startYear) || startYear < CURRENT_YEAR) return pricePerShare;
+  const yearsToRetirement = Math.max(0, Math.min(startYear - (priceEnteredYear || CURRENT_YEAR), 80));
   if (yearsToRetirement === 0) return pricePerShare;
   const sc = (cagr || 0) / 100;
   const dd1 = (d1 || 0) / 100, dd2 = (d2 || 0) / 100, dd3 = (d3 || 0) / 100;
@@ -128,13 +130,14 @@ function runProjection(plan, fxRates={}) {
   const base = p.baseCurrency||"USD";
   const rates = (fxRates&&typeof fxRates==="object")?fxRates:{};
   const inf = p.inflationRate / 100;
-  const sy = p.startYear, py = p.projectionYears;
+  const sy = (p.startYear&&isFinite(p.startYear)&&p.startYear>=CURRENT_YEAR)?p.startYear:CURRENT_YEAR;
+  const py = (p.projectionYears&&isFinite(p.projectionYears)&&p.projectionYears>0)?p.projectionYears:1;
   const totalYears = Math.ceil(py);
   const fracYear = py % 1;
-  const ea = plan.divestAssets.filter(a=>a.enabled&&a.shares>0&&a.pricePerShare>0);
+  const ea = plan.divestAssets.filter(a=>a.enabled&&a.shares>0&&a.pricePerShare>0&&isFinite(a.pricePerShare));
   const ef = plan.fixedIncome.filter(s=>s.enabled&&s.amount>0);
-  const ei = plan.investmentIncome.filter(s=>s.enabled&&s.shares>0&&s.pricePerShare>0);
-  const efa = plan.fixedAssets.filter(a=>a.enabled&&a.shares>0&&a.pricePerShare>0);
+  const ei = plan.investmentIncome.filter(s=>s.enabled&&s.shares>0&&s.pricePerShare>0&&isFinite(s.pricePerShare));
+  const efa = plan.fixedAssets.filter(a=>a.enabled&&a.shares>0&&a.pricePerShare>0&&isFinite(a.pricePerShare));
   const eo = plan.otherIncome.filter(s=>s.enabled&&((s.shares>0&&s.pricePerShare>0)||(s.includeIncome&&s.annualIncome>0)));
   if(!ea.length&&!ef.length&&!ei.length&&!eo.length&&!efa.length) return [];
 
@@ -596,7 +599,7 @@ export default function RetirementPlanner() {
     setPlan(prev=>{const next=fn(JSON.parse(JSON.stringify(prev)));triggerSave(next);return next;});
   },[triggerSave]);
 
-  const results = useMemo(()=>runProjection(plan,fxRate||{}),[plan,fxRate]);
+  const results = useMemo(()=>{try{return runProjection(plan,fxRate||{});}catch(e){console.error("Projection error:",e);return[];}},[plan,fxRate]);
   const y1=results[0]||{}, yL=results[results.length-1]||{};
   const peakIncome=results.length?Math.max(...results.map(r=>r.totalIncome)):0;
   const peakValue=results.length?Math.max(...results.map(r=>r.totalValue)):0;
@@ -760,6 +763,11 @@ function PlanningTab({plan, update, T, baseCurrency="USD", fxRate=null, fxError=
   const [showTax, setShowTax] = useState({}); // {fi_0: true, ii_1: true, oi_0: true}
   const applyInvPreset = (i,key)=>{const pr=CAGR_PRESETS[key];update(d=>{d.investmentIncome[i].cagr=pr.cagr;d.investmentIncome[i].cagrDecline1=pr.d1;d.investmentIncome[i].cagrDecline2=pr.d2;d.investmentIncome[i].cagrDecline3=pr.d3;d.investmentIncome[i].cagrFloor=pr.floor||0;return d;});setShowInvPresets(null);};
   const toggleTax = (key) => setShowTax(prev=>({...prev,[key]:!prev[key]}));
+  const onStartYear = (v) => {
+    const y = parseInt(v, 10);
+    if (!v || String(v).length < 4 || !isFinite(y)) return;
+    if (y >= CURRENT_YEAR && y <= 2150) up("startYear", y);
+  };
 
   return <div style={{display:"flex",flexDirection:"column",gap:12,width:"100%"}}>
     <Card title="Planning Parameters" T={T}>
@@ -767,7 +775,7 @@ function PlanningTab({plan, update, T, baseCurrency="USD", fxRate=null, fxError=
         <Field label="Person / Couple" value={p.personName} onChange={v=>up("personName",v)} T={T}/>
         <Field label="Age at Start" value={p.ageAtStart} type="number" onChange={v=>up("ageAtStart",+v||60)} T={T}/>
         <Field label="Inflation %" value={p.inflationRate} type="number" step="0.5" onChange={v=>up("inflationRate",+v||0)} T={T}/>
-        <Field label="Start Year" value={p.startYear} type="number" onChange={v=>up("startYear",+v||2030)} T={T}/>
+        <Field label="Start Year" value={p.startYear} type="number" onChange={onStartYear} T={T}/>
         <Field label="Projection Years" value={p.projectionYears} type="number" step="0.25" onChange={v=>up("projectionYears",Math.min(parseFloat(v)||30,60))} T={T}/>
         <div><label style={{fontSize:10,color:T.label,fontWeight:600,textTransform:"uppercase",letterSpacing:0.5,display:"block",marginBottom:3,fontFamily:FONT_LABEL}}>Base Currency</label>
         <select value={p.baseCurrency||"USD"} onChange={e=>up("baseCurrency",e.target.value)} style={{width:"100%",padding:"7px 10px",background:T.inputBg,border:`1px solid ${T.border2}`,borderRadius:6,fontSize:13,color:T.text,fontFamily:FONT_LABEL}}>
