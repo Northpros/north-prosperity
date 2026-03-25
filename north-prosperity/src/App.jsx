@@ -1321,19 +1321,23 @@ function AdditionalTab({plan, update, T, baseCurrency="USD", fxRate={}}) {
           {s.enabled&&s.shares>0&&s.price>0&&<div style={{textAlign:"right",fontSize:11,color:T.gold,fontWeight:600,fontFamily:FONT_MONO,paddingRight:10,marginTop:2,marginBottom:4}}>{fmt(s.shares*s.price,s.currency||baseCurrency)}</div>}
         </React.Fragment>;
       })}</div>
-      {totalInBase>0&&<div style={{background:T.summaryBg,border:`1px solid ${T.gold}20`,borderRadius:10,padding:18,marginTop:10,textAlign:"center"}}>
-        <div style={{fontSize:10,color:T.textDim,fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:4,fontFamily:FONT_LABEL}}>Total Available {hasTax?"(Pre-Tax)":""}</div>
-        <div style={{fontFamily:FONT_DISPLAY,fontSize:26,fontWeight:700,color:T.gold}}>{fmt(totalInBase,base)}</div>
-        {hasTax&&<div style={{display:"flex",gap:24,justifyContent:"center",marginTop:12,flexWrap:"wrap"}}>
-          <div>
-            <div style={{fontSize:9,color:T.amber,fontWeight:600,textTransform:"uppercase",letterSpacing:0.8,fontFamily:FONT_LABEL}}>Est. Cap Gains Tax</div>
-            <div style={{fontSize:18,fontWeight:700,color:T.amber,fontFamily:FONT_DISPLAY}}>{fmt(totalTaxBT,base)}</div>
+      {totalInBase>0&&<div style={{background:T.summaryBg,border:`1px solid ${T.gold}20`,borderRadius:10,padding:"16px 24px",marginTop:10}}>
+        <div style={{display:"flex",gap:32,alignItems:"center",justifyContent:"center",flexWrap:"wrap"}}>
+          <div style={{textAlign:"center"}}>
+            <div style={{fontSize:9,color:T.gold,fontWeight:600,textTransform:"uppercase",letterSpacing:0.8,marginBottom:4,fontFamily:FONT_LABEL}}>Total Available {hasTax?"(Pre-Tax)":""}</div>
+            <div style={{fontFamily:FONT_DISPLAY,fontSize:22,fontWeight:700,color:T.gold}}>{fmt(totalInBase,base)}</div>
           </div>
-          <div>
-            <div style={{fontSize:9,color:T.green,fontWeight:600,textTransform:"uppercase",letterSpacing:0.8,fontFamily:FONT_LABEL}}>After-Tax Proceeds</div>
-            <div style={{fontSize:22,fontWeight:700,color:T.green,fontFamily:FONT_DISPLAY}}>{fmt(afterTaxInBase,base)}</div>
-          </div>
-        </div>}
+          {hasTax&&<>
+            <div style={{textAlign:"center"}}>
+              <div style={{fontSize:9,color:T.amber,fontWeight:600,textTransform:"uppercase",letterSpacing:0.8,marginBottom:4,fontFamily:FONT_LABEL}}>Est. Cap Gains Tax</div>
+              <div style={{fontSize:22,fontWeight:700,color:T.amber,fontFamily:FONT_DISPLAY}}>{fmt(totalTaxBT,base)}</div>
+            </div>
+            <div style={{textAlign:"center"}}>
+              <div style={{fontSize:9,color:T.green,fontWeight:600,textTransform:"uppercase",letterSpacing:0.8,marginBottom:4,fontFamily:FONT_LABEL}}>After-Tax Proceeds</div>
+              <div style={{fontSize:22,fontWeight:700,color:T.green,fontFamily:FONT_DISPLAY}}>{fmt(afterTaxInBase,base)}</div>
+            </div>
+          </>}
+        </div>
       </div>}
       <div style={{background:T.inputBg,border:`1px solid ${T.border}`,borderRadius:10,padding:"14px 18px",marginTop:10}}>
         <div style={{fontSize:11,fontWeight:700,color:T.accent,fontFamily:FONT_LABEL,marginBottom:6,textTransform:"uppercase",letterSpacing:0.5}}>What is being sold to fund big ticket items?</div>
