@@ -1504,11 +1504,49 @@ function ItemRow({children,enabled,onToggle,onRemove,T}){return<div style={{disp
   <div style={{display:"flex",gap:6,flex:1,flexWrap:"wrap",alignItems:"flex-start"}}>{children}</div>
   <button onClick={onRemove} style={{background:"none",border:"none",color:T.textDim,cursor:"pointer",fontSize:14,padding:2,marginTop:14,flexShrink:0}}>{"\u00D7"}</button></div>;}
 
-function Field({label,value,onChange,type="text",step,placeholder,T}){return<div><label style={{fontSize:10,color:T.label,fontWeight:600,textTransform:"uppercase",letterSpacing:0.5,display:"block",marginBottom:3,fontFamily:FONT_LABEL}}>{label}</label>
-  <input type={type} value={value} step={step} placeholder={placeholder} onChange={e=>onChange(e.target.value)} onFocus={e=>e.target.select()} style={{width:"100%",padding:"7px 10px",background:T.inputBg,border:`1px solid ${T.border2}`,borderRadius:6,fontSize:13,color:T.text,fontFamily:FONT_LABEL}}/></div>;}
+function Field({label,value,onChange,type="text",step,placeholder,T}){
+  const isNum = type==="number";
+  const [local, setLocal] = useState(isNum?(value===0?"":String(value)):value);
+  useEffect(()=>{setLocal(isNum?(value===0?"":String(value)):value);},[value]);
+  const commit = () => {
+    if(!isNum){onChange(local);return;}
+    const v=parseFloat(local);
+    if(local===""||local==="-"){onChange(0);return;}
+    if(isFinite(v))onChange(v);
+    else setLocal(value===0?"":String(value));
+  };
+  return<div>
+    <label style={{fontSize:10,color:T.label,fontWeight:600,textTransform:"uppercase",letterSpacing:0.5,display:"block",marginBottom:3,fontFamily:FONT_LABEL}}>{label}</label>
+    <input type={type} value={local} step={step} placeholder={placeholder}
+      onChange={e=>setLocal(e.target.value)}
+      onBlur={commit}
+      onKeyDown={e=>{if(e.key==="Enter")commit();}}
+      onFocus={e=>e.target.select()}
+      style={{width:"100%",padding:"7px 10px",background:T.inputBg,border:`1px solid ${T.border2}`,borderRadius:6,fontSize:13,color:T.text,fontFamily:FONT_LABEL}}/>
+  </div>;
+}
 
-function MF({label,value,onChange,type="text",step,w="1fr",lock=false,px,cls,T}){return<div className={cls||""} style={{minWidth:30,flex:px?`0 0 ${px}px`:lock?"0 0 auto":w,width:px?px:undefined}}><label style={{fontSize:9,color:T.label,fontWeight:600,textTransform:"uppercase",letterSpacing:0.3,display:"block",marginBottom:2,fontFamily:FONT_LABEL}}>{label}</label>
-  <input type={type} value={value} step={step} onChange={e=>onChange(e.target.value)} onFocus={e=>e.target.select()} style={{width:"100%",padding:"4px 6px",background:T.inputBg,border:`1px solid ${T.border2}`,borderRadius:4,fontSize:12,color:T.text,fontFamily:FONT_LABEL}}/></div>;}
+function MF({label,value,onChange,type="text",step,w="1fr",lock=false,px,cls,T}){
+  const isNum = type==="number";
+  const [local, setLocal] = useState(isNum?(value===0?"":String(value)):value);
+  useEffect(()=>{setLocal(isNum?(value===0?"":String(value)):value);},[value]);
+  const commit = () => {
+    if(!isNum){onChange(local);return;}
+    const v=parseFloat(local);
+    if(local===""||local==="-"){onChange(0);return;}
+    if(isFinite(v))onChange(v);
+    else setLocal(value===0?"":String(value));
+  };
+  return<div className={cls||""} style={{minWidth:30,flex:px?`0 0 ${px}px`:lock?"0 0 auto":w,width:px?px:undefined}}>
+    <label style={{fontSize:9,color:T.label,fontWeight:600,textTransform:"uppercase",letterSpacing:0.3,display:"block",marginBottom:2,fontFamily:FONT_LABEL}}>{label}</label>
+    <input type={type} value={local} step={step}
+      onChange={e=>setLocal(e.target.value)}
+      onBlur={commit}
+      onKeyDown={e=>{if(e.key==="Enter")commit();}}
+      onFocus={e=>e.target.select()}
+      style={{width:"100%",padding:"4px 6px",background:T.inputBg,border:`1px solid ${T.border2}`,borderRadius:4,fontSize:12,color:T.text,fontFamily:FONT_LABEL}}/>
+  </div>;
+}
 
 function Chk({label,checked,onChange,T}){return<div style={{display:"flex",flexDirection:"column",alignItems:"center",minWidth:32}}><label style={{fontSize:9,color:T.label,fontWeight:600,letterSpacing:0.3,marginBottom:2,fontFamily:FONT_LABEL}}>{label}</label>
   <input type="checkbox" checked={checked} onChange={onChange} style={{width:14,height:14,cursor:"pointer",accentColor:T.accent}}/></div>;}
