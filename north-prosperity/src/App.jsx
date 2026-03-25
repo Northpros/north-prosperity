@@ -619,14 +619,28 @@ export default function RetirementPlanner() {
     a.download=`${plan.params.personName||"retirement-plan"}.json`.replace(/[^a-zA-Z0-9.-]/g,"_");
     a.click();URL.revokeObjectURL(a.href);
   };
+  const importInputRef = useRef(null);
   const importPlan = () => {
-    const input=document.createElement("input");input.type="file";input.accept=".json";
-    input.onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();
-    r.onload=ev=>{try{const d=JSON.parse(ev.target.result);if(d.params&&d.divestAssets){
-      const migrated=migratePlan(d);
-      setPlan(migrated);save(migrated);alert(`Loaded: ${migrated.params.personName||"plan"}`);
-    }else alert("Invalid file.");}catch{alert("Could not read file.");}};r.readAsText(f);};
-    input.click();
+    if(!importInputRef.current){
+      const input=document.createElement("input");
+      input.type="file";input.accept=".json";
+      input.style.display="none";
+      input.onchange=e=>{
+        const f=e.target.files[0];
+        input.value=""; // reset so same file can be re-imported
+        if(!f)return;
+        const r=new FileReader();
+        r.onload=ev=>{try{const d=JSON.parse(ev.target.result);if(d.params&&d.divestAssets){
+          const migrated=migratePlan(d);
+          setPlan(migrated);save(migrated);alert(`Loaded: ${migrated.params.personName||"plan"}`);
+        }else alert("Invalid file.");}catch{alert("Could not read file.");}};
+        r.readAsText(f);
+      };
+      document.body.appendChild(input);
+      importInputRef.current=input;
+    }
+    importInputRef.current.value="";
+    importInputRef.current.click();
   };
   const resetPlan = () => {if(window.confirm("Reset all data? This cannot be undone.")){const f=JSON.parse(JSON.stringify(DEFAULT_PLAN));setPlan(f);save(f);}};
 
