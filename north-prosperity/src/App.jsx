@@ -556,13 +556,14 @@ export default function RetirementPlanner() {
   const resetPlan = () => {if(window.confirm("Reset all data? This cannot be undone.")){const f=JSON.parse(JSON.stringify(DEFAULT_PLAN));setPlan(f);save(f);}};
 
   const tabs = [
-    {id:"planning",label:"Planning & Income",icon:"\u2699\uFE0F"},
-    {id:"divest",label:"Assets to Divest",icon:"\u{1F4B8}"},
-    {id:"fixed",label:"Fixed Assets",icon:"\u{1F3E0}"},
-    {id:"projections",label:"Projections",icon:"\u{1F4CA}"},
-    {id:"withdrawals",label:"Withdrawal Plan",icon:"\u{1F4CB}"},
-    {id:"charts",label:"Charts",icon:"\u{1F4C8}"},
-    {id:"additional",label:"Additional",icon:"\u{1F3AF}"},
+    {id:"planning",    label:"1. Planning & Income"},
+    {id:"divest",      label:"2. Assets to Divest"},
+    {id:"fixed",       label:"3. Fixed Assets"},
+    {id:"projections", label:"4. Projections"},
+    {id:"withdrawals", label:"5. Withdrawal Plan"},
+    {id:"charts",      label:"6. Charts"},
+    {id:"additional",  label:"7. Additional"},
+    {id:"summary",     label:"8. Summary"},
   ];
 
   return (
@@ -660,7 +661,7 @@ export default function RetirementPlanner() {
               color:tab===t.id?T.accent:T.textMid,
               borderBottom:tab===t.id?`2px solid ${T.accent}`:"2px solid transparent",
               transition:"all 0.15s",whiteSpace:"nowrap",letterSpacing:0.2,
-            }}>{t.icon} {t.label}</button>
+            }}>{t.label}</button>
           ))}
         </div>
 
@@ -673,6 +674,7 @@ export default function RetirementPlanner() {
           {tab==="withdrawals" && <WithdrawalTab plan={plan} results={results} T={T} baseCurrency={plan.params.baseCurrency||"USD"}/>}
           {tab==="charts" && <ChartsTab plan={plan} results={results} T={T} baseCurrency={plan.params.baseCurrency||"USD"}/>}
           {tab==="additional" && <AdditionalTab plan={plan} update={update} T={T} baseCurrency={plan.params.baseCurrency||"USD"} fxRate={fxRate||{}}/>}
+          {tab==="summary" && <SummaryTab plan={plan} results={results} T={T} baseCurrency={plan.params.baseCurrency||"USD"} fxRate={fxRate||{}}/>}
         </div>
       </div>
     </div>
@@ -1415,4 +1417,168 @@ function Hint({children,T}){return<p style={{color:T.textDim,fontSize:12,marginB
 function Empty({T,msg}){return<p style={{color:T.textDim,textAlign:"center",padding:50,fontSize:13,fontFamily:FONT_LABEL}}>{msg||"Enable at least one asset or income source."}</p>;}
 function SaveDot({status,T}){const c=status==="saving"?T.gold:T.green;return<div style={{display:"flex",alignItems:"center",gap:4,fontSize:10,color:c,fontFamily:FONT_LABEL}}><span style={{width:5,height:5,borderRadius:"50%",background:c}}/>{status==="saving"?"Saving...":"Saved"}</div>;}
 function SmBtn({onClick,label,T,danger}){return<button onClick={onClick} style={{padding:"5px 12px",background:danger?T.red+"15":T.inputBg,color:danger?T.red:T.textMid,border:`1px solid ${danger?T.red+"30":T.border2}`,borderRadius:6,fontSize:11,cursor:"pointer",fontWeight:500,fontFamily:FONT_LABEL,whiteSpace:"nowrap"}}>{label}</button>;}
-// v2.3 Phase 2 — Summary cards, notional gain ⓘ, Gross vs Net + Tax Paid charts
+// ============================================================
+// BIG TICKET SUMMARY HELPER — avoids IIFE in JSX (iOS compat)
+// ============================================================
+function BigTicketSummary({bt, bigTicketItem, bc, fxRate, T, Row, Section}) {
+  const rates = fxRate||{};
+  const btTotal = bt.reduce((t,s)=>t+toBase(s.shares*s.price,s.currency||bc,bc,rates),0);
+  const btAfterTax = bt.reduce((t,s)=>{
+    const price=toBase(s.price,s.currency||bc,bc,rates);
+    const cb=toBase(s.costBasis||0,s.currency||bc,bc,rates);
+    const gain=Math.max(0,price-cb);
+    const tax=(s.applyTax&&(s.taxRate||0)>0)?s.shares*gain*(s.taxRate/100):0;
+    return t+(s.shares*price)-tax;
+  },0);
+  const btHasTax = bt.some(s=>s.applyTax&&(s.taxRate||0)>0);
+  return (
+    <Section title="Big Ticket">
+      <Row label={`${bigTicketItem||"Big Ticket"} — Pre-Tax`} value={fmt(btTotal,bc)} color={T.gold}/>
+      {btHasTax&&<Row label={`${bigTicketItem||"Big Ticket"} — After-Tax`} value={fmt(btAfterTax,bc)} color={T.green}/>}
+    </Section>
+  );
+}
+
+// ============================================================
+// TAB: SUMMARY
+// ============================================================
+function SummaryTab({plan, results, T, baseCurrency="USD", fxRate={}}) {
+  const p = plan.params;
+  const bc = baseCurrency||"USD";
+  const y1 = results[0]||{};
+  const yL = results[results.length-1]||{};
+  const peakValue = results.length?Math.max(...results.map(r=>r.totalValue)):0;
+  const anyTax = results.some(r=>(r.totalTax||0)>0);
+  const totGross = results.reduce((t,r)=>t+r.totalIncome,0);
+  const totTax = results.reduce((t,r)=>t+(r.totalTax||0),0);
+  const totNet = results.reduce((t,r)=>t+(r.netIncome??r.totalIncome),0);
+
+  const fi = plan.fixedIncome.filter(s=>s.enabled&&s.amount>0);
+  const ii = plan.investmentIncome.filter(s=>s.enabled&&s.shares>0&&s.pricePerShare>0);
+  const oi = plan.otherIncome.filter(s=>s.enabled&&((s.shares>0&&s.pricePerShare>0)||(s.includeIncome&&s.annualIncome>0)));
+  const da = plan.divestAssets.filter(a=>a.enabled&&a.shares>0&&a.pricePerShare>0);
+  const fa = plan.fixedAssets.filter(a=>a.enabled&&a.shares>0&&a.pricePerShare>0);
+  const bt = plan.bigTicketStocks.filter(s=>s.enabled&&s.shares>0&&s.price>0);
+
+  const Section = ({title, children}) => (
+    <div style={{marginBottom:18}}>
+      <div style={{fontSize:10,fontWeight:700,color:T.accent,textTransform:"uppercase",letterSpacing:1.2,fontFamily:FONT_LABEL,marginBottom:8,paddingBottom:4,borderBottom:`1px solid ${T.border}`}}>{title}</div>
+      {children}
+    </div>
+  );
+  const Row = ({label, value, color}) => (
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",padding:"4px 0",borderBottom:`1px solid ${T.border}20`}}>
+      <span style={{fontSize:12,color:T.textMid,fontFamily:FONT_LABEL}}>{label}</span>
+      <span style={{fontSize:13,fontWeight:600,color:color||T.text,fontFamily:FONT_MONO}}>{value}</span>
+    </div>
+  );
+  const Tag = ({label, color}) => (
+    <span style={{fontSize:10,color:color||T.textMid,background:`${color||T.accent}15`,padding:"2px 8px",borderRadius:10,fontFamily:FONT_LABEL,fontWeight:600,marginRight:4,marginBottom:4,display:"inline-block"}}>{label}</span>
+  );
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:12,width:"100%"}}>
+      <Card title="Summary" badge="Read-only overview of your retirement plan" T={T}>
+
+        <Section title="Plan Details">
+          <Row label="Name / Couple" value={p.personName||"—"}/>
+          <Row label="Age at Start" value={p.ageAtStart}/>
+          <Row label="Start Year" value={p.startYear}/>
+          <Row label="Projection" value={`${p.projectionYears} years (to ${p.startYear+Math.ceil(p.projectionYears)-1})`}/>
+          <Row label="Base Currency" value={p.baseCurrency||"USD"}/>
+          <Row label="Inflation Rate" value={`${p.inflationRate}%`}/>
+        </Section>
+
+        {(fi.length>0||ii.length>0||oi.length>0)&&<Section title="Income Sources">
+          {fi.map(s=>(
+            <div key={s.id} style={{padding:"5px 0",borderBottom:`1px solid ${T.border}20`}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:4}}>
+                <span style={{fontSize:12,color:T.text,fontFamily:FONT_LABEL,fontWeight:600}}>{s.name}</span>
+                <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                  <span style={{fontSize:12,color:T.gold,fontFamily:FONT_MONO}}>{fmt(s.amount,s.currency||bc)}/yr</span>
+                  {s.startYear>p.startYear&&<Tag label={`starts ${s.startYear}`} color={T.textDim}/>}
+                  {s.indexing>0&&<Tag label={`+${s.indexing}% indexed`} color={T.cyan}/>}
+                  {s.applyTax&&(s.taxRate||0)>0&&<Tag label={`${s.taxRate}% tax`} color={T.amber}/>}
+                </div>
+              </div>
+            </div>
+          ))}
+          {ii.map(s=>(
+            <div key={s.id} style={{padding:"5px 0",borderBottom:`1px solid ${T.border}20`}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:4}}>
+                <span style={{fontSize:12,color:T.text,fontFamily:FONT_LABEL,fontWeight:600}}>{s.name}</span>
+                <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                  <span style={{fontSize:12,color:T.gold,fontFamily:FONT_MONO}}>{fmt(s.shares*s.pricePerShare,s.currency||bc)}</span>
+                  <Tag label={`${s.cagr}% CAGR`} color={T.accent}/>
+                  {s.applyTax&&(s.taxRate||0)>0&&<Tag label={`${s.taxRate}% tax`} color={T.amber}/>}
+                  {!s.applyTax&&<Tag label="tax-free" color={T.green}/>}
+                </div>
+              </div>
+            </div>
+          ))}
+          {oi.map(s=>(
+            <div key={s.id} style={{padding:"5px 0",borderBottom:`1px solid ${T.border}20`}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:4}}>
+                <span style={{fontSize:12,color:T.text,fontFamily:FONT_LABEL,fontWeight:600}}>{s.name}</span>
+                <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                  {s.includeIncome&&s.annualIncome>0&&<span style={{fontSize:12,color:T.gold,fontFamily:FONT_MONO}}>{fmt(s.annualIncome,s.currency||bc)}/yr</span>}
+                  {s.applyTax&&(s.taxRate||0)>0&&<Tag label={`${s.taxRate}% tax`} color={T.amber}/>}
+                </div>
+              </div>
+            </div>
+          ))}
+        </Section>}
+
+        {(da.length>0||fa.length>0)&&<Section title="Assets">
+          {da.map(a=>(
+            <div key={a.id} style={{padding:"5px 0",borderBottom:`1px solid ${T.border}20`}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:4}}>
+                <span style={{fontSize:12,color:T.text,fontFamily:FONT_LABEL,fontWeight:600}}>{a.name} <span style={{fontSize:10,color:T.textDim}}>Divest</span></span>
+                <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                  <span style={{fontSize:12,color:T.gold,fontFamily:FONT_MONO}}>{fmt(a.shares*a.pricePerShare,a.currency||bc)}</span>
+                  <Tag label={`${a.cagr}% CAGR`} color={T.accent}/>
+                  {a.applyTax&&(a.taxRate||0)>0&&<Tag label={`${a.taxRate}% cap gains`} color={T.amber}/>}
+                </div>
+              </div>
+            </div>
+          ))}
+          {fa.map(a=>(
+            <div key={a.id} style={{padding:"5px 0",borderBottom:`1px solid ${T.border}20`}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:4}}>
+                <span style={{fontSize:12,color:T.text,fontFamily:FONT_LABEL,fontWeight:600}}>{a.name} <span style={{fontSize:10,color:T.textDim}}>Fixed</span></span>
+                <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                  <span style={{fontSize:12,color:T.purple,fontFamily:FONT_MONO}}>{fmt(a.shares*a.pricePerShare,a.currency||bc)}</span>
+                  <Tag label={`${a.cagr}% CAGR`} color={T.accent}/>
+                </div>
+              </div>
+            </div>
+          ))}
+        </Section>}
+
+        {bt.length>0&&<BigTicketSummary bt={bt} bigTicketItem={plan.bigTicketItem||"Big Ticket"} bc={bc} fxRate={fxRate} T={T} Row={Row} Section={Section}/>}
+
+        {results.length>0&&<Section title="Key Outcomes">
+          <Row label="Year 1 Gross Income" value={fmt(y1.totalIncome,bc)} color={T.gold}/>
+          {anyTax&&<Row label="Year 1 Net Income" value={fmt(y1.netIncome??y1.totalIncome,bc)} color={T.green}/>}
+          <Row label="Year 1 Portfolio Value" value={fmtK(y1.totalValue,bc)} color={T.accent}/>
+          <Row label="Peak Portfolio" value={fmtK(peakValue,bc)} color={T.purple}/>
+          <Row label="Final Year Income" value={fmt(yL.totalIncome,bc)} color={T.cyan}/>
+          <Row label="Final Portfolio Value" value={fmtK(yL.totalValue,bc)} color={T.amber}/>
+          {anyTax&&<>
+            <Row label="Lifetime Gross Income" value={fmtK(totGross,bc)} color={T.gold}/>
+            <Row label="Lifetime Tax Paid" value={fmtK(totTax,bc)} color={T.amber}/>
+            <Row label="Lifetime Net Income" value={fmtK(totNet,bc)} color={T.green}/>
+            <Row label="Average Tax Rate" value={totGross>0?((totTax/totGross)*100).toFixed(1)+"%":"—"} color={T.amber}/>
+          </>}
+        </Section>}
+
+        {plan.notes&&<Section title="Notes & Plans">
+          <p style={{fontSize:12,color:T.textMid,fontFamily:FONT_LABEL,lineHeight:1.6,whiteSpace:"pre-wrap"}}>{plan.notes}</p>
+        </Section>}
+
+      </Card>
+    </div>
+  );
+}
+
+// v2.3 — Summary tab, numbered tabs, CAGR presets with floors
