@@ -99,29 +99,35 @@ const CAGR_PRESETS = {
 // ── Default Data ──────────────────────────────────────────────
 const mkId = () => Date.now() + Math.random();
 
-// Tax defaults: taxRate=0, applyTax=false, costBasis=0 (for cap gains rows)
+// ── EXAMPLE / DEFAULT PLAN ────────────────────────────────────
 const DEFAULT_PLAN = {
-  params: { personName:"", ageAtStart:60, inflationRate:3, startYear:2030, projectionYears:30, baseCurrency:"USD" },
-  divestAssets: [
-    {id:1,name:"Asset 1",note:"",shares:0,pricePerShare:0,priceEnteredYear:CURRENT_YEAR,cagr:10,cagrDecline1:0.5,cagrDecline2:0.3,cagrDecline3:0.1,dividendPercent:0,includeDividend:false,autoCalc:true,enabled:false,taxRate:0,applyTax:false,costBasis:0},
-    {id:2,name:"Asset 2",note:"",shares:0,pricePerShare:0,priceEnteredYear:CURRENT_YEAR,cagr:10,cagrDecline1:0.5,cagrDecline2:0.3,cagrDecline3:0.1,dividendPercent:0,includeDividend:false,autoCalc:true,enabled:false,taxRate:0,applyTax:false,costBasis:0},
-  ],
+  params: { personName:"Example", ageAtStart:65, inflationRate:4, startYear:2030, projectionYears:35, baseCurrency:"CAD" },
   fixedIncome: [
-    {id:1,name:"Pension",amount:0,startYear:2030,indexing:0,enabled:false,taxRate:0,applyTax:false},
-    {id:2,name:"Social Security",amount:0,startYear:2030,indexing:2,enabled:false,taxRate:0,applyTax:false},
+    {id:1,name:"Pension",amount:50000,startYear:2030,indexing:0,enabled:true,currency:"CAD",taxRate:21,applyTax:true},
+    {id:2,name:"CPP",amount:10200,startYear:2030,indexing:1.5,enabled:true,currency:"CAD",taxRate:21,applyTax:true},
+    {id:3,name:"OAS",amount:17000,startYear:2035,indexing:1.5,enabled:true,currency:"CAD",taxRate:21,applyTax:true},
   ],
   investmentIncome: [
-    {id:1,name:"401k",note:"",shares:0,pricePerShare:0,priceEnteredYear:CURRENT_YEAR,cagr:7,cagrDecline1:0.3,cagrDecline2:0.2,cagrDecline3:0.1,dividendPercent:0,includeDividend:false,autoCalc:true,enabled:false,taxRate:0,applyTax:false},
+    {id:1,name:"RY.TO",note:"",shares:500,pricePerShare:225,priceEnteredYear:CURRENT_YEAR,cagr:0,cagrDecline1:0,cagrDecline2:0,cagrDecline3:0,cagrFloor:0,dividendPercent:2.5,includeDividend:true,autoCalc:false,enabled:true,currency:"CAD",taxRate:0,applyTax:false},
+  ],
+  divestAssets: [
+    {id:1,name:"SPY",note:"",shares:200,pricePerShare:650,priceEnteredYear:CURRENT_YEAR,cagr:10,cagrDecline1:0.3,cagrDecline2:0.3,cagrDecline3:0.1,cagrFloor:2,dividendPercent:0,includeDividend:false,autoCalc:true,enabled:true,currency:"USD",taxRate:19,applyTax:true,costBasis:400},
+    {id:2,name:"NVDA",note:"",shares:400,pricePerShare:180,priceEnteredYear:CURRENT_YEAR,cagr:18,cagrDecline1:0.8,cagrDecline2:0.4,cagrDecline3:0.15,cagrFloor:4,dividendPercent:0,includeDividend:false,autoCalc:true,enabled:true,currency:"USD",taxRate:19,applyTax:true,costBasis:120},
+    {id:3,name:"SCHD",note:"",shares:1000,pricePerShare:30,priceEnteredYear:CURRENT_YEAR,cagr:10,cagrDecline1:0.5,cagrDecline2:0.3,cagrDecline3:0.1,cagrFloor:2,dividendPercent:0,includeDividend:false,autoCalc:true,enabled:true,currency:"USD",taxRate:19,applyTax:true,costBasis:20},
   ],
   otherIncome: [
     {id:1,name:"Business Income",note:"",shares:1,pricePerShare:0,cagr:3,cagrDecline:0.1,annualIncome:0,includeIncome:false,enabled:false,taxRate:0,applyTax:false},
   ],
   fixedAssets: [
-    {id:1,name:"Primary Residence",note:"",shares:1,pricePerShare:0,priceEnteredYear:CURRENT_YEAR,cagr:3,cagrDecline1:0.1,cagrDecline2:0.05,cagrDecline3:0.02,enabled:false,taxRate:0,applyTax:false,costBasis:0},
+    {id:1,name:"Primary Residence",note:"",shares:1,pricePerShare:1200000,priceEnteredYear:CURRENT_YEAR,cagr:3,cagrDecline1:0.1,cagrDecline2:0,cagrDecline3:0,cagrFloor:1,enabled:true,currency:"CAD",taxRate:0,applyTax:false,costBasis:0},
+    {id:2,name:"GOLD",note:"",shares:5,pricePerShare:4500,priceEnteredYear:CURRENT_YEAR,cagr:3,cagrDecline1:0.1,cagrDecline2:0,cagrDecline3:0,cagrFloor:1,enabled:true,currency:"USD",taxRate:0,applyTax:false,costBasis:0},
+    {id:3,name:"BTC",note:"",shares:1,pricePerShare:71000,priceEnteredYear:CURRENT_YEAR,cagr:28,cagrDecline1:2.5,cagrDecline2:0.7,cagrDecline3:0.12,cagrFloor:5,enabled:true,currency:"USD",taxRate:0,applyTax:false,costBasis:0},
   ],
-  bigTicketStocks: [{id:1,ticker:"",shares:0,price:0,enabled:false,taxRate:0,applyTax:false,costBasis:0}],
-  bigTicketItem: "",
-  notes: "",
+  bigTicketStocks: [
+    {id:1,ticker:"NVDA",shares:100,price:326,enabled:true,currency:"USD",taxRate:19,applyTax:true,costBasis:120},
+  ],
+  bigTicketItem: "VACATION TRIP RETIREMENT YEAR (EXAMPLE)",
+  notes: "This is an example plan — replace all fields with your own data.\n\nRemember to Export your plan regularly to save a backup JSON file.",
 };
 
 // ── CALCULATION ENGINE ──
@@ -589,8 +595,14 @@ export default function RetirementPlanner() {
   const [saveStatus, setSaveStatus] = useState("saved");
   const [fxRate, setFxRate] = useState(null);
   const [fxError, setFxError] = useState(false);
+  const [showWelcome, setShowWelcome] = useState(()=>{try{return!localStorage.getItem("np_welcomed");}catch{return false;}});
   const saveTimer = useRef(null);
   const T = darkMode ? themes.dark : themes.light;
+
+  const dismissWelcome = () => {
+    try{localStorage.setItem("np_welcomed","1");}catch{}
+    setShowWelcome(false);
+  };
 
   const triggerSave = useCallback((np)=>{
     setSaveStatus("saving");
@@ -688,6 +700,33 @@ export default function RetirementPlanner() {
       <DisclaimerFooter/>
 
       <div className="np-outer">
+        {/* WELCOME BANNER */}
+        {showWelcome&&<div style={{
+          background:`linear-gradient(135deg,${T.card},#0d1f2d)`,
+          border:`1px solid ${T.accent}40`,
+          borderLeft:`4px solid ${T.accent}`,
+          borderRadius:12,marginBottom:14,padding:"18px 24px",
+          display:"flex",alignItems:"flex-start",justifyContent:"space-between",
+          gap:16,flexWrap:"wrap",position:"relative",overflow:"hidden"
+        }}>
+          <div style={{position:"absolute",top:0,left:0,right:0,height:2,background:`linear-gradient(90deg,transparent,${T.accent},transparent)`}}/>
+          <div style={{flex:1,minWidth:200}}>
+            <div style={{fontFamily:FONT_DISPLAY,fontSize:16,fontWeight:700,color:T.accent,marginBottom:6}}>
+              👋 Welcome to North Prosperity
+            </div>
+            <div style={{fontFamily:FONT_LABEL,fontSize:12,color:T.textMid,lineHeight:1.7}}>
+              This is a <strong style={{color:T.text}}>sample plan</strong> to help you get started — explore the tabs to see how the planner works.
+              When you're ready, reset or edit any field to begin your own plan.<br/>
+              <span style={{color:T.gold}}>💾 Important:</span> <strong style={{color:T.text}}>Export your plan regularly</strong> using the Export button — this saves a JSON backup file you can reload anytime.
+              Your data is stored in this browser only and will be lost if you clear your browser data.
+            </div>
+          </div>
+          <button onClick={dismissWelcome} style={{
+            padding:"8px 20px",background:T.accent,color:"#fff",border:"none",
+            borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer",
+            fontFamily:FONT_LABEL,whiteSpace:"nowrap",flexShrink:0,alignSelf:"center"
+          }}>Got it — let's go</button>
+        </div>}
         {/* HEADER */}
         <div style={{background:T.card,borderRadius:14,border:`1px solid ${T.border}`,padding:"32px 34px",marginBottom:14,display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:14,position:"relative",overflow:"hidden"}}>
           <div style={{position:"absolute",top:0,left:0,right:0,height:3,background:`linear-gradient(90deg,transparent,${T.gold},transparent)`}}/>
