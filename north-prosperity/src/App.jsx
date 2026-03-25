@@ -755,6 +755,31 @@ export default function RetirementPlanner() {
   );
 }
 
+// Price field — locally controlled, only commits to plan state on blur or Enter
+// Prevents mid-type partial values (e.g. "4" from "400") from reaching the engine
+function PriceField({label, value, onCommit, cls, T}) {
+  const [local, setLocal] = useState(value===0?"":String(value));
+  useEffect(()=>setLocal(value===0?"":String(value)),[value]);
+  const commit = () => {
+    const v = parseFloat(local);
+    if (local===""||local==="-") { onCommit(0); return; }
+    if (isFinite(v) && v >= 0) onCommit(v);
+    else setLocal(value===0?"":String(value)); // revert
+  };
+  return (
+    <div className={cls||""} style={{minWidth:30,flex:"0.4fr"}}>
+      <label style={{fontSize:9,color:T.label,fontWeight:600,textTransform:"uppercase",letterSpacing:0.3,display:"block",marginBottom:2,fontFamily:FONT_LABEL}}>{label}</label>
+      <input type="number" value={local}
+        onChange={e=>setLocal(e.target.value)}
+        onBlur={commit}
+        onKeyDown={e=>{if(e.key==="Enter")commit();}}
+        onFocus={e=>e.target.select()}
+        style={{width:"100%",padding:"4px 6px",background:T.inputBg,border:`1px solid ${T.border2}`,borderRadius:4,fontSize:12,color:T.text,fontFamily:FONT_LABEL}}
+      />
+    </div>
+  );
+}
+
 // Start year field — free typing, only commits valid 4-digit year on blur/Enter
 function StartYearField({value, onCommit, T}) {
   const [local, setLocal] = useState(String(value));
@@ -848,7 +873,7 @@ function PlanningTab({plan, update, T, baseCurrency="USD", fxRate=null, fxError=
             <MF label="Name" value={s.name} w="1.0fr" onChange={v=>update(d=>{d.investmentIncome[i].name=v;return d;})} T={T}/>
             <MF label="Shares" cls="mf-sm" value={s.shares} type="number" w="0.25fr" onChange={v=>update(d=>{d.investmentIncome[i].shares=+v||0;return d;})} T={T}/>
             <div style={{minWidth:30,flex:"0.4fr"}}>
-              <MF label="Today's Price" cls="mf-md" value={s.pricePerShare} type="number" w="100%" onChange={v=>update(d=>{d.investmentIncome[i].pricePerShare=+v||0;d.investmentIncome[i].priceEnteredYear=CURRENT_YEAR;return d;})} T={T}/>
+              <PriceField label="Today's Price" cls="mf-md" value={s.pricePerShare} onCommit={v=>update(d=>{d.investmentIncome[i].pricePerShare=v;d.investmentIncome[i].priceEnteredYear=CURRENT_YEAR;return d;})} T={T}/>
               <StartPriceLabel pricePerShare={s.pricePerShare} cagr={s.cagr} d1={s.cagrDecline1!==undefined?s.cagrDecline1:0.3} d2={s.cagrDecline2!==undefined?s.cagrDecline2:0.2} d3={s.cagrDecline3!==undefined?s.cagrDecline3:0.1} floor={s.cagrFloor||0} priceEnteredYear={s.priceEnteredYear||CURRENT_YEAR} startYear={plan.params.startYear} currency={s.currency||baseCurrency} T={T}/>
             </div>
             <MF label="CAGR%" cls="mf-xs" value={s.cagr} type="number" step="0.5" w="0.22fr" onChange={v=>update(d=>{d.investmentIncome[i].cagr=+v||0;return d;})} T={T}/>
@@ -935,7 +960,7 @@ function DivestTab({plan, update, T, baseCurrency="USD"}) {
             <MF label="Ticker" value={a.name} w="0.7fr" onChange={v=>update(d=>{d.divestAssets[i].name=v;return d;})} T={T}/>
             <MF label="Shares" cls="mf-sm" value={a.shares} type="number" w="0.25fr" onChange={v=>update(d=>{d.divestAssets[i].shares=+v||0;return d;})} T={T}/>
             <div style={{minWidth:30,flex:"0.4fr"}}>
-              <MF label="Today's Price" cls="mf-md" value={a.pricePerShare} type="number" w="100%" onChange={v=>update(d=>{d.divestAssets[i].pricePerShare=+v||0;d.divestAssets[i].priceEnteredYear=CURRENT_YEAR;return d;})} T={T}/>
+              <PriceField label="Today's Price" cls="mf-md" value={a.pricePerShare} onCommit={v=>update(d=>{d.divestAssets[i].pricePerShare=v;d.divestAssets[i].priceEnteredYear=CURRENT_YEAR;return d;})} T={T}/>
               <StartPriceLabel pricePerShare={a.pricePerShare} cagr={a.cagr} d1={a.cagrDecline1} d2={a.cagrDecline2} d3={a.cagrDecline3} floor={a.cagrFloor||0} priceEnteredYear={a.priceEnteredYear||CURRENT_YEAR} startYear={plan.params.startYear} currency={a.currency||baseCurrency} T={T}/>
             </div>
             <MF label="CAGR%" cls="mf-xs" value={a.cagr} type="number" step="1" w="0.22fr" onChange={v=>update(d=>{d.divestAssets[i].cagr=+v||0;return d;})} T={T}/>
@@ -1050,7 +1075,7 @@ function FixedAssetsTab({plan, update, T, baseCurrency="USD"}) {
             <MF label="Name" value={a.name} w="1.0fr" onChange={v=>update(d=>{d.fixedAssets[i].name=v;return d;})} T={T}/>
             <MF label="Units" cls="mf-sm" value={a.shares} type="number" w="0.25fr" onChange={v=>update(d=>{d.fixedAssets[i].shares=+v||0;return d;})} T={T}/>
             <div style={{minWidth:30,flex:"0.4fr"}}>
-              <MF label="Today's Price" cls="mf-md" value={a.pricePerShare} type="number" w="100%" onChange={v=>update(d=>{d.fixedAssets[i].pricePerShare=+v||0;d.fixedAssets[i].priceEnteredYear=CURRENT_YEAR;return d;})} T={T}/>
+              <PriceField label="Today's Price" cls="mf-md" value={a.pricePerShare} onCommit={v=>update(d=>{d.fixedAssets[i].pricePerShare=v;d.fixedAssets[i].priceEnteredYear=CURRENT_YEAR;return d;})} T={T}/>
               <StartPriceLabel pricePerShare={a.pricePerShare} cagr={a.cagr} d1={a.cagrDecline1!==undefined?a.cagrDecline1:0.1} d2={a.cagrDecline2!==undefined?a.cagrDecline2:0.05} d3={a.cagrDecline3!==undefined?a.cagrDecline3:0.02} floor={a.cagrFloor||0} priceEnteredYear={a.priceEnteredYear||CURRENT_YEAR} startYear={plan.params.startYear} currency={a.currency||baseCurrency} T={T}/>
             </div>
             <MF label="CAGR%" cls="mf-xs" value={a.cagr} type="number" step="0.5" w="0.22fr" onChange={v=>update(d=>{d.fixedAssets[i].cagr=+v||0;return d;})} T={T}/>
