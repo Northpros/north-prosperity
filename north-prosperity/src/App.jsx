@@ -101,33 +101,30 @@ const mkId = () => Date.now() + Math.random();
 
 // ── EXAMPLE / DEFAULT PLAN ────────────────────────────────────
 const DEFAULT_PLAN = {
-  params: { personName:"Example", ageAtStart:65, inflationRate:4, startYear:2030, projectionYears:35, baseCurrency:"CAD" },
+  params: { personName:"Example (Enter name here)", ageAtStart:65, inflationRate:5, startYear:2032, projectionYears:35, baseCurrency:"USD" },
   fixedIncome: [
-    {id:1,name:"Pension",amount:50000,startYear:2030,indexing:0,enabled:true,currency:"CAD",taxRate:21,applyTax:true},
-    {id:2,name:"CPP",amount:10200,startYear:2030,indexing:1.5,enabled:true,currency:"CAD",taxRate:21,applyTax:true},
-    {id:3,name:"OAS",amount:17000,startYear:2035,indexing:1.5,enabled:true,currency:"CAD",taxRate:21,applyTax:true},
+    {id:1,name:"Pension (Example)",amount:0,startYear:2032,indexing:0,enabled:true,currency:"USD",taxRate:24,applyTax:true},
+    {id:2,name:"New Source",amount:0,startYear:2032,indexing:0,enabled:false,currency:"USD",taxRate:0,applyTax:false},
   ],
   investmentIncome: [
-    {id:1,name:"RY.TO",note:"",shares:500,pricePerShare:225,priceEnteredYear:CURRENT_YEAR,cagr:0,cagrDecline1:0,cagrDecline2:0,cagrDecline3:0,cagrFloor:0,dividendPercent:2.5,includeDividend:true,autoCalc:false,enabled:true,currency:"CAD",taxRate:0,applyTax:false},
+    {id:1,name:"Enter Asset Name",note:"",shares:0,pricePerShare:0,priceEnteredYear:CURRENT_YEAR,cagr:6,cagrDecline1:0.15,cagrDecline2:0.1,cagrDecline3:0.1,cagrFloor:0,dividendPercent:2.5,includeDividend:true,autoCalc:false,enabled:true,currency:"USD",taxRate:0,applyTax:false},
   ],
   divestAssets: [
-    {id:1,name:"SPY",note:"",shares:200,pricePerShare:650,priceEnteredYear:CURRENT_YEAR,cagr:10,cagrDecline1:0.3,cagrDecline2:0.3,cagrDecline3:0.1,cagrFloor:2,dividendPercent:0,includeDividend:false,autoCalc:true,enabled:true,currency:"USD",taxRate:19,applyTax:true,costBasis:400},
-    {id:2,name:"NVDA",note:"",shares:400,pricePerShare:180,priceEnteredYear:CURRENT_YEAR,cagr:18,cagrDecline1:0.8,cagrDecline2:0.4,cagrDecline3:0.15,cagrFloor:4,dividendPercent:0,includeDividend:false,autoCalc:true,enabled:true,currency:"USD",taxRate:19,applyTax:true,costBasis:120},
-    {id:3,name:"SCHD",note:"",shares:1000,pricePerShare:30,priceEnteredYear:CURRENT_YEAR,cagr:10,cagrDecline1:0.5,cagrDecline2:0.3,cagrDecline3:0.1,cagrFloor:2,dividendPercent:0,includeDividend:false,autoCalc:true,enabled:true,currency:"USD",taxRate:19,applyTax:true,costBasis:20},
+    {id:1,name:"Enter Asset here (Example)",note:"",shares:0,pricePerShare:0,priceEnteredYear:CURRENT_YEAR,cagr:10,cagrDecline1:0.3,cagrDecline2:0.3,cagrDecline3:0.1,cagrFloor:2,dividendPercent:0,includeDividend:false,autoCalc:true,enabled:true,currency:"USD",taxRate:20,applyTax:true,costBasis:400},
+    {id:2,name:"Asset 2",note:"",shares:0,pricePerShare:0,priceEnteredYear:CURRENT_YEAR,cagr:10,cagrDecline1:0.5,cagrDecline2:0.3,cagrDecline3:0.1,cagrFloor:2,dividendPercent:0,includeDividend:false,autoCalc:true,enabled:false,currency:"USD",taxRate:0,applyTax:false,costBasis:0},
   ],
   otherIncome: [
-    {id:1,name:"Business Income",note:"",shares:1,pricePerShare:0,cagr:3,cagrDecline:0.1,annualIncome:0,includeIncome:false,enabled:false,taxRate:0,applyTax:false},
+    {id:1,name:"Rental Property  (Example)",note:"",shares:0,pricePerShare:0,cagr:3,cagrDecline:0.1,annualIncome:1,includeIncome:true,enabled:true,currency:"USD",taxRate:0,applyTax:false},
   ],
   fixedAssets: [
-    {id:1,name:"Primary Residence",note:"",shares:1,pricePerShare:1200000,priceEnteredYear:CURRENT_YEAR,cagr:3,cagrDecline1:0.1,cagrDecline2:0,cagrDecline3:0,cagrFloor:1,enabled:true,currency:"CAD",taxRate:0,applyTax:false,costBasis:0},
-    {id:2,name:"GOLD",note:"",shares:5,pricePerShare:4500,priceEnteredYear:CURRENT_YEAR,cagr:3,cagrDecline1:0.1,cagrDecline2:0,cagrDecline3:0,cagrFloor:1,enabled:true,currency:"USD",taxRate:0,applyTax:false,costBasis:0},
-    {id:3,name:"BTC",note:"",shares:1,pricePerShare:71000,priceEnteredYear:CURRENT_YEAR,cagr:28,cagrDecline1:2.5,cagrDecline2:0.7,cagrDecline3:0.12,cagrFloor:5,enabled:true,currency:"USD",taxRate:0,applyTax:false,costBasis:0},
+    {id:1,name:"Primary Home (Example)",note:"",shares:1,pricePerShare:0,priceEnteredYear:CURRENT_YEAR,cagr:3,cagrDecline1:0.1,cagrDecline2:0,cagrDecline3:0,cagrFloor:1,enabled:true,currency:"USD",taxRate:0,applyTax:false,costBasis:0},
+    {id:2,name:"New Asset",note:"",shares:1,pricePerShare:0,priceEnteredYear:CURRENT_YEAR,cagr:3,cagrDecline1:0.1,cagrDecline2:0.05,cagrDecline3:0.02,cagrFloor:0,enabled:false,currency:"USD",taxRate:0,applyTax:false,costBasis:0},
   ],
   bigTicketStocks: [
-    {id:1,ticker:"NVDA",shares:100,price:326,enabled:true,currency:"USD",taxRate:19,applyTax:true,costBasis:120},
+    {id:1,ticker:"Enter Asset here (Example)",shares:1,price:1,enabled:true,currency:"USD",taxRate:0,applyTax:false,costBasis:0},
   ],
-  bigTicketItem: "VACATION TRIP RETIREMENT YEAR (EXAMPLE)",
-  notes: "This is an example plan — replace all fields with your own data.\n\nRemember to Export your plan regularly to save a backup JSON file.",
+  bigTicketItem: "Big Ticket  (Fill in)",
+  notes: "",
 };
 
 // ── CALCULATION ENGINE ──
@@ -715,10 +712,8 @@ export default function RetirementPlanner() {
               👋 Welcome to North Prosperity
             </div>
             <div style={{fontFamily:FONT_LABEL,fontSize:12,color:T.textMid,lineHeight:1.7}}>
-              This is a <strong style={{color:T.text}}>sample plan</strong> to help you get started — explore the tabs to see how the planner works.
-              When you're ready, reset or edit any field to begin your own plan.<br/>
-              <span style={{color:T.gold}}>💾 Important:</span> <strong style={{color:T.text}}>Export your plan regularly</strong> using the Export button — this saves a JSON backup file you can reload anytime.
-              Your data is stored in this browser only and will be lost if you clear your browser data.
+              This is a <strong style={{color:T.text}}>blank template</strong> to get you started — placeholder labels show you what goes in each field. Replace them with your own data and enable each row as you go.<br/>
+              <span style={{color:T.gold}}>💾 Important:</span> <strong style={{color:T.text}}>Export your plan regularly</strong> using the Export button — this saves a JSON backup file you can reload anytime. Your data is stored in this browser only and will be lost if you clear your browser data.
             </div>
           </div>
           <button onClick={dismissWelcome} style={{
