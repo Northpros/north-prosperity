@@ -728,10 +728,10 @@ export default function RetirementPlanner() {
           }}>Got it — let's go</button>
         </div>}
         {/* HEADER */}
-        <div style={{background:T.card,borderRadius:14,border:`1px solid ${T.border}`,padding:"32px 34px",marginBottom:14,display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:14,position:"relative",overflow:"hidden"}}>
+        <div style={{background:T.card,borderRadius:14,border:`1px solid ${T.border}`,padding:"24px 34px",marginBottom:14,display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:14,position:"relative",overflow:"hidden"}}>
           <div style={{position:"absolute",top:0,left:0,right:0,height:3,background:`linear-gradient(90deg,transparent,${T.gold},transparent)`}}/>
-          <div style={{display:"flex",alignItems:"center",gap:20}}>
-            <svg viewBox="0 0 200 200" width="64" height="64" xmlns="http://www.w3.org/2000/svg">
+          <div style={{display:"flex",alignItems:"center",gap:16}}>
+            <svg viewBox="0 0 200 200" width="48" height="48" xmlns="http://www.w3.org/2000/svg">
               <circle cx="100" cy="100" r="95" fill="none" stroke={T.gold} strokeWidth="2" opacity="0.5"/>
               <circle cx="100" cy="100" r="85" fill="none" stroke={T.gold} strokeWidth="0.5" opacity="0.3"/>
               <polygon points="100,12 108,82 100,78 92,82" fill={T.gold} stroke={T.gold} strokeWidth="0.5"/>
@@ -746,12 +746,9 @@ export default function RetirementPlanner() {
               <text x="100" y="198" fontFamily={FONT_MONO} fontSize="9" fontWeight="400" fill={T.textDim} textAnchor="middle">S</text>
               <text x="6" y="104" fontFamily={FONT_MONO} fontSize="9" fontWeight="400" fill={T.textDim} textAnchor="middle">W</text>
             </svg>
-            <div>
-              <div style={{display:"flex",alignItems:"baseline",gap:12,flexWrap:"wrap"}}>
-                <span style={{fontFamily:FONT_DISPLAY,fontSize:36,fontWeight:900,color:T.gold,lineHeight:1.1}}>North Prosperity</span>
-                <span style={{fontFamily:FONT_LABEL,fontSize:18,fontWeight:500,color:T.textMid,letterSpacing:0.5}}>Retirement Planner</span>
-              </div>
-              {plan.params.personName && <span style={{fontFamily:FONT_LABEL,fontSize:14,fontWeight:500,color:T.accent,marginTop:4,display:"block"}}>{plan.params.personName}</span>}
+            <div style={{display:"flex",flexDirection:"column",gap:2}}>
+              <span style={{fontFamily:FONT_LABEL,fontSize:10,fontWeight:700,color:T.textDim,letterSpacing:2.5,textTransform:"uppercase"}}>North Prosperity</span>
+              <span style={{fontFamily:FONT_LABEL,fontSize:32,fontWeight:800,color:T.gold,lineHeight:1.05,letterSpacing:-0.5}}>Retirement Planner</span>
             </div>
           </div>
           <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
