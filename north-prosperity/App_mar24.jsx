@@ -5,43 +5,12 @@ import {
 } from "recharts";
 
 // ============================================================
-// NORTH PROSPERITY RETIREMENT PLANNER — v2.4
+// NORTH PROSPERITY RETIREMENT PLANNER — v2.3 Phase 2
 // Phase 1: Tax engine + sub-row UI, cap gains, cost basis
 // Phase 2: Revised summary cards (6, new order/colors),
 //   notional gain tax ⓘ bubble, Year 1 Net only when tax active,
 //   2 new charts (Gross vs Net Income, Annual Tax Paid)
-// Phase 3: Pre-retirement price compounding — priceEnteredYear
-//   stamp per asset; engine compounds today's price forward to
-//   retirement start using full 3-phase CAGR+decline curve.
 // ============================================================
-
-// Current year — used for price stamp and pre-retirement compounding
-const CURRENT_YEAR = new Date().getFullYear();
-
-// Pre-retirement start price calculator
-// Compounds pricePerShare from priceEnteredYear → startYear
-// using the same 3-phase decline curve as the main engine.
-// Returns the estimated price at retirement start date.
-function calcStartPrice(pricePerShare, cagr, d1, d2, d3, floor, priceEnteredYear, startYear) {
-  if (!pricePerShare || !isFinite(pricePerShare) || pricePerShare <= 0) return 0;
-  if (!startYear || !isFinite(startYear) || startYear < CURRENT_YEAR) return pricePerShare;
-  const yearsToRetirement = Math.max(0, Math.min(startYear - (priceEnteredYear || CURRENT_YEAR), 80));
-  if (yearsToRetirement === 0) return pricePerShare;
-  const sc = (cagr || 0) / 100;
-  const dd1 = (d1 || 0) / 100, dd2 = (d2 || 0) / 100, dd3 = (d3 || 0) / 100;
-  const floorRate = (floor || 0) / 100;
-  const p2s = sc - 5 * dd1, p3s = p2s - 15 * dd2;
-  let price = pricePerShare;
-  for (let y = 1; y <= yearsToRetirement; y++) {
-    let yc;
-    if (y <= 5) yc = sc - y * dd1;
-    else if (y <= 20) yc = p2s - (y - 5) * dd2;
-    else yc = p3s - (y - 20) * dd3;
-    yc = Math.max(yc, floorRate);
-    price = price * (1 + yc);
-  }
-  return Math.round(price);
-}
 
 // ── Formatting ────────────────────────────────────────────────
 const CURRENCIES=[
@@ -64,68 +33,63 @@ const toBase=(v,cur,base,rates)=>{if(!rates||cur===base)return v;const r=typeof 
 // ── Theme ─────────────────────────────────────────────────────
 const themes = {
   dark: {
-    bg:"#0b1220", card:"#111b2e", border:"#1e2d47", border2:"#2a3f5f",
-    inputBg:"#0e1929", text:"#e8edf5", textMid:"#96aecb", textDim:"#6a85a8",
-    accent:"#f59e0b", gold:"#fbbf24", green:"#34d399", red:"#ef4444",
-    purple:"#818cf8", cyan:"#38bdf8", label:"#96aecb",
-    rowAlt:"#0d1826", rowHover:"#13233a",
-    headerBg:"#111b2e", summaryBg:"#0f1e35",
+    bg:"#07071a", card:"#0d0d1f", border:"#1a1a3a", border2:"#2a2a4a",
+    inputBg:"#1a1a2e", text:"#e0e0ff", textMid:"#888", textDim:"#555",
+    accent:"#6C8EFF", gold:"#d4af37", green:"#34d399", red:"#ef4444",
+    purple:"#a78bfa", cyan:"#06b6d4", label:"#888",
+    rowAlt:"#0a0a18", rowHover:"#12122a",
+    headerBg:"#0d0d1f", summaryBg:"#0f0f24",
     amber:"#f59e0b",
   },
   light: {
-    bg:"#f1f5fb", card:"#ffffff", border:"#d1dce8", border2:"#b8ccde",
-    inputBg:"#f8fafd", text:"#0d1f35", textMid:"#3a567a", textDim:"#6a8aaa",
-    accent:"#d97706", gold:"#b45309", green:"#059669", red:"#dc2626",
-    purple:"#6366f1", cyan:"#0891b2", label:"#6a8aaa",
-    rowAlt:"#f4f8fc", rowHover:"#eaf2fb",
-    headerBg:"#ffffff", summaryBg:"#f0f7ff",
+    bg:"#f0f2f8", card:"#ffffff", border:"#d0d4e8", border2:"#c0c8e0",
+    inputBg:"#f8f9ff", text:"#1a1a3a", textMid:"#556", textDim:"#778",
+    accent:"#4a6ef5", gold:"#b8941f", green:"#059669", red:"#dc2626",
+    purple:"#7c3aed", cyan:"#0891b2", label:"#778",
+    rowAlt:"#f8f9ff", rowHover:"#eef1ff",
+    headerBg:"#ffffff", summaryBg:"#f0f4ff",
     amber:"#d97706",
   }
 };
-const CHART_COLORS = ["#f59e0b","#38bdf8","#34d399","#818cf8","#fb923c","#f472b6","#fbbf24","#ef4444","#a3e635","#67e8f9"];
+const CHART_COLORS = ["#6C8EFF","#d4af37","#34d399","#a78bfa","#06b6d4","#ec4899","#f59e0b","#ef4444","#84cc16","#f472b6"];
 
 // ── CAGR Presets ──────────────────────────────────────────────
 const CAGR_PRESETS = {
-  "hyper":       { label:"Hyper Growth",       desc:"Disruptive companies (early TSLA, early NVDA)", cagr:35, d1:3.0,  d2:0.6,  d3:0.25, floor:4.0,  vol:65 },
-  "aggressive":  { label:"Aggressive Growth",  desc:"High-growth stocks (MSTR, early TSLA)",               cagr:25, d1:1.7,  d2:0.5,  d3:0.25, floor:4.0,  vol:40 },
-  "growth":      { label:"Growth",             desc:"Tech/growth stocks (NVDA, AMZN, mature TSLA)",               cagr:18, d1:0.8,  d2:0.4,  d3:0.15, floor:4.0,  vol:28 },
-  "moderate":    { label:"Moderate",           desc:"Blue chips (AAPL, MSFT)",                       cagr:11, d1:0.25, d2:0.2,  d3:0.08, floor:2.5,  vol:18 },
-  "conservative":{ label:"Conservative",       desc:"Index funds (SPY, VOO)",                        cagr:8, d1:0.15, d2:0.1,  d3:0.05, floor:2.0,  vol:15 },
-  "ultra":       { label:"Ultra Conservative", desc:"Bonds, GICs, T-Bills",                          cagr:4,  d1:0.05, d2:0.05, d3:0.0,  floor:1.5,  vol:4  },
-  "crypto":      { label:"Crypto (BTC)",       desc:"Bitcoin — long-term adoption thesis",           cagr:30, d1:2.8,  d2:0.6,  d3:0.05, floor:2.0,  vol:80 },
-  "income":      { label:"Income / Dividend",  desc:"REITs, dividend ETFs",                          cagr:8,  d1:0.08, d2:0.05, d3:0.05, floor:3.0,  vol:12 },
-  "gold":        { label:"Gold",               desc:"Physical gold — inflation hedge / store of value", cagr:5,  d1:0.1,  d2:0.05, d3:0.02, floor:3.0,  vol:18 },
-  "realestate":  { label:"Real Estate",        desc:"Residential / commercial property — long-run nominal", cagr:3,  d1:0.1,  d2:0.05, d3:0.02, floor:2.0,  vol:10 },
+  "hyper":       { label:"🔥 Hyper Growth",     desc:"Disruptive companies (early TSLA, early NVDA)", cagr:30, d1:2.8, d2:1.0, d3:0.2 },
+  "aggressive":  { label:"🚀 Aggressive Growth", desc:"High-growth stocks (TSLA, MSTR)", cagr:25, d1:1.5, d2:0.7, d3:0.2 },
+  "growth":      { label:"📈 Growth",            desc:"Tech/growth stocks (NVDA, AMZN)", cagr:18, d1:0.8, d2:0.4, d3:0.15 },
+  "moderate":    { label:"⚖️ Moderate",          desc:"Blue chips (AAPL, MSFT)", cagr:12, d1:0.5, d2:0.3, d3:0.1 },
+  "conservative":{ label:"🛡️ Conservative",      desc:"Index funds (SPY, VOO)", cagr:10, d1:0.3, d2:0.2, d3:0.1 },
+  "ultra":       { label:"💴 Ultra Conservative", desc:"Bonds, GICs, T-Bills", cagr:3, d1:0.1, d2:0.0, d3:0.0 },
+  "crypto":      { label:"₿ Crypto",             desc:"Bitcoin, Ethereum", cagr:28, d1:2.5, d2:0.7, d3:0.12 },
+  "income":      { label:"💰 Income/Dividend",    desc:"REITs, dividend ETFs", cagr:7, d1:0.2, d2:0.1, d3:0.05 },
 };
 
 // ── Default Data ──────────────────────────────────────────────
 const mkId = () => Date.now() + Math.random();
 
-// ── EXAMPLE / DEFAULT PLAN ────────────────────────────────────
+// Tax defaults: taxRate=0, applyTax=false, costBasis=0 (for cap gains rows)
 const DEFAULT_PLAN = {
-  params: { personName:"Example (Enter name here)", ageAtStart:65, inflationRate:5, startYear:2032, projectionYears:35, baseCurrency:"USD", withdrawalBuffer:0 },
+  params: { personName:"", ageAtStart:60, inflationRate:3, startYear:2030, projectionYears:30, baseCurrency:"USD" },
+  divestAssets: [
+    {id:1,name:"Asset 1",note:"",shares:0,pricePerShare:0,cagr:10,cagrDecline1:0.5,cagrDecline2:0.3,cagrDecline3:0.1,dividendPercent:0,includeDividend:false,autoCalc:true,enabled:false,taxRate:0,applyTax:false,costBasis:0},
+    {id:2,name:"Asset 2",note:"",shares:0,pricePerShare:0,cagr:10,cagrDecline1:0.5,cagrDecline2:0.3,cagrDecline3:0.1,dividendPercent:0,includeDividend:false,autoCalc:true,enabled:false,taxRate:0,applyTax:false,costBasis:0},
+  ],
   fixedIncome: [
-    {id:1,name:"Pension (Example)",amount:0,startYear:2032,indexing:0,enabled:true,currency:"USD",taxRate:24,applyTax:true},
-    {id:2,name:"New Source",amount:0,startYear:2032,indexing:0,enabled:false,currency:"USD",taxRate:0,applyTax:false},
+    {id:1,name:"Pension",amount:0,startYear:2030,indexing:0,enabled:false,taxRate:0,applyTax:false},
+    {id:2,name:"Social Security",amount:0,startYear:2030,indexing:2,enabled:false,taxRate:0,applyTax:false},
   ],
   investmentIncome: [
-    {id:1,name:"Enter Asset Name",note:"",shares:0,pricePerShare:0,priceEnteredYear:CURRENT_YEAR,cagr:6,cagrDecline1:0.15,cagrDecline2:0.1,cagrDecline3:0.1,cagrFloor:0,dividendPercent:2.5,includeDividend:true,autoCalc:false,enabled:true,currency:"USD",taxRate:0,applyTax:false,vol:12,volOverride:false},
-  ],
-  divestAssets: [
-    {id:1,name:"Enter Asset here (Example)",note:"",shares:0,pricePerShare:0,priceEnteredYear:CURRENT_YEAR,cagr:10,cagrDecline1:0.3,cagrDecline2:0.3,cagrDecline3:0.1,cagrFloor:2,dividendPercent:0,includeDividend:false,autoCalc:true,enabled:true,currency:"USD",taxRate:20,applyTax:true,costBasis:400,vol:18,volOverride:false},
-    {id:2,name:"Asset 2",note:"",shares:0,pricePerShare:0,priceEnteredYear:CURRENT_YEAR,cagr:10,cagrDecline1:0.5,cagrDecline2:0.3,cagrDecline3:0.1,cagrFloor:2,dividendPercent:0,includeDividend:false,autoCalc:true,enabled:false,currency:"USD",taxRate:0,applyTax:false,costBasis:0,vol:18,volOverride:false},
+    {id:1,name:"401k",note:"",shares:0,pricePerShare:0,cagr:7,cagrDecline1:0.3,cagrDecline2:0.2,cagrDecline3:0.1,dividendPercent:0,includeDividend:false,autoCalc:true,enabled:false,taxRate:0,applyTax:false},
   ],
   otherIncome: [
-    {id:1,name:"Rental Property  (Example)",note:"",shares:0,pricePerShare:0,cagr:3,cagrDecline:0.1,annualIncome:1,includeIncome:true,enabled:true,currency:"USD",taxRate:0,applyTax:false,vol:12,volOverride:false},
+    {id:1,name:"Business Income",note:"",shares:1,pricePerShare:0,cagr:3,cagrDecline:0.1,annualIncome:0,includeIncome:false,enabled:false,taxRate:0,applyTax:false},
   ],
   fixedAssets: [
-    {id:1,name:"Primary Home (Example)",note:"",shares:1,pricePerShare:0,priceEnteredYear:CURRENT_YEAR,cagr:3,cagrDecline1:0.1,cagrDecline2:0,cagrDecline3:0,cagrFloor:1,enabled:true,currency:"USD",taxRate:0,applyTax:false,costBasis:0,vol:10,volOverride:false},
-    {id:2,name:"New Asset",note:"",shares:1,pricePerShare:0,priceEnteredYear:CURRENT_YEAR,cagr:3,cagrDecline1:0.1,cagrDecline2:0.05,cagrDecline3:0.02,cagrFloor:0,enabled:false,currency:"USD",taxRate:0,applyTax:false,costBasis:0,vol:10,volOverride:false},
+    {id:1,name:"Primary Residence",note:"",shares:1,pricePerShare:0,cagr:3,cagrDecline1:0.1,cagrDecline2:0.05,cagrDecline3:0.02,enabled:false,taxRate:0,applyTax:false,costBasis:0},
   ],
-  bigTicketStocks: [
-    {id:1,ticker:"Enter Asset here (Example)",shares:1,price:1,enabled:true,currency:"USD",taxRate:0,applyTax:false,costBasis:0},
-  ],
-  bigTicketItem: "Big Ticket  (Fill in)",
+  bigTicketStocks: [{id:1,ticker:"",shares:0,price:0,enabled:false,taxRate:0,applyTax:false,costBasis:0}],
+  bigTicketItem: "",
   notes: "",
 };
 
@@ -135,52 +99,47 @@ function runProjection(plan, fxRates={}) {
   const base = p.baseCurrency||"USD";
   const rates = (fxRates&&typeof fxRates==="object")?fxRates:{};
   const inf = p.inflationRate / 100;
-  const sy = (p.startYear&&isFinite(p.startYear)&&p.startYear>=CURRENT_YEAR)?p.startYear:CURRENT_YEAR;
-  const py = (p.projectionYears&&isFinite(p.projectionYears)&&p.projectionYears>0)?p.projectionYears:1;
+  const sy = p.startYear, py = p.projectionYears;
   const totalYears = Math.ceil(py);
   const fracYear = py % 1;
-  const ea = plan.divestAssets.filter(a=>a.enabled&&a.shares>0&&a.pricePerShare>0&&isFinite(a.pricePerShare));
+  const ea = plan.divestAssets.filter(a=>a.enabled&&a.shares>0&&a.pricePerShare>0);
   const ef = plan.fixedIncome.filter(s=>s.enabled&&s.amount>0);
-  const ei = plan.investmentIncome.filter(s=>s.enabled&&s.shares>0&&s.pricePerShare>0&&isFinite(s.pricePerShare));
-  const efa = plan.fixedAssets.filter(a=>a.enabled&&a.shares>0&&a.pricePerShare>0&&isFinite(a.pricePerShare));
+  const ei = plan.investmentIncome.filter(s=>s.enabled&&s.shares>0&&s.pricePerShare>0);
+  const efa = plan.fixedAssets.filter(a=>a.enabled&&a.shares>0&&a.pricePerShare>0);
   const eo = plan.otherIncome.filter(s=>s.enabled&&((s.shares>0&&s.pricePerShare>0)||(s.includeIncome&&s.annualIncome>0)));
   if(!ea.length&&!ef.length&&!ei.length&&!eo.length&&!efa.length) return [];
 
-  const build3Phase = (baseRate, d1, d2, d3, floor=0) => {
+  const build3Phase = (baseRate, d1, d2, d3) => {
     const sc = baseRate/100;
     const dd1=(d1||0)/100, dd2=(d2||0)/100, dd3=(d3||0)/100;
-    const floorRate = (floor||0)/100;
     const p2s=sc-5*dd1, p3s=p2s-15*dd2;
     const mult = [1];
     for(let y=1;y<totalYears;y++){
       let yc; if(y<=5) yc=sc-y*dd1; else if(y<=20) yc=p2s-(y-5)*dd2; else yc=p3s-(y-20)*dd3;
-      yc=Math.max(yc, floorRate); mult.push(mult[y-1]*(1+yc));
+      yc=Math.max(yc,0); mult.push(mult[y-1]*(1+yc));
     }
     return mult;
   };
 
   const dp = ea.map(a=>{
-    const mult = build3Phase(a.cagr, a.cagrDecline1, a.cagrDecline2, a.cagrDecline3, a.cagrFloor||0);
-    const rawBp=toBase(a.pricePerShare,a.currency||base,base,rates);
-    const bp=calcStartPrice(rawBp,a.cagr,a.cagrDecline1,a.cagrDecline2,a.cagrDecline3,a.cagrFloor||0,a.priceEnteredYear||CURRENT_YEAR,sy);
+    const mult = build3Phase(a.cagr, a.cagrDecline1, a.cagrDecline2, a.cagrDecline3);
+    const bp=toBase(a.pricePerShare,a.currency||base,base,rates);
     return mult.map(m=>Math.round(bp*m));
   });
   const ip = ei.map(s=>{
     const d1=s.cagrDecline1!==undefined?s.cagrDecline1:(s.cagrDecline||0.3);
     const d2=s.cagrDecline2!==undefined?s.cagrDecline2:((s.cagrDecline||0.3)*0.6);
     const d3=s.cagrDecline3!==undefined?s.cagrDecline3:((s.cagrDecline||0.3)*0.3);
-    const mult = build3Phase(s.cagr, d1, d2, d3, s.cagrFloor||0);
-    const rawBp=toBase(s.pricePerShare,s.currency||base,base,rates);
-    const bp=calcStartPrice(rawBp,s.cagr,d1,d2,d3,s.cagrFloor||0,s.priceEnteredYear||CURRENT_YEAR,sy);
+    const mult = build3Phase(s.cagr, d1, d2, d3);
+    const bp=toBase(s.pricePerShare,s.currency||base,base,rates);
     return mult.map(m=>Math.round(bp*m));
   });
   const fap = efa.map(a=>{
     const d1=a.cagrDecline1!==undefined?a.cagrDecline1:(a.cagrDecline||0.1);
     const d2=a.cagrDecline2!==undefined?a.cagrDecline2:((a.cagrDecline||0.1)*0.5);
     const d3=a.cagrDecline3!==undefined?a.cagrDecline3:((a.cagrDecline||0.1)*0.2);
-    const mult = build3Phase(a.cagr, d1, d2, d3, a.cagrFloor||0);
-    const rawBp=toBase(a.pricePerShare,a.currency||base,base,rates);
-    const bp=calcStartPrice(rawBp,a.cagr,d1,d2,d3,a.cagrFloor||0,a.priceEnteredYear||CURRENT_YEAR,sy);
+    const mult = build3Phase(a.cagr, d1, d2, d3);
+    const bp=toBase(a.pricePerShare,a.currency||base,base,rates);
     return mult.map(m=>Math.round(bp*m));
   });
   const op = eo.map(s=>{
@@ -188,17 +147,13 @@ function runProjection(plan, fxRates={}) {
     for(let y=1;y<totalYears;y++){let yc=b-d*y;yc=Math.max(yc,0);pr.push(Math.round(pr[y-1]*(1+yc)));}return pr;
   });
 
-  const buf = (p.withdrawalBuffer||0)/100;
-
   const aw = ea.map((a,i)=>{
     if(!a.autoCalc)return 0; let sr=0;
-    for(let y=0;y<totalYears;y++){const yf=(fracYear>0&&y===totalYears-1)?fracYear:1;const px=dp[i][y];if(!px||px<=0)return 0;sr+=yf*Math.pow(1+inf,y)/px;}
-    return sr>0?a.shares*(1-buf)/sr:0;
+    for(let y=0;y<totalYears;y++){const yf=(fracYear>0&&y===totalYears-1)?fracYear:1;sr+=yf*Math.pow(1+inf,y)/dp[i][y];}return a.shares/sr;
   });
   const iw = ei.map((s,i)=>{
     if(!s.autoCalc)return 0; let sr=0;
-    for(let y=0;y<totalYears;y++){const yf=(fracYear>0&&y===totalYears-1)?fracYear:1;const px=ip[i][y];if(!px||px<=0)return 0;sr+=yf*Math.pow(1+inf,y)/px;}
-    return sr>0?s.shares*(1-buf)/sr:0;
+    for(let y=0;y<totalYears;y++){const yf=(fracYear>0&&y===totalYears-1)?fracYear:1;sr+=yf*Math.pow(1+inf,y)/ip[i][y];}return s.shares/sr;
   });
 
   const ds = ea.map((a,i)=>({rem:a.shares,bw:Math.round(aw[i])}));
@@ -313,24 +268,22 @@ const save = (plan) => { try{localStorage.setItem(STORAGE_KEY,JSON.stringify(pla
 function migratePlan(d) {
   const taxDefaults = {taxRate:0,applyTax:false};
   const capGainsDefaults = {taxRate:0,applyTax:false,costBasis:0};
-  const volDefaults = {vol:18,volOverride:false};
-  d.divestAssets=(d.divestAssets||[]).map(a=>({dividendPercent:0,includeDividend:false,cagrFloor:0,priceEnteredYear:CURRENT_YEAR,...capGainsDefaults,...volDefaults,...a}));
+  d.divestAssets=(d.divestAssets||[]).map(a=>({dividendPercent:0,includeDividend:false,...capGainsDefaults,...a}));
   d.fixedIncome=(d.fixedIncome||[]).map(s=>({...taxDefaults,...s}));
   d.investmentIncome=(d.investmentIncome||[]).map(s=>({
-    dividendPercent:0,includeDividend:false,cagrFloor:0,priceEnteredYear:CURRENT_YEAR,
+    dividendPercent:0,includeDividend:false,
     cagrDecline1:s.cagrDecline1!==undefined?s.cagrDecline1:0.3,
     cagrDecline2:s.cagrDecline2!==undefined?s.cagrDecline2:0.2,
     cagrDecline3:s.cagrDecline3!==undefined?s.cagrDecline3:0.1,
-    ...taxDefaults,...volDefaults,...s
+    ...taxDefaults,...s
   }));
   d.fixedAssets=(d.fixedAssets||[]).map(a=>({
-    cagrFloor:0,priceEnteredYear:CURRENT_YEAR,
     cagrDecline1:a.cagrDecline1!==undefined?a.cagrDecline1:0.1,
     cagrDecline2:a.cagrDecline2!==undefined?a.cagrDecline2:0.05,
     cagrDecline3:a.cagrDecline3!==undefined?a.cagrDecline3:0.02,
-    ...capGainsDefaults,...volDefaults,...a,vol:a.vol!==undefined?a.vol:10
+    ...capGainsDefaults,...a
   }));
-  d.otherIncome=(d.otherIncome||[]).map(s=>({...taxDefaults,...volDefaults,...s,vol:s.vol!==undefined?s.vol:12}));
+  d.otherIncome=(d.otherIncome||[]).map(s=>({...taxDefaults,...s}));
   d.bigTicketStocks=(d.bigTicketStocks||[]).map(s=>({...capGainsDefaults,...s}));
   d.notes=d.notes||"";d.bigTicketItem=d.bigTicketItem||"";
   return d;
@@ -345,10 +298,10 @@ const YahooLink = ({ticker, T}) => ticker ? (
 ) : null;
 
 // ── Font constants ───────────────────────────────────────────
-const FONT_DISPLAY = "'Syne', sans-serif";
-const FONT_BODY = "'DM Sans','Helvetica Neue',sans-serif";
+const FONT_DISPLAY = "'Playfair Display',Georgia,serif";
+const FONT_BODY = "'Lato','Helvetica Neue',sans-serif";
 const FONT_MONO = "'JetBrains Mono','SF Mono','Fira Code',monospace";
-const FONT_LABEL = "'DM Sans', sans-serif";
+const FONT_LABEL = "'Inter','Segoe UI',sans-serif";
 
 // ── Content width lock ───────────────────────────────────────
 const CONTENT_MAX = 1440;
@@ -384,7 +337,7 @@ function TaxInfoBubble({type, T}) {
 
   return (
     <span ref={btnRef} onClick={handleInfo} onTouchEnd={e=>{e.preventDefault();handleInfo(e);}}
-      style={{cursor:"pointer",color:T.accent,fontSize:10,WebkitUserSelect:"none",userSelect:"none",marginLeft:2}}>ⓘ
+      style={{cursor:"pointer",color:T.accent,fontSize:9,WebkitUserSelect:"none",userSelect:"none",marginLeft:2}}>ⓘ
       {tip&&<div className="np-infobubble" style={{top:tip.top,left:tip.left,background:T.card,color:T.text,border:`1px solid ${T.border2}`,boxShadow:"0 4px 20px rgba(0,0,0,0.5)",zIndex:99999,position:"fixed",width:260,padding:"10px 12px",borderRadius:8,fontSize:11,lineHeight:1.5,fontFamily:FONT_MONO,pointerEvents:"none"}}>
         {messages[type]||messages.income}
       </div>}
@@ -397,7 +350,7 @@ function TaxToggleBtn({open, applyTax, onToggle, T}) {
   const active = applyTax;
   return (
     <button onClick={onToggle} style={{
-      fontSize:10, fontWeight:600, fontFamily:FONT_LABEL,
+      fontSize:9, fontWeight:600, fontFamily:FONT_LABEL,
       background: active ? `${T.amber}18` : "none",
       color: active ? T.amber : T.textDim,
       border: `1px solid ${active ? T.amber+"50" : T.border2}`,
@@ -413,7 +366,7 @@ function TaxToggleBtn({open, applyTax, onToggle, T}) {
 // Tax sub-row for income-type assets (fixed income, tax deferred, other income)
 function TaxSubRowIncome({taxRate, applyTax, onTaxRate, onApplyTax, type, T}) {
   return (
-    <div className="np-taxrow" style={{
+    <div style={{
       display:"flex", gap:10, alignItems:"center", flexWrap:"wrap",
       padding:"8px 12px", marginBottom:4, marginTop:-2,
       background: applyTax ? `${T.amber}08` : T.bg,
@@ -422,7 +375,7 @@ function TaxSubRowIncome({taxRate, applyTax, onTaxRate, onApplyTax, type, T}) {
       borderTop:"none",
     }}>
       <div style={{display:"flex",flexDirection:"column",minWidth:130}}>
-        <label style={{fontSize:10,color:applyTax?T.amber:T.label,fontWeight:600,textTransform:"uppercase",letterSpacing:0.3,marginBottom:2,fontFamily:FONT_LABEL,display:"flex",alignItems:"center"}}>
+        <label style={{fontSize:9,color:applyTax?T.amber:T.label,fontWeight:600,textTransform:"uppercase",letterSpacing:0.3,marginBottom:2,fontFamily:FONT_LABEL,display:"flex",alignItems:"center"}}>
           Effective Tax Rate %<TaxInfoBubble type={type} T={T}/>
         </label>
         <input
@@ -438,7 +391,7 @@ function TaxSubRowIncome({taxRate, applyTax, onTaxRate, onApplyTax, type, T}) {
         />
       </div>
       <div style={{display:"flex",flexDirection:"column",alignItems:"center",minWidth:70,paddingTop:14}}>
-        <label style={{fontSize:10,color:applyTax?T.amber:T.label,fontWeight:600,letterSpacing:0.3,marginBottom:3,fontFamily:FONT_LABEL}}>Apply Tax</label>
+        <label style={{fontSize:9,color:applyTax?T.amber:T.label,fontWeight:600,letterSpacing:0.3,marginBottom:3,fontFamily:FONT_LABEL}}>Apply Tax</label>
         <input type="checkbox" checked={!!applyTax} onChange={onApplyTax}
           style={{width:14,height:14,cursor:"pointer",accentColor:T.amber}}/>
       </div>
@@ -454,7 +407,7 @@ function TaxSubRowIncome({taxRate, applyTax, onTaxRate, onApplyTax, type, T}) {
 // Tax sub-row for cap-gains assets (divest, fixed assets, big ticket)
 function TaxSubRowCapGains({taxRate, applyTax, costBasis, onTaxRate, onApplyTax, onCostBasis, type, currency, T}) {
   return (
-    <div className="np-taxrow" style={{
+    <div style={{
       display:"flex", gap:10, alignItems:"center", flexWrap:"wrap",
       padding:"8px 12px", marginBottom:4, marginTop:-2,
       background: applyTax ? `${T.amber}08` : T.bg,
@@ -463,7 +416,7 @@ function TaxSubRowCapGains({taxRate, applyTax, costBasis, onTaxRate, onApplyTax,
       borderTop:"none",
     }}>
       <div style={{display:"flex",flexDirection:"column",minWidth:130}}>
-        <label style={{fontSize:10,color:applyTax?T.amber:T.label,fontWeight:600,textTransform:"uppercase",letterSpacing:0.3,marginBottom:2,fontFamily:FONT_LABEL,display:"flex",alignItems:"center"}}>
+        <label style={{fontSize:9,color:applyTax?T.amber:T.label,fontWeight:600,textTransform:"uppercase",letterSpacing:0.3,marginBottom:2,fontFamily:FONT_LABEL,display:"flex",alignItems:"center"}}>
           Effective Tax Rate %<TaxInfoBubble type={type||"capgains"} T={T}/>
         </label>
         <input
@@ -479,7 +432,7 @@ function TaxSubRowCapGains({taxRate, applyTax, costBasis, onTaxRate, onApplyTax,
         />
       </div>
       <div style={{display:"flex",flexDirection:"column",minWidth:140}}>
-        <label style={{fontSize:10,color:T.label,fontWeight:600,textTransform:"uppercase",letterSpacing:0.3,marginBottom:2,fontFamily:FONT_LABEL}}>
+        <label style={{fontSize:9,color:T.label,fontWeight:600,textTransform:"uppercase",letterSpacing:0.3,marginBottom:2,fontFamily:FONT_LABEL}}>
           Cost Basis / Share ({currency||"USD"})
         </label>
         <input
@@ -495,7 +448,7 @@ function TaxSubRowCapGains({taxRate, applyTax, costBasis, onTaxRate, onApplyTax,
         />
       </div>
       <div style={{display:"flex",flexDirection:"column",alignItems:"center",minWidth:70,paddingTop:14}}>
-        <label style={{fontSize:10,color:applyTax?T.amber:T.label,fontWeight:600,letterSpacing:0.3,marginBottom:3,fontFamily:FONT_LABEL}}>Apply Tax</label>
+        <label style={{fontSize:9,color:applyTax?T.amber:T.label,fontWeight:600,letterSpacing:0.3,marginBottom:3,fontFamily:FONT_LABEL}}>Apply Tax</label>
         <input type="checkbox" checked={!!applyTax} onChange={onApplyTax}
           style={{width:14,height:14,cursor:"pointer",accentColor:T.amber}}/>
       </div>
@@ -527,536 +480,20 @@ function NotionalGainInfo({T}) {
   },[tip]);
   return (
     <span ref={btnRef} onClick={handleInfo} onTouchEnd={e=>{e.preventDefault();handleInfo(e);}}
-      style={{cursor:"pointer",color:T.accent,fontSize:10,WebkitUserSelect:"none",userSelect:"none",marginLeft:3}}>ⓘ
+      style={{cursor:"pointer",color:T.accent,fontSize:9,WebkitUserSelect:"none",userSelect:"none",marginLeft:3}}>ⓘ
       {tip&&<div style={{top:tip.top,left:tip.left,background:T.card,color:T.text,border:`1px solid ${T.border2}`,boxShadow:"0 4px 20px rgba(0,0,0,0.5)",zIndex:99999,position:"fixed",width:260,padding:"10px 12px",borderRadius:8,fontSize:11,lineHeight:1.5,fontFamily:FONT_MONO,pointerEvents:"none"}}>
         This is the estimated capital gains tax if you sold your entire current position today at the price entered. It is a snapshot only — not a real tax bill. The projection engine charges tax year by year as shares are actually sold, using the projected price at time of sale. This figure will grow over time as the share price appreciates.
       </div>}
     </span>
   );
 }
-// Start price label — shown under Price field when pre-retirement compounding applies
-function StartPriceLabel({pricePerShare, cagr, d1, d2, d3, floor, priceEnteredYear, startYear, currency, T}) {
-  const [tip, setTip] = useState(null);
-  const btnRef = useRef(null);
-  const yearsToRet = Math.max(0, startYear - (priceEnteredYear || CURRENT_YEAR));
-  const handleInfo = (e) => {
-    e.stopPropagation();
-    if(tip){setTip(null);return;}
-    const r = btnRef.current?.getBoundingClientRect();
-    if(r) setTip({top:r.bottom+6, left:Math.min(r.left, window.innerWidth-280)});
-  };
-  useEffect(()=>{
-    if(!tip)return;
-    const close=()=>setTip(null);
-    document.addEventListener("click",close);
-    document.addEventListener("touchstart",close);
-    return()=>{document.removeEventListener("click",close);document.removeEventListener("touchstart",close);};
-  },[tip]);
-  // null check AFTER all hooks
-  if (!pricePerShare || pricePerShare <= 0 || !isFinite(pricePerShare) || yearsToRet <= 0) return null;
-  const startPx = calcStartPrice(pricePerShare, cagr, d1, d2, d3, floor, priceEnteredYear || CURRENT_YEAR, startYear);
-  return (
-    <div style={{display:"flex",alignItems:"center",gap:3,marginTop:2}}>
-      <span style={{fontSize:10,color:T.cyan,fontFamily:FONT_MONO,whiteSpace:"nowrap"}}>
-        Est. @ {startYear}: {fmt(startPx, currency||"USD")}
-      </span>
-      <span ref={btnRef} onClick={handleInfo} onTouchEnd={e=>{e.preventDefault();handleInfo(e);}}
-        style={{cursor:"pointer",color:T.cyan,fontSize:10,WebkitUserSelect:"none",userSelect:"none",opacity:0.7}}>ⓘ
-        {tip&&<div style={{top:tip.top,left:tip.left,background:T.card,color:T.text,border:`1px solid ${T.border2}`,boxShadow:"0 4px 20px rgba(0,0,0,0.5)",zIndex:99999,position:"fixed",width:270,padding:"10px 12px",borderRadius:8,fontSize:11,lineHeight:1.6,fontFamily:FONT_MONO,pointerEvents:"none"}}>
-          <strong style={{color:T.cyan}}>Today's price: {fmt(pricePerShare,currency||"USD")}</strong><br/>
-          Entered: {priceEnteredYear||CURRENT_YEAR} · Retirement: {startYear}<br/>
-          Years of pre-retirement growth: {yearsToRet}<br/><br/>
-          The engine compounds your today's price forward using the same CAGR + decline curve, so projections start from a realistic retirement-date baseline — not today's price. Update the price field any time to refresh this estimate.
-        </div>}
-      </span>
-    </div>
-  );
-}
-// ============================================================
-// MONTE CARLO ENGINE
-// ============================================================
-// Box-Muller transform — generates standard normal random number
-function randNorm() {
-  let u=0,v=0;
-  while(u===0) u=Math.random();
-  while(v===0) v=Math.random();
-  return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);
-}
-
-// Build year-by-year volatility curve — mirrors CAGR decline logic
-// vol declines proportionally using same d1/d2/d3 rates as CAGR
-function buildVolCurve(startVol, d1, d2, d3, totalYears) {
-  if(!startVol || startVol<=0) return Array(totalYears).fill(0);
-  const sv = startVol/100;
-  const dd1=(d1||0)/100, dd2=(d2||0)/100, dd3=(d3||0)/100;
-  const p2s = sv - 5*dd1, p3s = p2s - 15*dd2;
-  const curve = [];
-  for(let y=0;y<totalYears;y++){
-    let yv;
-    if(y<5) yv=sv-y*dd1;
-    else if(y<20) yv=p2s-(y-5)*dd2;
-    else yv=p3s-(y-20)*dd3;
-    curve.push(Math.max(0.005, yv)); // floor at 0.5%
-  }
-  return curve;
-}
-
-// Derive vol from CAGR if no override
-function deriveVol(asset) {
-  if(asset.volOverride && asset.vol>0) return asset.vol;
-  // Map cagr to approximate vol using preset ratios
-  const cagr = asset.cagr||0;
-  if(cagr===0) return 0;
-  if(cagr>=30) return 65;
-  if(cagr>=22) return 40;
-  if(cagr>=15) return 28;
-  if(cagr>=10) return 18;
-  if(cagr>=7)  return 15;
-  if(cagr>=4)  return 12;
-  return 8;
-}
-
-function runMonteCarlo(plan, fxRates={}, numSims=2000) {
-  const p = plan.params;
-  const base = p.baseCurrency||"USD";
-  const rates = fxRates&&typeof fxRates==="object"?fxRates:{};
-  const inf = p.inflationRate/100;
-  const buf = (p.withdrawalBuffer||0)/100;
-  const sy = (p.startYear&&isFinite(p.startYear)&&p.startYear>=CURRENT_YEAR)?p.startYear:CURRENT_YEAR;
-  const py = (p.projectionYears&&isFinite(p.projectionYears)&&p.projectionYears>0)?p.projectionYears:1;
-  const totalYears = Math.ceil(py);
-  const fracYear = py%1;
-
-  const detResults = runProjection(plan, fxRates);
-  if(!detResults.length) return null;
-
-  // Full deterministic (buffer=0) for reference line and probability calculation
-  const fullDetPlan = buf>0 ? {...plan, params:{...plan.params, withdrawalBuffer:0}} : plan;
-  const fullDetResults = buf>0 ? runProjection(fullDetPlan, fxRates) : detResults;
-  const fullDetLifetime = fullDetResults.reduce((t,r)=>t+r.totalIncome,0);
-  const bufferedDetLifetime = detResults.reduce((t,r)=>t+r.totalIncome,0);
-
-  // Separate certain from uncertain
-  const ea  = plan.divestAssets.filter(a=>a.enabled&&a.shares>0&&a.pricePerShare>0&&isFinite(a.pricePerShare));
-  const ei  = plan.investmentIncome.filter(s=>s.enabled&&s.shares>0&&s.pricePerShare>0&&isFinite(s.pricePerShare));
-  const eo  = plan.otherIncome.filter(s=>s.enabled&&((s.shares>0&&s.pricePerShare>0)||(s.includeIncome&&s.annualIncome>0)));
-  const efa = plan.fixedAssets.filter(a=>a.enabled&&a.shares>0&&a.pricePerShare>0&&isFinite(a.pricePerShare));
-  const ef  = plan.fixedIncome.filter(s=>s.enabled&&s.amount>0);
-
-  // Fixed income floor — certain, Year 1 sum of all fixed income sources
-  const fixedIncomeFloor = ef.reduce((t,s)=>t+toBase(s.amount,s.currency||base,base,rates),0);
-
-  // Deterministic volatile income (divest + tax deferred + other + fixed asset appreciation)
-  const detVolatileIncome = detResults.map(r=>
-    (r.assets||[]).reduce((t,a)=>t+a.withdrawal+a.dividendIncome,0) +
-    (r.investmentIncomeSources||[]).reduce((t,s)=>t+s.withdrawal+s.dividendIncome,0) +
-    (r.otherIncome||0)
-  );
-
-  // Vol curves
-  const eaVol  = ea.map(a=>buildVolCurve(deriveVol(a),a.cagrDecline1||0.3,a.cagrDecline2||0.15,a.cagrDecline3||0.05,totalYears));
-  const eiVol  = ei.map(s=>{const d1=s.cagrDecline1!==undefined?s.cagrDecline1:0.3;const d2=s.cagrDecline2!==undefined?s.cagrDecline2:0.2;const d3=s.cagrDecline3!==undefined?s.cagrDecline3:0.1;return buildVolCurve(deriveVol(s),d1,d2,d3,totalYears);});
-  const eoVol  = eo.map(s=>buildVolCurve(deriveVol(s),s.cagrDecline||0.1,(s.cagrDecline||0.1)*0.5,(s.cagrDecline||0.1)*0.2,totalYears));
-
-  // Deterministic price arrays
-  const build3Phase=(baseRate,d1,d2,d3,floor=0)=>{
-    const sc=baseRate/100,dd1=(d1||0)/100,dd2=(d2||0)/100,dd3=(d3||0)/100,floorRate=(floor||0)/100;
-    const p2s=sc-5*dd1,p3s=p2s-15*dd2;const mult=[1];
-    for(let y=1;y<totalYears;y++){let yc;if(y<=5)yc=sc-y*dd1;else if(y<=20)yc=p2s-(y-5)*dd2;else yc=p3s-(y-20)*dd3;yc=Math.max(yc,floorRate);mult.push(mult[y-1]*(1+yc));}
-    return mult;
-  };
-  const eaDetPx  = ea.map(a=>{const mult=build3Phase(a.cagr,a.cagrDecline1,a.cagrDecline2,a.cagrDecline3,a.cagrFloor||0);const bp=calcStartPrice(toBase(a.pricePerShare,a.currency||base,base,rates),a.cagr,a.cagrDecline1,a.cagrDecline2,a.cagrDecline3,a.cagrFloor||0,a.priceEnteredYear||CURRENT_YEAR,sy);return mult.map(m=>bp*m);});
-  const eiDetPx  = ei.map(s=>{const d1=s.cagrDecline1!==undefined?s.cagrDecline1:0.3;const d2=s.cagrDecline2!==undefined?s.cagrDecline2:0.2;const d3=s.cagrDecline3!==undefined?s.cagrDecline3:0.1;const mult=build3Phase(s.cagr,d1,d2,d3,s.cagrFloor||0);const bp=calcStartPrice(toBase(s.pricePerShare,s.currency||base,base,rates),s.cagr,d1,d2,d3,s.cagrFloor||0,s.priceEnteredYear||CURRENT_YEAR,sy);return mult.map(m=>bp*m);});
-  const eoDetPx  = eo.map(s=>{const pr=[Math.round(toBase(s.pricePerShare||0,s.currency||base,base,rates))];const b=s.cagr/100,d=(s.cagrDecline||0)/100;for(let y=1;y<totalYears;y++){let yc=b-d*y;yc=Math.max(yc,0);pr.push(pr[y-1]*(1+yc));}return pr;});
-
-  // Withdrawal weights
-  const aw=ea.map((a,i)=>{if(!a.autoCalc)return 0;let sr=0;for(let y=0;y<totalYears;y++){const yf=(fracYear>0&&y===totalYears-1)?fracYear:1;const px=eaDetPx[i][y];if(!px||px<=0)return 0;sr+=yf*Math.pow(1+inf,y)/px;}return sr>0?a.shares/sr:0;});
-  const iw=ei.map((s,i)=>{if(!s.autoCalc)return 0;let sr=0;for(let y=0;y<totalYears;y++){const yf=(fracYear>0&&y===totalYears-1)?fracYear:1;const px=eiDetPx[i][y];if(!px||px<=0)return 0;sr+=yf*Math.pow(1+inf,y)/px;}return sr>0?s.shares/sr:0;});
-
-  // Simulate volatile income only
-  const allVolatileIncome = Array.from({length:totalYears},()=>[]);
-  const allTotalIncome = Array.from({length:totalYears},()=>[]);
-  const lifetimeTotals = [];
-
-  for(let sim=0;sim<numSims;sim++){
-    const eaShock  = ea.map((_,i)=>{let c=1;return Array.from({length:totalYears},(_,y)=>{c*=Math.exp(eaVol[i][y]*randNorm()-0.5*eaVol[i][y]*eaVol[i][y]);return c;});});
-    const eiShock  = ei.map((_,i)=>{let c=1;return Array.from({length:totalYears},(_,y)=>{c*=Math.exp(eiVol[i][y]*randNorm()-0.5*eiVol[i][y]*eiVol[i][y]);return c;});});
-    const eoShock  = eo.map((_,i)=>{let c=1;return Array.from({length:totalYears},(_,y)=>{c*=Math.exp(eoVol[i][y]*randNorm()-0.5*eoVol[i][y]*eoVol[i][y]);return c;});});
-
-    const eaPx  = ea.map((_,i)=>eaDetPx[i].map((px,y)=>Math.max(0.01,px*eaShock[i][y])));
-    const eiPx  = ei.map((_,i)=>eiDetPx[i].map((px,y)=>Math.max(0.01,px*eiShock[i][y])));
-    const eoPx  = eo.map((_,i)=>eoDetPx[i].map((px,y)=>Math.max(0.01,px*eoShock[i][y])));
-
-    // Recalculate withdrawal weights using this sim's shocked prices — FULL EXTRACTION always
-    // Buffer only affects the target/probability calculation, not the simulation itself
-    const simAw=ea.map((a,i)=>{
-      if(!a.autoCalc)return 0;
-      let sr=0;
-      for(let y=0;y<totalYears;y++){const yf=(fracYear>0&&y===totalYears-1)?fracYear:1;const px=eaPx[i][y];if(!px||px<=0)return 0;sr+=yf*Math.pow(1+inf,y)/px;}
-      return sr>0?a.shares/sr:0;
-    });
-    const simIw=ei.map((s,i)=>{
-      if(!s.autoCalc)return 0;
-      let sr=0;
-      for(let y=0;y<totalYears;y++){const yf=(fracYear>0&&y===totalYears-1)?fracYear:1;const px=eiPx[i][y];if(!px||px<=0)return 0;sr+=yf*Math.pow(1+inf,y)/px;}
-      return sr>0?s.shares/sr:0;
-    });
-
-    const ds  = ea.map((a,i)=>({rem:a.shares,bw:Math.round(simAw[i])}));
-    const is2 = ei.map((s,i)=>({rem:s.shares,bw:Math.round(simIw[i])}));
-
-    let lifetimeTotal = 0;
-
-    for(let y=0;y<totalYears;y++){
-      const yf=(fracYear>0&&y===totalYears-1)?fracYear:1;
-      let volatileIncome=0;
-
-      // Fixed income — deterministic, added to total but not simulated
-      let fixedIncomeTh=0;
-      ef.forEach(s=>{if(sy+y>=s.startYear){const ya=sy+y-s.startYear;fixedIncomeTh+=toBase(s.amount*Math.pow(1+(s.indexing||0)/100,ya)*yf,s.currency||base,base,rates);}});
-
-      // Divest at shocked prices
-      ds.forEach((st,idx)=>{
-        const pr=eaPx[idx][y];
-        const t=Math.round(st.bw*Math.pow(1+inf,y)*yf);
-        let ss=0;if(st.rem>0&&pr>0){const ex=t/pr;ss=Math.min(Math.round(ex*1e6)/1e6,st.rem);}
-        const wd=Math.round(ss*pr);
-        ds[idx].rem=Math.max(Math.round((st.rem-ss)*1e6)/1e6,0);
-        volatileIncome+=wd;
-        if(ea[idx].includeDividend&&ea[idx].dividendPercent>0) volatileIncome+=ds[idx].rem*pr*(ea[idx].dividendPercent/100)*yf;
-      });
-
-      // Investment income at shocked prices
-      is2.forEach((st,idx)=>{
-        const pr=eiPx[idx][y];
-        let wd=0;
-        if(st.rem>0&&pr>0){const t=Math.round(st.bw*Math.pow(1+inf,y)*yf);const ex=t/pr;const ss=Math.min(Math.round(ex*1e6)/1e6,st.rem);wd=Math.round(ss*pr);is2[idx].rem=Math.max(Math.round((st.rem-ss)*1e6)/1e6,0);}
-        if(ei[idx].includeDividend&&ei[idx].dividendPercent>0) volatileIncome+=is2[idx].rem*eiPx[idx][y]*(ei[idx].dividendPercent/100)*yf;
-        volatileIncome+=wd;
-      });
-
-      // Other income
-      eo.forEach((s,idx)=>{if(s.includeIncome&&s.annualIncome>0) volatileIncome+=Math.round(toBase(s.annualIncome,s.currency||base,base,rates)*yf);});
-
-      allVolatileIncome[y].push(volatileIncome);
-      allTotalIncome[y].push(fixedIncomeTh+volatileIncome);
-      lifetimeTotal+=fixedIncomeTh+volatileIncome;
-    }
-    lifetimeTotals.push(lifetimeTotal);
-  }
-
-  const percentile=(arr,pct)=>{const s=[...arr].sort((a,b)=>a-b);const i=(pct/100)*(s.length-1);const lo=Math.floor(i),hi=Math.ceil(i);return s[lo]+(s[hi]-s[lo])*(i-lo);};
-
-  // Fan chart — total income with both plan lines
-  const fanChart=detResults.map((r,y)=>({
-    year:r.year,
-    p10:Math.round(percentile(allTotalIncome[y],10)),
-    p25:Math.round(percentile(allTotalIncome[y],25)),
-    p50:Math.round(percentile(allTotalIncome[y],50)),
-    p75:Math.round(percentile(allTotalIncome[y],75)),
-    p90:Math.round(percentile(allTotalIncome[y],90)),
-    det:r.totalIncome||0,
-    fullDet:fullDetResults[y]?.totalIncome||0,
-    floor:r.fixedIncome||fixedIncomeFloor,
-  }));
-
-  // Probability: % of full-extraction sims that exceeded the full deterministic lifetime income
-  const probExceedFullDet=((lifetimeTotals.filter(v=>v>=fullDetLifetime).length/numSims)*100).toFixed(1);
-  // Probability: % of full-extraction sims that exceeded the buffered target
-  // This answers: "if I accept X% less income, what % of scenarios deliver that?"
-  const probExceedBuffered=buf>0?((lifetimeTotals.filter(v=>v>=bufferedDetLifetime).length/numSims)*100).toFixed(1):probExceedFullDet;
-
-  // Milestones — total income (fixed + volatile)
-  const milestones=[10,20,30].map(yr=>({
-    yr,
-    p10:yr<=totalYears?Math.round(percentile(allTotalIncome[Math.min(yr-1,totalYears-1)],10)):null,
-    p25:yr<=totalYears?Math.round(percentile(allTotalIncome[Math.min(yr-1,totalYears-1)],25)):null,
-    p50:yr<=totalYears?Math.round(percentile(allTotalIncome[Math.min(yr-1,totalYears-1)],50)):null,
-    p75:yr<=totalYears?Math.round(percentile(allTotalIncome[Math.min(yr-1,totalYears-1)],75)):null,
-    p90:yr<=totalYears?Math.round(percentile(allTotalIncome[Math.min(yr-1,totalYears-1)],90)):null,
-    det:yr<=totalYears?detResults[Math.min(yr-1,totalYears-1)]?.totalIncome:null,
-  }));
-
-  const medianLifetime=Math.round(percentile(lifetimeTotals,50));
-  const worstLifetime=Math.round(percentile(lifetimeTotals,10));
-  const bestLifetime=Math.round(percentile(lifetimeTotals,90));
-  const medianVolatileYr1=Math.round(percentile(allVolatileIncome[0],50));
-  const worstVolatileYr1=Math.round(percentile(allVolatileIncome[0],10));
-
-  return{
-    fixedIncomeFloor,
-    medianLifetime,worstLifetime,bestLifetime,
-    medianVolatileYr1,worstVolatileYr1,
-    numSims,
-    fanChart,milestones,
-    detVolatileYr1:detVolatileIncome[0]||0,
-    year1TotalDet:detResults[0]?.totalIncome||0,
-    probExceedFullDet,
-    probExceedBuffered,
-    withdrawalBuffer:p.withdrawalBuffer||0,
-    bufferedDetLifetime,
-    fullDetLifetime,
-  };
-}
-// ============================================================
-// TAB 9: SIMULATION
-// ============================================================
-function SimulationTab({plan, results, T, baseCurrency="USD", fxRate={}, onMcResult, mcResult, mcStale=false}) {
-  const bc = baseCurrency||"USD";
-  const [numSims, setNumSims] = useState(2000);
-  const [running, setRunning] = useState(false);
-  const [ran, setRan] = useState(false);
-
-  const runSim = () => {
-    setRunning(true);
-    if(onMcResult) onMcResult(null);
-    setTimeout(()=>{
-      try{
-        const r=runMonteCarlo(plan,fxRate,numSims);
-        if(onMcResult) onMcResult(r);
-        setRan(true);
-      }catch(e){console.error("MC error:",e);}
-      setRunning(false);
-    },50);
-  };
-
-  if(!results.length) return(
-    <div style={{width:"100%"}}>
-      <Card title="Monte Carlo Simulation" T={T}>
-        <Empty T={T} msg="Enable at least one asset or income source in the Planning tab first."/>
-      </Card>
-    </div>
-  );
-
-  return(
-    <div style={{display:"flex",flexDirection:"column",gap:12,width:"100%"}}>
-
-      {/* Controls */}
-      <Card title="Monte Carlo Simulation" badge="Probability-based retirement analysis" T={T}>
-        <Hint T={T}>Simulates your volatile assets (divest, tax deferred, other income) through thousands of randomized return scenarios. Fixed income (pension, CPP, OAS) is treated as certain and shown separately as your guaranteed floor.</Hint>
-        <div style={{display:"flex",gap:16,alignItems:"flex-end",flexWrap:"wrap",marginBottom:16}}>
-          <div>
-            <label style={{fontSize:10,color:T.label,fontWeight:600,textTransform:"uppercase",letterSpacing:0.5,display:"block",marginBottom:4,fontFamily:FONT_LABEL}}>Simulations</label>
-            <select value={numSims} onChange={e=>setNumSims(+e.target.value)} style={{background:T.inputBg,border:`1px solid ${T.border2}`,borderRadius:6,padding:"7px 12px",color:T.text,fontSize:13,fontFamily:FONT_LABEL,cursor:"pointer"}}>
-              <option value={500}>500 — Fast</option>
-              <option value={1000}>1,000</option>
-              <option value={2000}>2,000 — Default</option>
-              <option value={5000}>5,000 — Precise</option>
-            </select>
-          </div>
-          <button onClick={runSim} disabled={running} style={{
-            padding:"10px 28px",background:running?T.border:T.accent,color:running?"#fff":"#000",
-            border:"none",borderRadius:8,fontSize:13,fontWeight:700,cursor:running?"not-allowed":"pointer",
-            fontFamily:FONT_LABEL,transition:"all 0.2s",letterSpacing:0.3,alignSelf:"flex-end"
-          }}>{running?`Running ${numSims.toLocaleString()} simulations...`:"Run Simulation"}</button>
-          {ran&&!running&&<span style={{fontSize:11,color:T.green,fontFamily:FONT_MONO,alignSelf:"flex-end",paddingBottom:4}}>Complete</span>}
-        </div>
-        <div style={{background:T.inputBg,border:`1px solid ${T.border}`,borderRadius:8,padding:"12px 16px",fontSize:11,color:T.textMid,fontFamily:FONT_LABEL,lineHeight:1.7}}>
-          <strong style={{color:T.text}}>What is being simulated:</strong> Divest assets, tax deferred accounts, and other income sources are run through randomized annual return scenarios. Volatility declines as each asset matures. Fixed income sources are excluded from the simulation — they are certain and form your guaranteed income floor.
-        </div>
-      </Card>
-
-      {/* Results */}
-      {mcStale&&mcResult&&<div style={{background:`${T.amber}15`,border:`1px solid ${T.amber}40`,borderRadius:8,padding:"10px 14px",marginBottom:12,display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:13,color:T.amber,fontWeight:700,fontFamily:FONT_MONO}}>⚠</span><span style={{fontSize:12,color:T.amber,fontFamily:FONT_LABEL}}>Parameters changed — results may be outdated. Re-run simulation to update.</span></div>}
-      {mcResult&&(
-        <>
-          {/* Hero cards — exact SumCard match */}
-          {(()=>{
-            const v1=fmtK(mcResult.fixedIncomeFloor,bc);
-            const v2=fmtK(mcResult.medianVolatileYr1,bc);
-            const v3=fmtK(mcResult.worstVolatileYr1,bc);
-            const v4=fmtK(mcResult.medianLifetime,bc);
-            const v5=fmtK(mcResult.worstLifetime,bc);
-            const v6=fmtK(mcResult.bestLifetime,bc);
-            const longest=[v1,v2,v3,v4,v5,v6].reduce((a,b)=>b.length>a.length?b:a,"");
-            const fs=autoSize(longest,20);
-            return(
-            <div className="np-sumcards">
-              {[["Guaranteed Floor",v1,T.green,"fixed income · certain"],
-                ["Median Yr 1 Volatile",v2,T.accent,"50th pct · volatile assets"],
-                ["Worst Yr 1 Volatile",v3,T.red,"10th pct · volatile assets"],
-                ["Median Lifetime",v4,T.accent,"total income · all sources"],
-                ["Worst Lifetime",v5,T.red,"10th pct · total income"],
-                ["Best Lifetime",v6,T.green,"90th pct · total income"],
-              ].map(([label,val,color,note])=>(
-                <SumCard key={label} label={label} value={val} color={color} note={note} fontSize={fs} T={T}/>
-              ))}
-            </div>
-            );
-          })()}
-
-          {/* Milestone table */}
-          <Card title="Total Income at Key Milestones" T={T}>
-            <Hint T={T}>How your total income (fixed + volatile) holds up at years 10, 20 and 30. Fixed income is certain — the spread reflects volatile asset variance only.</Hint>
-            <div style={{overflowX:"auto"}}>
-              <table style={{width:"100%",borderCollapse:"collapse",minWidth:500}}>
-                <thead>
-                  <tr style={{background:T.inputBg}}>
-                    {["Year","1-in-10 Low","1-in-4 Low","Most Likely","3-in-4 Below","9-in-10 Below","Perfect Returns"].map(h=>(
-                      <th key={h} style={{padding:"5px 12px",textAlign:"right",fontSize:10,fontWeight:700,color:T.textMid,fontFamily:FONT_MONO,whiteSpace:"nowrap",borderBottom:`1px solid ${T.border}`}}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {mcResult.milestones.filter(m=>m.p50!==null).map((m,i)=>(
-                    <tr key={i} style={{borderBottom:`1px solid ${T.border}30`,background:i%2?T.rowAlt:"transparent"}}>
-                      <td style={{padding:"5px 12px",textAlign:"right",fontSize:12,fontWeight:700,color:T.text,fontFamily:FONT_MONO}}>Yr {m.yr} ({plan.params.startYear+m.yr-1})</td>
-                      <td style={{padding:"5px 12px",textAlign:"right",fontSize:12,color:T.red,fontFamily:FONT_MONO}}>{fmtK(m.p10,bc)}</td>
-                      <td style={{padding:"5px 12px",textAlign:"right",fontSize:12,color:T.amber,fontFamily:FONT_MONO}}>{fmtK(m.p25||0,bc)}</td>
-                      <td style={{padding:"5px 12px",textAlign:"right",fontSize:12,color:T.accent,fontFamily:FONT_MONO,fontWeight:700}}>{fmtK(m.p50,bc)}</td>
-                      <td style={{padding:"5px 12px",textAlign:"right",fontSize:12,color:T.green,fontFamily:FONT_MONO}}>{fmtK(m.p75||0,bc)}</td>
-                      <td style={{padding:"5px 12px",textAlign:"right",fontSize:12,color:T.green,fontFamily:FONT_MONO}}>{fmtK(m.p90,bc)}</td>
-                      <td style={{padding:"5px 12px",textAlign:"right",fontSize:12,color:T.textMid,fontFamily:FONT_MONO,fontStyle:"italic"}}>{fmtK(m.det,bc)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </Card>
-
-          {/* Fan chart — volatile income only */}
-          <Card title="Total Annual Income — Percentile Bands" T={T}>
-            <Hint T={T}>Total income (pension + volatile assets) across all simulations. The green floor line is your guaranteed fixed income — it never changes. Everything above that line comes from your volatile assets. Wider bands mean more variance in your asset income.</Hint>
-            <div style={{height:420}}>
-              <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={mcResult.fanChart} margin={{top:10,right:20,left:10,bottom:5}}>
-                  <defs>
-                    <linearGradient id="mcBand" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={T.accent} stopOpacity={0.2}/>
-                      <stop offset="95%" stopColor={T.accent} stopOpacity={0.02}/>
-                    </linearGradient>
-                  </defs>
-                  <XAxis dataKey="year" tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={{stroke:T.border}}/>
-                  <YAxis tickFormatter={v=>fmtK(v,bc)} tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={false}/>
-                  {mcResult.fixedIncomeFloor>0&&<ReferenceLine y={mcResult.fixedIncomeFloor} stroke={T.green} strokeDasharray="4 2" strokeWidth={2} label={{value:`Guaranteed floor ${fmtK(mcResult.fixedIncomeFloor,bc)}`,fill:T.green,fontSize:10,fontFamily:FONT_MONO,position:"insideTopLeft"}}/>}
-                  <Tooltip content={({active,payload,label})=>{
-                    if(!active||!payload?.length)return null;
-                    return<div style={{background:T.card,border:`1px solid ${T.border2}`,borderRadius:8,padding:"10px 14px",fontSize:11,fontFamily:FONT_MONO}}>
-                      <div style={{color:T.textMid,marginBottom:6}}>{label}</div>
-                      {payload.map((p,i)=><div key={i} style={{color:p.color||T.text,marginBottom:2}}>{p.name}: {fmtK(p.value,bc)}</div>)}
-                    </div>;
-                  }}/>
-                  <Legend wrapperStyle={{fontSize:11,fontFamily:FONT_MONO}}/>
-                  <Area type="monotone" dataKey="p90" name="90th pct" stroke={T.green} fill="url(#mcBand)" strokeWidth={1} strokeDasharray="4 2" dot={false}/>
-                  <Area type="monotone" dataKey="p75" name="75th pct" stroke={T.accent} fill="url(#mcBand)" strokeWidth={1} strokeDasharray="4 2" dot={false}/>
-                  <Line type="monotone" dataKey="p50" name="Median" stroke={T.accent} strokeWidth={2.5} dot={false}/>
-                  <Line type="monotone" dataKey="p25" name="25th pct" stroke={T.amber} strokeWidth={1} strokeDasharray="4 2" dot={false}/>
-                  <Line type="monotone" dataKey="p10" name="10th pct" stroke={T.red} strokeWidth={1} strokeDasharray="4 2" dot={false}/>
-                  <Line type="monotone" dataKey="fullDet" name="Full Extraction" stroke={T.textMid} strokeWidth={1.5} strokeDasharray="6 3" dot={false}/>
-                  {mcResult.withdrawalBuffer>0&&<Line type="monotone" dataKey="det" name={`Buffered Plan (${mcResult.withdrawalBuffer}%)`} stroke={T.cyan} strokeWidth={2} dot={false}/>}
-                </ComposedChart>
-              </ResponsiveContainer>
-            </div>
-          </Card>
-
-          {/* Probability statement — above Plan Assessment */}
-          <div style={{background:`${T.amber}10`,border:`1px solid ${T.amber}30`,borderRadius:10,padding:"12px 18px"}}>
-            <div style={{fontSize:12,color:T.text,fontFamily:FONT_LABEL,lineHeight:1.7}}>
-              <strong style={{color:T.textMid}}>Full extraction plan</strong> was achieved or exceeded in <strong style={{color:T.amber}}>{mcResult.probExceedFullDet}%</strong> of {mcResult.numSims.toLocaleString()} simulations — over and above guaranteed fixed income of <strong style={{color:T.green}}>{fmtK(mcResult.fixedIncomeFloor,bc)}/yr</strong>.
-              {mcResult.withdrawalBuffer>0&&<> &nbsp;·&nbsp; Accepting <strong style={{color:T.cyan}}>{mcResult.withdrawalBuffer}% less income</strong> raises that to <strong style={{color:T.cyan}}>{mcResult.probExceedBuffered}%</strong>.</>}
-            </div>
-            <div style={{fontSize:11,color:T.textMid,fontFamily:FONT_LABEL,marginTop:4}}>
-              {mcResult.withdrawalBuffer===0
-                ? "Use the Withdrawal Buffer slider on Tab 5 to see how accepting less income raises your probability of success."
-                : `At ${mcResult.withdrawalBuffer}% buffer your income target drops from ${fmtK(mcResult.fullDetLifetime,bc)} to ${fmtK(mcResult.bufferedDetLifetime,bc)} lifetime — lower income, higher certainty.`}
-            </div>
-          </div>
-
-          {/* Contextual guidance panel */}
-          {(()=>{
-            const year1Total = mcResult.year1TotalDet||0;
-            const floorPct = year1Total>0?Math.round((mcResult.fixedIncomeFloor/year1Total)*100):0;
-            const worstAnnual = Math.round(mcResult.worstLifetime/plan.params.projectionYears);
-            const medianAnnual = Math.round(mcResult.medianLifetime/plan.params.projectionYears);
-            const prob = parseFloat(mcResult.withdrawalBuffer>0?mcResult.probExceedBuffered:mcResult.probExceedFullDet);
-            const buf = mcResult.withdrawalBuffer;
-
-            // Determine risk profile based on fixed income coverage
-            let profileLabel, targetRange, profileColor, bufferGuidance;
-            if(floorPct>=50){
-              profileLabel="Low Market Dependency";
-              targetRange="35-55%";
-              profileColor=T.green;
-              bufferGuidance=buf<=15?"appropriate for your profile":buf<=20?"slightly conservative but reasonable":"very conservative — your pension provides strong security";
-            } else if(floorPct>=30){
-              profileLabel="Moderate Market Dependency";
-              targetRange="50-65%";
-              profileColor=T.accent;
-              bufferGuidance=buf<=10?"consider increasing to 10-15%":buf<=20?"appropriate for your profile":"conservative — consider 15-20%";
-            } else if(floorPct>=10){
-              profileLabel="High Market Dependency";
-              targetRange="65-80%";
-              profileColor=T.amber;
-              bufferGuidance=buf<15?"consider increasing to 15-20%":buf<=25?"appropriate for your profile":"reasonable given limited guaranteed income";
-            } else {
-              profileLabel="Full Market Dependency";
-              targetRange="75-90%";
-              profileColor=T.red;
-              bufferGuidance=buf<20?"strongly recommend increasing to 20-25% — no guaranteed income floor":buf<=30?"appropriate — no pension means assets must do all the work":"appropriate given no guaranteed income";
-            }
-
-            const probVerdict = prob<parseFloat(targetRange.split("-")[0])
-              ? `Your current probability of ${prob}% is below the ${targetRange}% range typical for your profile. Consider increasing your withdrawal buffer.`
-              : prob>parseFloat(targetRange.split("-")[1])
-              ? `Your current probability of ${prob}% is above the ${targetRange}% range for your profile — your plan is well-positioned.`
-              : `Your current probability of ${prob}% falls within the ${targetRange}% range considered appropriate for your profile.`;
-
-            return(
-            <Card title="Plan Assessment" T={T}>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:1,borderRadius:8,overflow:"hidden",border:`1px solid ${T.border}`}}>
-
-                <div style={{background:T.inputBg,padding:"14px 16px",borderRight:`1px solid ${T.border}`}}>
-                  <div style={{fontSize:10,fontWeight:700,color:T.textMid,fontFamily:FONT_LABEL,marginBottom:8,textTransform:"uppercase",letterSpacing:1}}>Risk Profile</div>
-                  <div style={{fontSize:13,fontWeight:700,color:T.text,fontFamily:FONT_LABEL,marginBottom:6}}>{profileLabel}</div>
-                  <div style={{fontSize:11,color:T.textMid,fontFamily:FONT_LABEL,lineHeight:1.6}}>
-                    Guaranteed income covers <strong style={{color:T.text}}>{floorPct}%</strong> of Year 1. {floorPct>=50?"Assets are a bonus on top of a secure base.":floorPct>=30?"Assets carry meaningful weight.":floorPct>=10?"Sequence-of-returns risk is significant.":"No guaranteed floor — assets are everything."}
-                  </div>
-                </div>
-
-                <div style={{background:T.inputBg,padding:"14px 16px",borderRight:`1px solid ${T.border}`}}>
-                  <div style={{fontSize:10,fontWeight:700,color:T.textMid,fontFamily:FONT_LABEL,marginBottom:8,textTransform:"uppercase",letterSpacing:1}}>Probability Target</div>
-                  <div style={{fontSize:13,fontWeight:700,color:T.text,fontFamily:FONT_LABEL,marginBottom:6}}>{targetRange}% appropriate for your profile</div>
-                  <div style={{fontSize:11,color:T.textMid,fontFamily:FONT_LABEL,lineHeight:1.6}}>{probVerdict}</div>
-                </div>
-
-                <div style={{background:T.inputBg,padding:"14px 16px",borderRight:`1px solid ${T.border}`}}>
-                  <div style={{fontSize:10,fontWeight:700,color:T.textMid,fontFamily:FONT_LABEL,marginBottom:8,textTransform:"uppercase",letterSpacing:1}}>Buffer Assessment</div>
-                  <div style={{fontSize:13,fontWeight:700,color:T.text,fontFamily:FONT_LABEL,marginBottom:6}}>{buf}% buffer — {bufferGuidance.split("—")[0].trim()}</div>
-                  <div style={{fontSize:11,color:T.textMid,fontFamily:FONT_LABEL,lineHeight:1.6}}>{buf>0?"Withdrawals reduced. All projections reflect this. Lower income, higher certainty.":"Full extraction — maximum income, maximum exposure to bad sequences."}</div>
-                </div>
-
-                <div style={{background:T.inputBg,padding:"14px 16px"}}>
-                  <div style={{fontSize:10,fontWeight:700,color:T.textMid,fontFamily:FONT_LABEL,marginBottom:8,textTransform:"uppercase",letterSpacing:1}}>Summary — {plan.params.projectionYears} Yr Avg</div>
-                  <div style={{fontSize:11,color:T.textMid,fontFamily:FONT_LABEL,lineHeight:1.9}}>
-                    <div style={{display:"flex",justifyContent:"space-between",gap:8}}><span>Worst case avg/yr</span><strong style={{color:T.red}}>{fmtK(Math.round(mcResult.worstLifetime/plan.params.projectionYears),bc)}</strong></div>
-                    <div style={{display:"flex",justifyContent:"space-between",gap:8}}><span>Median avg/yr</span><strong style={{color:T.accent}}>{fmtK(Math.round(mcResult.medianLifetime/plan.params.projectionYears),bc)}</strong></div>
-                    {mcResult.withdrawalBuffer>0&&<div style={{display:"flex",justifyContent:"space-between",gap:8}}><span>Buffered target ({mcResult.withdrawalBuffer}%)/yr</span><strong style={{color:T.cyan}}>{fmtK(Math.round(mcResult.bufferedDetLifetime/plan.params.projectionYears),bc)}</strong></div>}
-                    <div style={{fontSize:10,color:T.textDim,marginTop:4}}>Includes pension + volatile assets</div>
-                  </div>
-                </div>
-
-              </div>
-              <div style={{marginTop:8,fontSize:10,color:T.textDim,fontFamily:FONT_LABEL,lineHeight:1.6,padding:"0 2px"}}>
-                ⓘ Educational purposes only — not financial advice. Consult a qualified advisor.
-              </div>
-            </Card>
-            );
-          })()}
-
-        </>
-      )}
-    </div>
-  );
-}
-
-
 function DisclaimerFooter(){
   const [expanded, setExpanded] = React.useState(false);
   return(
     <div className="np-disclaimer" onClick={()=>setExpanded(e=>!e)} style={{cursor:"pointer"}}>
       <div className="np-disclaimer-text">
         ⚠️ Not financial advice · Educational only · © 2026 North Prosperity
-        <span style={{marginLeft:6,color:"#f59e0b",fontSize:10}}>{expanded?"▲ less":"▼ more"}</span>
+        <span style={{marginLeft:6,color:"#6C8EFF",fontSize:9}}>{expanded?"▲ less":"▼ more"}</span>
       </div>
       {expanded&&<div className="np-disclaimer-full">
         For educational and simulation purposes only · Past performance does not guarantee future results · Always consult a qualified financial advisor · FX conversion uses live rate as a fixed assumption · Tax calculations are estimates only — consult a qualified tax advisor for your jurisdiction
@@ -1075,29 +512,20 @@ export default function RetirementPlanner() {
   const [saveStatus, setSaveStatus] = useState("saved");
   const [fxRate, setFxRate] = useState(null);
   const [fxError, setFxError] = useState(false);
-  const [showWelcome, setShowWelcome] = useState(()=>{try{return!localStorage.getItem("np_welcomed");}catch{return false;}});
-  const [mcResult, setMcResult] = useState(null);
-  const [mcStale, setMcStale] = useState(false);
   const saveTimer = useRef(null);
   const T = darkMode ? themes.dark : themes.light;
-
-  useEffect(()=>{if(mcResult) setMcStale(true);},[plan]);
-  const dismissWelcome = () => {
-    try{localStorage.setItem("np_welcomed","1");}catch{}
-    setShowWelcome(false);
-  };
 
   const triggerSave = useCallback((np)=>{
     setSaveStatus("saving");
     if(saveTimer.current)clearTimeout(saveTimer.current);
-    saveTimer.current=setTimeout(()=>{save(np);setSaveStatus("saved");},100);
+    saveTimer.current=setTimeout(()=>{save(np);setSaveStatus("saved");},600);
   },[]);
 
   const update = useCallback((fn)=>{
     setPlan(prev=>{const next=fn(JSON.parse(JSON.stringify(prev)));triggerSave(next);return next;});
   },[triggerSave]);
 
-  const results = useMemo(()=>{try{return runProjection(plan,fxRate||{});}catch(e){console.error("Projection error:",e);return[];}},[plan,fxRate]);
+  const results = useMemo(()=>runProjection(plan,fxRate||{}),[plan,fxRate]);
   const y1=results[0]||{}, yL=results[results.length-1]||{};
   const peakIncome=results.length?Math.max(...results.map(r=>r.totalIncome)):0;
   const peakValue=results.length?Math.max(...results.map(r=>r.totalValue)):0;
@@ -1114,162 +542,89 @@ export default function RetirementPlanner() {
     a.download=`${plan.params.personName||"retirement-plan"}.json`.replace(/[^a-zA-Z0-9.-]/g,"_");
     a.click();URL.revokeObjectURL(a.href);
   };
-  const importInputRef = useRef(null);
   const importPlan = () => {
-    if(!importInputRef.current){
-      const input=document.createElement("input");
-      input.type="file";input.accept=".json";
-      input.style.display="none";
-      input.onchange=e=>{
-        const f=e.target.files[0];
-        input.value="";
-        if(!f)return;
-        const r=new FileReader();
-        r.onload=ev=>{try{const d=JSON.parse(ev.target.result);if(d.params&&d.divestAssets){
-          const migrated=migratePlan(d);
-          // Cancel any pending save timer so it can't overwrite the import
-          if(saveTimer.current)clearTimeout(saveTimer.current);
-          setPlan(migrated);
-          // Defer save slightly to let setPlan settle
-          setTimeout(()=>{save(migrated);setSaveStatus("saved");},100);
-          alert(`Loaded: ${migrated.params.personName||"plan"}`);
-        }else alert("Invalid file.");}catch{alert("Could not read file.");}};
-        r.readAsText(f);
-      };
-      document.body.appendChild(input);
-      importInputRef.current=input;
-    }
-    importInputRef.current.value="";
-    importInputRef.current.click();
+    const input=document.createElement("input");input.type="file";input.accept=".json";
+    input.onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();
+    r.onload=ev=>{try{const d=JSON.parse(ev.target.result);if(d.params&&d.divestAssets){
+      const migrated=migratePlan(d);
+      setPlan(migrated);save(migrated);alert(`Loaded: ${migrated.params.personName||"plan"}`);
+    }else alert("Invalid file.");}catch{alert("Could not read file.");}};r.readAsText(f);};
+    input.click();
   };
   const resetPlan = () => {if(window.confirm("Reset all data? This cannot be undone.")){const f=JSON.parse(JSON.stringify(DEFAULT_PLAN));setPlan(f);save(f);}};
 
   const tabs = [
-    {id:"planning",    label:"1. Planning & Income"},
-    {id:"divest",      label:"2. Assets to Divest"},
-    {id:"fixed",       label:"3. Fixed Assets"},
-    {id:"simulation",  label:"4. Monte Carlo Sim"},
-    {id:"withdrawals", label:"5. Withdrawal Plan"},
-    {id:"projections", label:"6. Projections"},
-    {id:"charts",      label:"7. Charts"},
-    {id:"additional",  label:"8. Additional"},
-    {id:"summary",     label:"9. Summary"},
+    {id:"planning",   label:"1. Planning & Income"},
+    {id:"divest",     label:"2. Assets to Divest"},
+    {id:"fixed",      label:"3. Fixed Assets"},
+    {id:"projections",label:"4. Projections"},
+    {id:"withdrawals",label:"5. Withdrawal Plan"},
+    {id:"charts",     label:"6. Charts"},
+    {id:"additional", label:"7. Additional"},
+    {id:"summary",    label:"8. Summary"},
   ];
 
   return (
-    <div className="np-wrap" style={{fontFamily:FONT_BODY,transition:"background 0.3s,color 0.3s"}}>
+    <div style={{fontFamily:FONT_BODY,background:T.bg,minHeight:"100vh",width:"100%",padding:"12px 16px 120px",color:T.text,transition:"background 0.3s,color 0.3s"}}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600&display=swap');
-        html,body,#root{width:100%;min-height:100vh;margin:0;padding:0;background:${T.bg};}
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Lato:wght@300;400;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap');
         *{box-sizing:border-box;margin:0;padding:0;}
-        .np-wrap{width:100%;min-height:100vh;background:${T.bg};padding:12px 0 120px;color:${T.text};}
-        ::selection{background:${T.accent}30;}
+        ::selection{background:#6C8EFF40;}
         ::-webkit-scrollbar{width:5px;height:5px;}
         ::-webkit-scrollbar-track{background:${T.bg};}
         ::-webkit-scrollbar-thumb{background:${T.border2};border-radius:3px;}
         input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0;}
         input[type=number]{-moz-appearance:textfield;}
         input:focus,select:focus{outline:none;border-color:${T.accent}!important;}
-        .np-outer{max-width:${CONTENT_MAX}px;width:100%;margin:0 auto;padding:0 16px;display:flex;flex-direction:column;}
+        .np-outer{max-width:${CONTENT_MAX}px;width:100%;margin:0 auto;display:flex;flex-direction:column;}
         .np-outer>*{width:100%!important;max-width:100%!important;min-width:0!important;}
-        .np-sumcards{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:14px;}
-        @media(max-width:900px){.np-sumcards{grid-template-columns:repeat(3,1fr);}}
-        @media(max-width:480px){.np-sumcards{grid-template-columns:repeat(2,1fr);}}
         @media (max-width:480px){
           .mf-xs{max-width:58px!important;min-width:0!important;}
           .mf-sm{max-width:75px!important;min-width:0!important;}
           .mf-md{max-width:95px!important;min-width:0!important;}
         }
-        .np-disclaimer{position:fixed;bottom:0;left:0;right:0;z-index:9999;background:#0b1220;border-top:1px solid #1e2d47;padding:5px 12px;}
-        .np-disclaimer-text{font-family:'JetBrains Mono','SF Mono',monospace;font-size:10px;color:#4a607a;line-height:1.5;display:block;}
-        .np-disclaimer-full{font-family:'JetBrains Mono','SF Mono',monospace;font-size:10px;color:#4a607a;line-height:1.5;display:block;margin-top:3px;}
+        .np-disclaimer{position:fixed;bottom:0;left:0;right:0;z-index:9999;background:#0d0d1f;border-top:1px solid #2a2a4a;padding:5px 12px;}
+        .np-disclaimer-text{font-family:'JetBrains Mono','SF Mono',monospace;font-size:10px;color:#555577;line-height:1.5;display:block;}
+        .np-disclaimer-full{font-family:'JetBrains Mono','SF Mono',monospace;font-size:10px;color:#555577;line-height:1.5;display:block;margin-top:3px;}
         .np-infobubble{position:fixed;z-index:99999;width:240px;padding:10px 12px;border-radius:8px;font-size:11px;line-height:1.5;pointer-events:none;font-family:'JetBrains Mono','SF Mono',monospace;}
-        @media(max-width:640px){
-          .np-outer{padding:0 8px!important;}
-          .np-tabs{gap:1px!important;}
-          .np-tabs button{padding:8px 8px!important;font-size:11px!important;}
-          .np-header-btns{gap:4px!important;}
-          .np-header-btns button{padding:4px 8px!important;font-size:10px!important;}
-          .np-sumcards{grid-template-columns:repeat(2,1fr)!important;gap:6px!important;}
-          .np-taxrow{padding:10px 8px!important;gap:8px!important;}
-          .np-taxrow>div{min-width:0!important;flex:1 1 120px!important;}
-          .np-itemrow{padding:10px 8px!important;gap:8px!important;}
-          .np-infobubble{width:220px!important;}
-          .mf-xs{max-width:52px!important;min-width:0!important;}
-          .mf-sm{max-width:68px!important;min-width:0!important;}
-          .mf-md{max-width:88px!important;min-width:0!important;}
-        }
-        @media print{
-          body,html{background:#fff!important;color:#000!important;}
-          .np-wrap{background:#fff!important;padding:0!important;}
-          .np-disclaimer,.np-tabs,.np-sumcards,.np-header-btns{display:none!important;}
-          .np-print-hide{display:none!important;}
-          .np-print-only{display:block!important;}
-          .np-outer{max-width:100%!important;padding:0 20px!important;}
-          *{color:#000!important;background:transparent!important;border-color:#ccc!important;box-shadow:none!important;}
-          .np-print-header{display:flex!important;justify-content:space-between;align-items:center;padding-bottom:8px;border-bottom:2px solid #000;margin-bottom:16px;}
-        }
       `}</style>
 
       <DisclaimerFooter/>
 
       <div className="np-outer">
-        {/* WELCOME BANNER */}
-        {showWelcome&&<div style={{
-          background:`linear-gradient(135deg,${T.card},#0d1f2d)`,
-          border:`1px solid ${T.accent}40`,
-          borderLeft:`4px solid ${T.accent}`,
-          borderRadius:12,marginBottom:14,padding:"18px 24px",
-          display:"flex",alignItems:"flex-start",justifyContent:"space-between",
-          gap:16,flexWrap:"wrap",position:"relative",overflow:"hidden"
-        }}>
-          <div style={{position:"absolute",top:0,left:0,right:0,height:2,background:`linear-gradient(90deg,transparent,${T.accent},transparent)`}}/>
-          <div style={{flex:1,minWidth:200}}>
-            <div style={{fontFamily:FONT_DISPLAY,fontSize:16,fontWeight:700,color:T.accent,marginBottom:6}}>
-              👋 Welcome to North Prosperity
-            </div>
-            <div style={{fontFamily:FONT_LABEL,fontSize:12,color:T.textMid,lineHeight:1.7}}>
-              This is a <strong style={{color:T.text}}>blank template</strong> to get you started — placeholder labels show you what goes in each field. Replace them with your own data and enable each row as you go.<br/>
-              <span style={{color:T.gold}}>💾 Important:</span> <strong style={{color:T.text}}>Export your plan regularly</strong> using the Export button — this saves a JSON backup file you can reload anytime. Your data is stored in this browser only and will be lost if you clear your browser data.
-            </div>
-          </div>
-          <button onClick={dismissWelcome} style={{
-            padding:"8px 20px",background:T.accent,color:"#fff",border:"none",
-            borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer",
-            fontFamily:FONT_LABEL,whiteSpace:"nowrap",flexShrink:0,alignSelf:"center"
-          }}>Got it — let's go</button>
-        </div>}
         {/* HEADER */}
-        <div style={{background:T.card,borderRadius:14,border:`1px solid ${T.border}`,padding:"18px 28px",marginBottom:14,display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:14,position:"relative",overflow:"hidden"}}>
-          <div style={{position:"absolute",top:0,left:0,right:0,height:3,background:`linear-gradient(90deg,transparent,${T.amber},${T.gold},transparent)`}}/>
-          <div style={{display:"flex",alignItems:"center",gap:16}}>
-            <svg viewBox="0 0 200 200" width="42" height="42" xmlns="http://www.w3.org/2000/svg">
+        <div style={{background:T.card,borderRadius:14,border:`1px solid ${T.border}`,padding:"32px 34px",marginBottom:14,display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:14,position:"relative",overflow:"hidden"}}>
+          <div style={{position:"absolute",top:0,left:0,right:0,height:3,background:`linear-gradient(90deg,transparent,${T.gold},transparent)`}}/>
+          <div style={{display:"flex",alignItems:"center",gap:20}}>
+            <svg viewBox="0 0 200 200" width="64" height="64" xmlns="http://www.w3.org/2000/svg">
               <circle cx="100" cy="100" r="95" fill="none" stroke={T.gold} strokeWidth="2" opacity="0.5"/>
               <circle cx="100" cy="100" r="85" fill="none" stroke={T.gold} strokeWidth="0.5" opacity="0.3"/>
               <polygon points="100,12 108,82 100,78 92,82" fill={T.gold} stroke={T.gold} strokeWidth="0.5"/>
               <polygon points="100,188 92,118 100,122 108,118" fill={T.accent} stroke={T.accent} strokeWidth="0.5" opacity="0.4"/>
               <polygon points="12,100 82,92 78,100 82,108" fill={T.accent} stroke={T.accent} strokeWidth="0.5" opacity="0.4"/>
               <polygon points="188,100 118,108 122,100 118,92" fill={T.accent} stroke={T.accent} strokeWidth="0.5" opacity="0.4"/>
-              <circle cx="100" cy="100" r="28" fill={darkMode?"#111b2e":"#fff"} stroke={T.gold} strokeWidth="2.5"/>
-              <circle cx="100" cy="100" r="24" fill={darkMode?"#0b1220":"#f8f9fa"} stroke={T.gold} strokeWidth="0.5" opacity="0.5"/>
+              <circle cx="100" cy="100" r="28" fill={darkMode?"#0d0d1f":"#fff"} stroke={T.gold} strokeWidth="2.5"/>
+              <circle cx="100" cy="100" r="24" fill={darkMode?"#07071a":"#f8f9fa"} stroke={T.gold} strokeWidth="0.5" opacity="0.5"/>
               <text x="100" y="102" fontFamily={FONT_DISPLAY} fontSize="36" fontWeight="900" fill={T.gold} textAnchor="middle" dominantBaseline="central">N</text>
-              <text x="100" y="8" fontFamily={FONT_MONO} fontSize="10" fontWeight="700" fill={T.gold} textAnchor="middle" opacity="0.6">N</text>
-              <text x="194" y="104" fontFamily={FONT_MONO} fontSize="10" fontWeight="400" fill={T.textDim} textAnchor="middle">E</text>
-              <text x="100" y="198" fontFamily={FONT_MONO} fontSize="10" fontWeight="400" fill={T.textDim} textAnchor="middle">S</text>
-              <text x="6" y="104" fontFamily={FONT_MONO} fontSize="10" fontWeight="400" fill={T.textDim} textAnchor="middle">W</text>
+              <text x="100" y="8" fontFamily={FONT_MONO} fontSize="9" fontWeight="700" fill={T.gold} textAnchor="middle" opacity="0.6">N</text>
+              <text x="194" y="104" fontFamily={FONT_MONO} fontSize="9" fontWeight="400" fill={T.textDim} textAnchor="middle">E</text>
+              <text x="100" y="198" fontFamily={FONT_MONO} fontSize="9" fontWeight="400" fill={T.textDim} textAnchor="middle">S</text>
+              <text x="6" y="104" fontFamily={FONT_MONO} fontSize="9" fontWeight="400" fill={T.textDim} textAnchor="middle">W</text>
             </svg>
-            <div style={{textAlign:"left"}}>
-              <div style={{fontFamily:FONT_LABEL,fontSize:10,fontWeight:700,color:T.textMid,letterSpacing:3,textTransform:"uppercase"}}>North Prosperity</div>
-              <div style={{fontFamily:FONT_DISPLAY,fontSize:26,fontWeight:800,color:T.accent,lineHeight:1.1,letterSpacing:-0.5}}>Retirement Planner</div>
-              <div style={{fontFamily:FONT_LABEL,fontSize:11,color:T.textMid,letterSpacing:1}}>RETIREMENT PROJECTION ENGINE</div>
+            <div>
+              <div style={{display:"flex",alignItems:"baseline",gap:12,flexWrap:"wrap"}}>
+                <span style={{fontFamily:FONT_DISPLAY,fontSize:36,fontWeight:900,color:T.gold,lineHeight:1.1}}>North Prosperity</span>
+                <span style={{fontFamily:FONT_LABEL,fontSize:18,fontWeight:500,color:T.textMid,letterSpacing:0.5}}>Retirement Planner</span>
+              </div>
+              {plan.params.personName && <span style={{fontFamily:FONT_LABEL,fontSize:14,fontWeight:500,color:T.accent,marginTop:4,display:"block"}}>{plan.params.personName}</span>}
             </div>
           </div>
-          <div className="np-header-btns" style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
             <SaveDot status={saveStatus} T={T}/>
-            <SmBtn onClick={()=>setDarkMode(!darkMode)} label={darkMode?"Light":"Dark"} T={T}/>
-            <SmBtn onClick={importPlan} label="Import" T={T}/>
-            <SmBtn onClick={exportPlan} label="Export" T={T}/>
-            <SmBtn onClick={resetPlan} label="Reset" T={T} danger/>
+            <SmBtn onClick={()=>setDarkMode(!darkMode)} label={darkMode?"\u2600\uFE0F Light":"\u{1F319} Dark"} T={T}/>
+            <SmBtn onClick={importPlan} label={"\u{1F4C2} Import"} T={T}/>
+            <SmBtn onClick={exportPlan} label={"\u{1F4BE} Export"} T={T}/>
+            <SmBtn onClick={resetPlan} label={"\u{1F504} Reset"} T={T} danger/>
           </div>
         </div>
 
@@ -1277,28 +632,26 @@ export default function RetirementPlanner() {
         {results.length>0 && (()=>{
           const bc=plan.params.baseCurrency||"USD";
           const anyTax=results.some(r=>(r.totalTax||0)>0);
-          const v1g  = fmtCard(y1.totalIncome,bc);
-          const v1n  = fmtCard(y1.netIncome??y1.totalIncome,bc);
-          const v1p  = fmtCard(y1.totalValue,bc);
-          const vpk  = fmtCard(peakValue,bc);
-          const vfi  = fmtCard(yL.totalIncome,bc);
-          const vfp  = fmtCard(yL.totalValue,bc);
-          const longest = [v1g,v1n,v1p,vpk,vfi,vfp].reduce((a,b)=>b.length>a.length?b:a,"");
-          const fs = autoSize(longest);
           return(
-          <div className="np-sumcards">
-            <SumCard label="Year 1 Gross"     value={v1g} color={T.gold}                       fontSize={fs} T={T}/>
-            <SumCard label="Year 1 Net"        value={v1n} color={anyTax?T.green:T.textDim}    fontSize={fs} note={anyTax?null:"no tax configured"} T={T}/>
-            <SumCard label="Year 1 Portfolio"  value={v1p} color={T.accent}                    fontSize={fs} T={T}/>
-            <SumCard label="Peak Portfolio"    value={vpk} color={T.purple}                    fontSize={fs} T={T}/>
-            <SumCard label="Final Income"      value={vfi} color={T.cyan}                      fontSize={fs} T={T}/>
-            <SumCard label="Final Portfolio"   value={vfp} color={T.amber}                     fontSize={fs} T={T}/>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:10,marginBottom:14}}>
+            <SumCard label="Year 1 Gross" value={fmt(y1.totalIncome,bc)} color={T.gold} T={T}/>
+            <SumCard
+              label="Year 1 Net"
+              value={fmt(y1.netIncome??y1.totalIncome,bc)}
+              color={anyTax?T.green:T.textDim}
+              note={anyTax?null:"no tax configured"}
+              T={T}
+            />
+            <SumCard label="Year 1 Portfolio" value={fmtK(y1.totalValue,bc)} color={T.accent} T={T}/>
+            <SumCard label="Peak Portfolio" value={fmtK(peakValue,bc)} color={T.purple} T={T}/>
+            <SumCard label="Final Income" value={fmt(yL.totalIncome,bc)} color={T.cyan} T={T}/>
+            <SumCard label="Final Portfolio" value={fmtK(yL.totalValue,bc)} color={T.amber} T={T}/>
           </div>
           );
         })()}
 
         {/* TABS */}
-        <div className="np-tabs" style={{display:"flex",gap:2,marginBottom:14,flexWrap:"wrap",borderBottom:`1px solid ${T.border}`}}>
+        <div style={{display:"flex",gap:2,marginBottom:14,flexWrap:"wrap",borderBottom:`1px solid ${T.border}`}}>
           {tabs.map(t=>(
             <button key={t.id} onClick={()=>setTab(t.id)} style={{
               padding:"11px 16px",border:"none",cursor:"pointer",fontSize:12,fontWeight:tab===t.id?600:500,
@@ -1316,61 +669,12 @@ export default function RetirementPlanner() {
           {tab==="divest" && <DivestTab plan={plan} update={update} T={T} baseCurrency={plan.params.baseCurrency||"USD"}/>}
           {tab==="fixed" && <FixedAssetsTab plan={plan} update={update} T={T} baseCurrency={plan.params.baseCurrency||"USD"}/>}
           {tab==="projections" && <ProjectionsTab plan={plan} results={results} T={T} baseCurrency={plan.params.baseCurrency||"USD"}/>}
-          {tab==="withdrawals" && <WithdrawalTab plan={plan} update={update} results={results} T={T} baseCurrency={plan.params.baseCurrency||"USD"}/>}
+          {tab==="withdrawals" && <WithdrawalTab plan={plan} results={results} T={T} baseCurrency={plan.params.baseCurrency||"USD"}/>}
           {tab==="charts" && <ChartsTab plan={plan} results={results} T={T} baseCurrency={plan.params.baseCurrency||"USD"}/>}
           {tab==="additional" && <AdditionalTab plan={plan} update={update} T={T} baseCurrency={plan.params.baseCurrency||"USD"} fxRate={fxRate||{}}/>}
-          {tab==="summary" && <SummaryTab plan={plan} results={results} T={T} baseCurrency={plan.params.baseCurrency||"USD"} fxRate={fxRate||{}} mcResult={mcResult} mcStale={mcStale}/>}
-          {tab==="simulation" && <SimulationTab plan={plan} results={results} T={T} baseCurrency={plan.params.baseCurrency||"USD"} fxRate={fxRate||{}} onMcResult={(r)=>{setMcResult(r);setMcStale(false);}} mcResult={mcResult} mcStale={mcStale}/>}
+          {tab==="summary" && <SummaryTab plan={plan} results={results} T={T} baseCurrency={plan.params.baseCurrency||"USD"} fxRate={fxRate||{}}/>}
         </div>
       </div>
-    </div>
-  );
-}
-
-// Price field — locally controlled, only commits to plan state on blur or Enter
-// Prevents mid-type partial values (e.g. "4" from "400") from reaching the engine
-function PriceField({label, value, onCommit, cls, T}) {
-  const [local, setLocal] = useState(value===0?"":String(value));
-  useEffect(()=>setLocal(value===0?"":String(value)),[value]);
-  const commit = () => {
-    const v = parseFloat(local);
-    if (local===""||local==="-") { onCommit(0); return; }
-    if (isFinite(v) && v >= 0) onCommit(v);
-    else setLocal(value===0?"":String(value));
-  };
-  return (
-    <div className={cls||""} style={{minWidth:30,flex:"0.4fr"}}>
-      <label style={{fontSize:10,color:T.label,fontWeight:600,textTransform:"uppercase",letterSpacing:0.3,display:"block",marginBottom:2,fontFamily:FONT_LABEL}}>{label}</label>
-      <input type="number" value={local}
-        onChange={e=>setLocal(e.target.value)}
-        onBlur={commit}
-        onKeyDown={e=>{if(e.key==="Enter")commit();}}
-        onFocus={e=>e.target.select()}
-        style={{width:"100%",padding:"4px 6px",background:T.inputBg,border:`1px solid ${T.border2}`,borderRadius:4,fontSize:12,color:T.text,fontFamily:FONT_LABEL}}
-      />
-    </div>
-  );
-}
-
-// Start year field — free typing, only commits valid 4-digit year on blur/Enter
-function StartYearField({value, onCommit, T}) {
-  const [local, setLocal] = useState(String(value));
-  useEffect(()=>setLocal(String(value)),[value]);
-  const commit = () => {
-    const y = parseInt(local, 10);
-    if (isFinite(y) && y >= 2000 && y <= 2150) onCommit(String(y));
-    else setLocal(String(value)); // revert if invalid
-  };
-  return (
-    <div>
-      <label style={{fontSize:10,color:T.label,fontWeight:600,textTransform:"uppercase",letterSpacing:0.5,display:"block",marginBottom:3,fontFamily:FONT_LABEL}}>Start Year</label>
-      <input type="number" value={local}
-        onChange={e=>setLocal(e.target.value)}
-        onBlur={commit}
-        onKeyDown={e=>{if(e.key==="Enter")commit();}}
-        onFocus={e=>e.target.select()}
-        style={{width:"100%",padding:"7px 10px",background:T.inputBg,border:`1px solid ${T.border2}`,borderRadius:6,fontSize:13,color:T.text,fontFamily:FONT_LABEL}}
-      />
     </div>
   );
 }
@@ -1383,13 +687,8 @@ function PlanningTab({plan, update, T, baseCurrency="USD", fxRate=null, fxError=
   const up = (k,v)=>update(d=>{d.params[k]=v;return d;});
   const [showInvPresets, setShowInvPresets] = useState(null);
   const [showTax, setShowTax] = useState({}); // {fi_0: true, ii_1: true, oi_0: true}
-  const applyInvPreset = (i,key)=>{const pr=CAGR_PRESETS[key];update(d=>{d.investmentIncome[i].cagr=pr.cagr;d.investmentIncome[i].cagrDecline1=pr.d1;d.investmentIncome[i].cagrDecline2=pr.d2;d.investmentIncome[i].cagrDecline3=pr.d3;d.investmentIncome[i].cagrFloor=pr.floor||0;if(!d.investmentIncome[i].volOverride)d.investmentIncome[i].vol=pr.vol||18;return d;});setShowInvPresets(null);};
+  const applyInvPreset = (i,key)=>{const pr=CAGR_PRESETS[key];update(d=>{d.investmentIncome[i].cagr=pr.cagr;d.investmentIncome[i].cagrDecline1=pr.d1;d.investmentIncome[i].cagrDecline2=pr.d2;d.investmentIncome[i].cagrDecline3=pr.d3;return d;});setShowInvPresets(null);};
   const toggleTax = (key) => setShowTax(prev=>({...prev,[key]:!prev[key]}));
-  const onStartYear = (v) => {
-    const y = parseInt(v, 10);
-    if (!isFinite(y) || y < 2000 || y > 2150) return;
-    up("startYear", y);
-  };
 
   return <div style={{display:"flex",flexDirection:"column",gap:12,width:"100%"}}>
     <Card title="Planning Parameters" T={T}>
@@ -1397,14 +696,14 @@ function PlanningTab({plan, update, T, baseCurrency="USD", fxRate=null, fxError=
         <Field label="Person / Couple" value={p.personName} onChange={v=>up("personName",v)} T={T}/>
         <Field label="Age at Start" value={p.ageAtStart} type="number" onChange={v=>up("ageAtStart",+v||60)} T={T}/>
         <Field label="Inflation %" value={p.inflationRate} type="number" step="0.5" onChange={v=>up("inflationRate",+v||0)} T={T}/>
-        <StartYearField value={p.startYear} onCommit={onStartYear} T={T}/>
+        <Field label="Start Year" value={p.startYear} type="number" onChange={v=>up("startYear",+v||2030)} T={T}/>
         <Field label="Projection Years" value={p.projectionYears} type="number" step="0.25" onChange={v=>up("projectionYears",Math.min(parseFloat(v)||30,60))} T={T}/>
         <div><label style={{fontSize:10,color:T.label,fontWeight:600,textTransform:"uppercase",letterSpacing:0.5,display:"block",marginBottom:3,fontFamily:FONT_LABEL}}>Base Currency</label>
         <select value={p.baseCurrency||"USD"} onChange={e=>up("baseCurrency",e.target.value)} style={{width:"100%",padding:"7px 10px",background:T.inputBg,border:`1px solid ${T.border2}`,borderRadius:6,fontSize:13,color:T.text,fontFamily:FONT_LABEL}}>
           {CURRENCIES.map(c=><option key={c.code} value={c.code}>{c.label}</option>)}
         </select>
-        {fxRate&&<div style={{fontSize:10,color:T.green,fontFamily:FONT_MONO,marginTop:3}}>Live rates loaded ✓</div>}
-        {fxError&&<div style={{fontSize:10,color:T.red,fontFamily:FONT_MONO,marginTop:3}}>FX offline — using 1:1</div>}
+        {fxRate&&<div style={{fontSize:9,color:T.green,fontFamily:FONT_MONO,marginTop:3}}>Live rates loaded ✓</div>}
+        {fxError&&<div style={{fontSize:9,color:T.red,fontFamily:FONT_MONO,marginTop:3}}>FX offline — using 1:1</div>}
         </div>
       </div>
     </Card>
@@ -1436,18 +735,15 @@ function PlanningTab({plan, update, T, baseCurrency="USD", fxRate=null, fxError=
 
     {/* TAX DEFERRED SOURCES */}
     <Card title="Tax Deferred Sources of Income" badge="RRSP, TFSA, RRIF, 401(k), IRA, ISA, SIPP, Super, KiwiSaver, Pillar 3a, Afore" T={T}
-      action={plan.investmentIncome.length<10?()=>update(d=>{d.investmentIncome.push({id:mkId(),name:"New Investment",note:"",shares:0,pricePerShare:0,priceEnteredYear:CURRENT_YEAR,cagr:7,cagrDecline1:0.3,cagrDecline2:0.2,cagrDecline3:0.1,dividendPercent:0,includeDividend:false,autoCalc:true,enabled:false,taxRate:0,applyTax:false});return d;}):null} actionLabel="+ Add">
-      <Hint T={T}>Enter today's price — the engine compounds it to your retirement start date using your CAGR + decline curve. Amort/Sell draws balance to $0 by end of term. Div pays dividends from remaining balance. Three-phase CAGR decline: Yr 1-5, Yr 6-20, Yr 21+. Tax treatment varies — use % Tax to configure per account.</Hint>
+      action={plan.investmentIncome.length<10?()=>update(d=>{d.investmentIncome.push({id:mkId(),name:"New Investment",note:"",shares:0,pricePerShare:0,cagr:7,cagrDecline1:0.3,cagrDecline2:0.2,cagrDecline3:0.1,dividendPercent:0,includeDividend:false,autoCalc:true,enabled:false,taxRate:0,applyTax:false});return d;}):null} actionLabel="+ Add">
+      <Hint T={T}>Tax-deferred accounts worldwide. Amort/Sell draws balance to $0 by end of term. Div pays dividends from remaining balance. Three-phase CAGR decline: Yr 1-5, Yr 6-20, Yr 21+. Tax treatment varies — use % Tax to configure per account.</Hint>
       {plan.investmentIncome.map((s,i)=>{
         const tk=`ii_${i}`;
         return <div key={s.id}>
           <ItemRow enabled={s.enabled} T={T} onToggle={()=>update(d=>{d.investmentIncome[i].enabled=!d.investmentIncome[i].enabled;return d;})} onRemove={()=>update(d=>{d.investmentIncome.splice(i,1);return d;})}>
             <MF label="Name" value={s.name} w="1.0fr" onChange={v=>update(d=>{d.investmentIncome[i].name=v;return d;})} T={T}/>
             <MF label="Shares" cls="mf-sm" value={s.shares} type="number" w="0.25fr" onChange={v=>update(d=>{d.investmentIncome[i].shares=+v||0;return d;})} T={T}/>
-            <div style={{minWidth:30,flex:"0.4fr"}}>
-              <PriceField label="Today's Price" cls="mf-md" value={s.pricePerShare} onCommit={v=>update(d=>{d.investmentIncome[i].pricePerShare=v;d.investmentIncome[i].priceEnteredYear=CURRENT_YEAR;return d;})} T={T}/>
-              <StartPriceLabel pricePerShare={s.pricePerShare} cagr={s.cagr} d1={s.cagrDecline1!==undefined?s.cagrDecline1:0.3} d2={s.cagrDecline2!==undefined?s.cagrDecline2:0.2} d3={s.cagrDecline3!==undefined?s.cagrDecline3:0.1} floor={s.cagrFloor||0} priceEnteredYear={s.priceEnteredYear||CURRENT_YEAR} startYear={plan.params.startYear} currency={s.currency||baseCurrency} T={T}/>
-            </div>
+            <MF label="Price" cls="mf-md" value={s.pricePerShare} type="number" w="0.4fr" onChange={v=>update(d=>{d.investmentIncome[i].pricePerShare=+v||0;return d;})} T={T}/>
             <MF label="CAGR%" cls="mf-xs" value={s.cagr} type="number" step="0.5" w="0.22fr" onChange={v=>update(d=>{d.investmentIncome[i].cagr=+v||0;return d;})} T={T}/>
             <MF label="Yr 1-5 ↓%" cls="mf-xs" value={s.cagrDecline1!==undefined?s.cagrDecline1:(s.cagrDecline||0.3)} type="number" step="0.1" w="0.22fr" onChange={v=>update(d=>{d.investmentIncome[i].cagrDecline1=+v||0;return d;})} T={T}/>
             <MF label="Yr 6-20 ↓%" cls="mf-xs" value={s.cagrDecline2!==undefined?s.cagrDecline2:((s.cagrDecline||0.3)*0.6)} type="number" step="0.1" w="0.22fr" onChange={v=>update(d=>{d.investmentIncome[i].cagrDecline2=+v||0;return d;})} T={T}/>
@@ -1458,7 +754,7 @@ function PlanningTab({plan, update, T, baseCurrency="USD", fxRate=null, fxError=
             <Chk label="Amort/Sell" checked={s.autoCalc} onChange={()=>update(d=>{d.investmentIncome[i].autoCalc=!d.investmentIncome[i].autoCalc;return d;})} T={T}/>
             <div style={{display:"flex",flexDirection:"column",gap:2,alignSelf:"end",paddingBottom:4}}>
               <YahooLink ticker={s.name} T={T}/>
-              <button onClick={()=>setShowInvPresets(showInvPresets===i?null:i)} style={{fontSize:10,color:T.accent,background:"none",border:"none",cursor:"pointer",fontFamily:FONT_LABEL}}>CAGR % Preset</button>
+              <button onClick={()=>setShowInvPresets(showInvPresets===i?null:i)} style={{fontSize:9,color:T.accent,background:"none",border:"none",cursor:"pointer",fontFamily:FONT_LABEL}}>CAGR % Preset</button>
             </div>
             <TaxToggleBtn open={showTax[tk]} applyTax={s.applyTax} onToggle={()=>toggleTax(tk)} T={T}/>
           </ItemRow>
@@ -1472,8 +768,8 @@ function PlanningTab({plan, update, T, baseCurrency="USD", fxRate=null, fxError=
           {showInvPresets===i&&<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(170px,1fr))",gap:6,padding:"6px 28px 10px",background:T.bg,borderRadius:8,margin:"-2px 0 6px"}}>
             {Object.entries(CAGR_PRESETS).map(([k,pr])=><button key={k} onClick={()=>applyInvPreset(i,k)} style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:8,padding:"8px 10px",cursor:"pointer",textAlign:"left"}}>
               <div style={{fontSize:11,fontWeight:600,color:T.text,fontFamily:FONT_LABEL}}>{pr.label}</div>
-              <div style={{fontSize:10,color:T.textMid,fontFamily:FONT_LABEL}}>{pr.desc}</div>
-              <div style={{fontSize:10,color:T.accent,fontFamily:FONT_MONO}}>{pr.cagr}% | {pr.d1}/{pr.d2}/{pr.d3}</div>
+              <div style={{fontSize:9,color:T.textMid,fontFamily:FONT_LABEL}}>{pr.desc}</div>
+              <div style={{fontSize:9,color:T.accent,fontFamily:FONT_MONO}}>{pr.cagr}% | {pr.d1}/{pr.d2}/{pr.d3}</div>
             </button>)}
           </div>}
         </div>;
@@ -1518,23 +814,20 @@ function PlanningTab({plan, update, T, baseCurrency="USD", fxRate=null, fxError=
 function DivestTab({plan, update, T, baseCurrency="USD"}) {
   const [showPresets, setShowPresets] = useState(null);
   const [showTax, setShowTax] = useState({});
-  const applyPreset = (i, key) => {const p=CAGR_PRESETS[key];update(d=>{d.divestAssets[i].cagr=p.cagr;d.divestAssets[i].cagrDecline1=p.d1;d.divestAssets[i].cagrDecline2=p.d2;d.divestAssets[i].cagrDecline3=p.d3;d.divestAssets[i].cagrFloor=p.floor||0;if(!d.divestAssets[i].volOverride)d.divestAssets[i].vol=p.vol||18;return d;});setShowPresets(null);};
+  const applyPreset = (i, key) => {const p=CAGR_PRESETS[key];update(d=>{d.divestAssets[i].cagr=p.cagr;d.divestAssets[i].cagrDecline1=p.d1;d.divestAssets[i].cagrDecline2=p.d2;d.divestAssets[i].cagrDecline3=p.d3;return d;});setShowPresets(null);};
   const toggleTax = (key) => setShowTax(prev=>({...prev,[key]:!prev[key]}));
 
   return <div style={{display:"flex",flexDirection:"column",gap:12,width:"100%"}}>
     <Card title="Investment Assets to Divest" badge="Max 20" T={T}
-      action={plan.divestAssets.length<20?()=>update(d=>{d.divestAssets.push({id:mkId(),name:`Asset ${d.divestAssets.length+1}`,note:"",shares:0,pricePerShare:0,priceEnteredYear:CURRENT_YEAR,cagr:10,cagrDecline1:0.5,cagrDecline2:0.3,cagrDecline3:0.1,dividendPercent:0,includeDividend:false,autoCalc:true,enabled:false,taxRate:0,applyTax:false,costBasis:0});return d;}):null} actionLabel="+ Add Asset">
-      <Hint T={T}>Enter today's price — the engine automatically compounds it forward to your retirement start date using your CAGR + decline curve. Three-phase decline: Yr 1-5, Yr 6-20, Yr 21+. Use % Tax to set cap gains rate and cost basis.</Hint>
+      action={plan.divestAssets.length<20?()=>update(d=>{d.divestAssets.push({id:mkId(),name:`Asset ${d.divestAssets.length+1}`,note:"",shares:0,pricePerShare:0,cagr:10,cagrDecline1:0.5,cagrDecline2:0.3,cagrDecline3:0.1,dividendPercent:0,includeDividend:false,autoCalc:true,enabled:false,taxRate:0,applyTax:false,costBasis:0});return d;}):null} actionLabel="+ Add Asset">
+      <Hint T={T}>Unregistered assets sold on an amortization schedule to $0 by end of term. Three-phase CAGR decline: Yr 1-5, Yr 6-20, Yr 21+. Use % Tax to set cap gains rate and cost basis.</Hint>
       {plan.divestAssets.map((a,i)=>{
         const tk=`da_${i}`;
         return <div key={a.id}>
           <ItemRow enabled={a.enabled} T={T} onToggle={()=>update(d=>{d.divestAssets[i].enabled=!d.divestAssets[i].enabled;return d;})} onRemove={()=>update(d=>{d.divestAssets.splice(i,1);return d;})}>
             <MF label="Ticker" value={a.name} w="0.7fr" onChange={v=>update(d=>{d.divestAssets[i].name=v;return d;})} T={T}/>
             <MF label="Shares" cls="mf-sm" value={a.shares} type="number" w="0.25fr" onChange={v=>update(d=>{d.divestAssets[i].shares=+v||0;return d;})} T={T}/>
-            <div style={{minWidth:30,flex:"0.4fr"}}>
-              <PriceField label="Today's Price" cls="mf-md" value={a.pricePerShare} onCommit={v=>update(d=>{d.divestAssets[i].pricePerShare=v;d.divestAssets[i].priceEnteredYear=CURRENT_YEAR;return d;})} T={T}/>
-              <StartPriceLabel pricePerShare={a.pricePerShare} cagr={a.cagr} d1={a.cagrDecline1} d2={a.cagrDecline2} d3={a.cagrDecline3} floor={a.cagrFloor||0} priceEnteredYear={a.priceEnteredYear||CURRENT_YEAR} startYear={plan.params.startYear} currency={a.currency||baseCurrency} T={T}/>
-            </div>
+            <MF label="Price" cls="mf-md" value={a.pricePerShare} type="number" w="0.4fr" onChange={v=>update(d=>{d.divestAssets[i].pricePerShare=+v||0;return d;})} T={T}/>
             <MF label="CAGR%" cls="mf-xs" value={a.cagr} type="number" step="1" w="0.22fr" onChange={v=>update(d=>{d.divestAssets[i].cagr=+v||0;return d;})} T={T}/>
             <MF label="Yr 1-5 ↓%" cls="mf-xs" value={a.cagrDecline1} type="number" step="0.1" w="0.22fr" onChange={v=>update(d=>{d.divestAssets[i].cagrDecline1=+v||0;return d;})} T={T}/>
             <MF label="Yr 6-20 ↓%" cls="mf-xs" value={a.cagrDecline2} type="number" step="0.1" w="0.22fr" onChange={v=>update(d=>{d.divestAssets[i].cagrDecline2=+v||0;return d;})} T={T}/>
@@ -1545,7 +838,7 @@ function DivestTab({plan, update, T, baseCurrency="USD"}) {
             <Chk label="Amort/Sell" checked={a.autoCalc} onChange={()=>update(d=>{d.divestAssets[i].autoCalc=!d.divestAssets[i].autoCalc;return d;})} T={T}/>
             <div style={{display:"flex",flexDirection:"column",gap:2,alignSelf:"end",paddingBottom:4}}>
               <YahooLink ticker={a.name} T={T}/>
-              <button onClick={()=>setShowPresets(showPresets===i?null:i)} style={{fontSize:10,color:T.accent,background:"none",border:"none",cursor:"pointer",fontFamily:FONT_LABEL}}>CAGR % Preset</button>
+              <button onClick={()=>setShowPresets(showPresets===i?null:i)} style={{fontSize:9,color:T.accent,background:"none",border:"none",cursor:"pointer",fontFamily:FONT_LABEL}}>CAGR % Preset</button>
             </div>
             <TaxToggleBtn open={showTax[tk]} applyTax={a.applyTax} onToggle={()=>toggleTax(tk)} T={T}/>
           </ItemRow>
@@ -1569,8 +862,8 @@ function DivestTab({plan, update, T, baseCurrency="USD"}) {
           {showPresets===i&&<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(170px,1fr))",gap:6,padding:"6px 28px 10px",background:T.bg,borderRadius:8,margin:"-2px 0 6px"}}>
             {Object.entries(CAGR_PRESETS).map(([k,p])=><button key={k} onClick={()=>applyPreset(i,k)} style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:8,padding:"8px 10px",cursor:"pointer",textAlign:"left"}}>
               <div style={{fontSize:11,fontWeight:600,color:T.text,fontFamily:FONT_LABEL}}>{p.label}</div>
-              <div style={{fontSize:10,color:T.textMid,fontFamily:FONT_LABEL}}>{p.desc}</div>
-              <div style={{fontSize:10,color:T.accent,fontFamily:FONT_MONO}}>{p.cagr}% | {p.d1}/{p.d2}/{p.d3}</div>
+              <div style={{fontSize:9,color:T.textMid,fontFamily:FONT_LABEL}}>{p.desc}</div>
+              <div style={{fontSize:9,color:T.accent,fontFamily:FONT_MONO}}>{p.cagr}% | {p.d1}/{p.d2}/{p.d3}</div>
             </button>)}
           </div>}
         </div>;
@@ -1590,14 +883,11 @@ function DivestTab({plan, update, T, baseCurrency="USD"}) {
 function CagrExamplesBox({T}) {
   const [open, setOpen] = useState(false);
   const examples = [
-    {label:"Hyper Growth",       desc:"e.g., disruptive companies (early TSLA, early NVDA)", cagr:35, d1:3.0,  d2:0.6,  d3:0.25, floor:5.0,  explain:"Starts at 35% CAGR. Years 1-5: declines 3.0%/yr to ~20% by year 5. Years 6-20: declines 0.6%/yr to ~11% by year 20. Years 21+: declines 0.25%/yr, floor held at 5%."},
-    {label:"Aggressive Growth",  desc:"e.g., high-growth stocks (TSLA, MSTR)",               cagr:25, d1:1.7,  d2:0.5,  d3:0.25, floor:4.0,  explain:"Starts at 25% CAGR. Years 1-5: declines 1.7%/yr to ~16.5% by year 5. Years 6-20: declines 0.5%/yr to ~9% by year 20. Years 21+: declines 0.25%/yr, floor held at 4%."},
-    {label:"Growth",             desc:"e.g., tech/growth stocks (NVDA, AMZN)",               cagr:18, d1:0.8,  d2:0.4,  d3:0.15, floor:4.0,  explain:"Starts at 18% CAGR. Years 1-5: declines 0.8%/yr to ~14% by year 5. Years 6-20: declines 0.4%/yr to ~8% by year 20. Years 21+: declines 0.15%/yr, floor held at 4%."},
-    {label:"Moderate",           desc:"e.g., blue chips (AAPL, MSFT)",                       cagr:12, d1:0.5,  d2:0.3,  d3:0.1,  floor:3.0,  explain:"Starts at 12% CAGR. Years 1-5: declines 0.5%/yr to ~9.5% by year 5. Years 6-20: declines 0.3%/yr to ~5% by year 20. Years 21+: declines 0.1%/yr, floor held at 3%."},
-    {label:"Conservative",       desc:"e.g., index funds (SPY, VOO)",                        cagr:10, d1:0.3,  d2:0.3,  d3:0.1,  floor:2.0,  explain:"Starts at 10% CAGR. Years 1-5: declines 0.3%/yr to ~8.5% by year 5. Years 6-20: declines 0.3%/yr to ~4% by year 20. Years 21+: declines 0.1%/yr, floor held at 2%."},
-    {label:"Ultra Conservative", desc:"e.g., bonds, GICs, T-Bills",                          cagr:4,  d1:0.2,  d2:0.15, d3:0.0,  floor:2.0,  explain:"Starts at 4% CAGR. Years 1-5: declines 0.2%/yr to ~3% by year 5. Years 6-20: declines 0.15%/yr to ~2% by year 20. Years 21+: rate held flat at the 2% floor — reflecting stable fixed-income instruments."},
-    {label:"Crypto",             desc:"e.g., Bitcoin, Ethereum",                             cagr:28, d1:2.8,  d2:0.5,  d3:0.08, floor:5.0,  explain:"Starts at 28% CAGR. Years 1-5: declines 2.8%/yr to ~14% by year 5. Years 6-20: declines 0.5%/yr to ~6.5% by year 20. Years 21+: declines 0.08%/yr, floor held at 5%."},
-    {label:"Income / Dividend",  desc:"e.g., REITs, dividend ETFs",                          cagr:6,  d1:0.15, d2:0.1,  d3:0.1,  floor:2.0,  explain:"Starts at 6% CAGR. Years 1-5: declines 0.15%/yr to ~5.25% by year 5. Years 6-20: declines 0.1%/yr to ~3.75% by year 20. Years 21+: declines 0.1%/yr, floor held at 2%."},
+    {label:"🔥 Hyper Growth Stocks",desc:"e.g., disruptive companies (early TSLA, early NVDA)",cagr:30,d1:2.8,d2:1.0,d3:0.2,explain:"Starts at 30% CAGR. Years 1-5: declines 2.8%/yr to ~16% by year 5. Years 6-20: declines 1.0%/yr to ~1% by year 20. Years 21+: declines 0.2%/yr, settling near 0%."},
+    {label:"📈 Growth Stocks",desc:"e.g., NVDA, AMZN, META",cagr:18,d1:0.8,d2:0.4,d3:0.15,explain:"Starts at 18% CAGR. Years 1-5: declines 0.8%/yr to ~14% by year 5. Years 6-20: declines 0.4%/yr to ~8% by year 20. Years 21+: declines 0.15%/yr, settling near 6-7%."},
+    {label:"⚖️ Moderate Stocks",desc:"e.g., AAPL, MSFT, JNJ",cagr:12,d1:0.5,d2:0.3,d3:0.1,explain:"Starts at 12% CAGR. Years 1-5: declines 0.5%/yr to ~9.5% by year 5. Years 6-20: declines 0.3%/yr to ~5% by year 20. Years 21+: declines 0.1%/yr, settling near 4%."},
+    {label:"🛡️ Conservative / Index",desc:"e.g., SPY, VOO, VTI",cagr:10,d1:0.3,d2:0.2,d3:0.1,explain:"Starts at 10% CAGR. Years 1-5: declines 0.3%/yr to ~8.5% by year 5. Years 6-20: declines 0.2%/yr to ~5.5% by year 20. Years 21+: declines 0.1%/yr, settling near 4-5%."},
+    {label:"💴 Ultra Conservative",desc:"e.g., Bonds, GICs, T-Bills",cagr:3,d1:0.1,d2:0.0,d3:0.0,explain:"Starts at 3% CAGR. Years 1-5: slight decline of 0.1%/yr to ~2.5% by year 5. Years 6+: rate holds essentially flat, reflecting stable fixed-income instruments."},
   ];
   return <Card title="CAGR Decline Examples" T={T}>
     <div style={{cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}} onClick={()=>setOpen(!open)}>
@@ -1606,7 +896,7 @@ function CagrExamplesBox({T}) {
     </div>
     {open&&<div style={{display:"flex",flexDirection:"column",gap:10,marginTop:6}}>
       <div style={{fontSize:12,color:T.textMid,fontFamily:FONT_LABEL,lineHeight:1.6,padding:"0 4px"}}>
-        The 3-phase model assumes high early growth that gradually matures — mimicking how companies evolve from high-growth to stable phases. The three decline rates (Yr 1-5, Yr 6-20, Yr 21+) control how quickly CAGR drops in each period. Each preset has a floor — a minimum CAGR the calculation will never fall below, reflecting that quality assets retain long-term value.
+        The 3-phase model assumes high early growth that gradually matures — mimicking how companies evolve from high-growth to stable phases. The three decline rates (1-5%, 6-20%, 21+%) control how quickly CAGR drops in each period. The CAGR never goes below 0%.
       </div>
       {examples.map((ex,i)=><div key={i} style={{background:T.inputBg,borderRadius:10,padding:"14px 18px",border:`1px solid ${T.border}`}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6,flexWrap:"wrap",gap:6}}>
@@ -1615,13 +905,13 @@ function CagrExamplesBox({T}) {
             <span style={{fontSize:11,color:T.textMid,marginLeft:8,fontFamily:FONT_LABEL}}>{ex.desc}</span>
           </div>
           <div style={{fontFamily:FONT_MONO,fontSize:12,color:T.accent,background:`${T.accent}10`,padding:"3px 10px",borderRadius:6}}>
-            {ex.cagr}% | {ex.d1} / {ex.d2} / {ex.d3} | floor {ex.floor}%
+            {ex.cagr}% | {ex.d1} / {ex.d2} / {ex.d3}
           </div>
         </div>
         <div style={{fontSize:11.5,color:T.text,fontFamily:FONT_LABEL,lineHeight:1.7,opacity:0.85}}>{ex.explain}</div>
       </div>)}
       <div style={{fontSize:11,color:T.textDim,fontFamily:FONT_LABEL,padding:"4px 4px 0",lineHeight:1.5}}>
-        💡 <strong>Tip:</strong> Use the Preset button on each asset for quick setup, then fine-tune as needed. Each preset's floor ensures CAGR never declines below a minimum — e.g. 5% for Hyper Growth, 2% for Ultra Conservative. You can override any value manually after applying a preset.
+        💡 <strong>Tip:</strong> Use the Preset button on each asset for quick setup. Ultra Conservative suits bonds and GICs; steeper declines suit individual growth stocks that may mature over decades.
       </div>
     </div>}
   </Card>;
@@ -1633,30 +923,27 @@ function CagrExamplesBox({T}) {
 function FixedAssetsTab({plan, update, T, baseCurrency="USD"}) {
   const [showPresets, setShowPresets] = useState(null);
   const [showTax, setShowTax] = useState({});
-  const applyPreset = (i,key)=>{const p=CAGR_PRESETS[key];update(d=>{d.fixedAssets[i].cagr=p.cagr;d.fixedAssets[i].cagrDecline1=p.d1;d.fixedAssets[i].cagrDecline2=p.d2;d.fixedAssets[i].cagrDecline3=p.d3;d.fixedAssets[i].cagrFloor=p.floor||0;if(!d.fixedAssets[i].volOverride)d.fixedAssets[i].vol=p.vol||10;return d;});setShowPresets(null);};
+  const applyPreset = (i,key)=>{const p=CAGR_PRESETS[key];update(d=>{d.fixedAssets[i].cagr=p.cagr;d.fixedAssets[i].cagrDecline1=p.d1;d.fixedAssets[i].cagrDecline2=p.d2;d.fixedAssets[i].cagrDecline3=p.d3;return d;});setShowPresets(null);};
   const toggleTax = (key) => setShowTax(prev=>({...prev,[key]:!prev[key]}));
 
   return <div style={{display:"flex",flexDirection:"column",gap:12,width:"100%"}}>
     <Card title="Fixed Assets (Non-Income)" badge="Real Estate, Precious Metals, Collectibles, Hard Assets" T={T}
-      action={plan.fixedAssets.length<10?()=>update(d=>{d.fixedAssets.push({id:mkId(),name:"New Asset",note:"",shares:1,pricePerShare:0,priceEnteredYear:CURRENT_YEAR,cagr:3,cagrDecline1:0.1,cagrDecline2:0.05,cagrDecline3:0.02,enabled:false,taxRate:0,applyTax:false,costBasis:0});return d;}):null} actionLabel="+ Add">
-      <Hint T={T}>Enter today's price — the engine compounds it to your retirement start date. Assets that grow in value but don't generate income. Three-phase CAGR decline: Yr 1-5, Yr 6-20, Yr 21+. Use % Tax for notional cap gains on sale.</Hint>
+      action={plan.fixedAssets.length<10?()=>update(d=>{d.fixedAssets.push({id:mkId(),name:"New Asset",note:"",shares:1,pricePerShare:0,cagr:3,cagrDecline1:0.1,cagrDecline2:0.05,cagrDecline3:0.02,enabled:false,taxRate:0,applyTax:false,costBasis:0});return d;}):null} actionLabel="+ Add">
+      <Hint T={T}>Assets that grow in value but don't generate income. Three-phase CAGR decline: Yr 1-5, Yr 6-20, Yr 21+. Use % Tax for notional cap gains on sale.</Hint>
       {plan.fixedAssets.map((a,i)=>{
         const tk=`fa_${i}`;
         return <div key={a.id}>
           <ItemRow enabled={a.enabled} T={T} onToggle={()=>update(d=>{d.fixedAssets[i].enabled=!d.fixedAssets[i].enabled;return d;})} onRemove={()=>update(d=>{d.fixedAssets.splice(i,1);return d;})}>
             <MF label="Name" value={a.name} w="1.0fr" onChange={v=>update(d=>{d.fixedAssets[i].name=v;return d;})} T={T}/>
             <MF label="Units" cls="mf-sm" value={a.shares} type="number" w="0.25fr" onChange={v=>update(d=>{d.fixedAssets[i].shares=+v||0;return d;})} T={T}/>
-            <div style={{minWidth:30,flex:"0.4fr"}}>
-              <PriceField label="Today's Price" cls="mf-md" value={a.pricePerShare} onCommit={v=>update(d=>{d.fixedAssets[i].pricePerShare=v;d.fixedAssets[i].priceEnteredYear=CURRENT_YEAR;return d;})} T={T}/>
-              <StartPriceLabel pricePerShare={a.pricePerShare} cagr={a.cagr} d1={a.cagrDecline1!==undefined?a.cagrDecline1:0.1} d2={a.cagrDecline2!==undefined?a.cagrDecline2:0.05} d3={a.cagrDecline3!==undefined?a.cagrDecline3:0.02} floor={a.cagrFloor||0} priceEnteredYear={a.priceEnteredYear||CURRENT_YEAR} startYear={plan.params.startYear} currency={a.currency||baseCurrency} T={T}/>
-            </div>
+            <MF label="Price" cls="mf-md" value={a.pricePerShare} type="number" w="0.4fr" onChange={v=>update(d=>{d.fixedAssets[i].pricePerShare=+v||0;return d;})} T={T}/>
             <MF label="CAGR%" cls="mf-xs" value={a.cagr} type="number" step="0.5" w="0.22fr" onChange={v=>update(d=>{d.fixedAssets[i].cagr=+v||0;return d;})} T={T}/>
             <MF label="Yr 1-5 ↓%" cls="mf-xs" value={a.cagrDecline1!==undefined?a.cagrDecline1:(a.cagrDecline||0.1)} type="number" step="0.1" w="0.22fr" onChange={v=>update(d=>{d.fixedAssets[i].cagrDecline1=+v||0;return d;})} T={T}/>
             <MF label="Yr 6-20 ↓%" cls="mf-xs" value={a.cagrDecline2!==undefined?a.cagrDecline2:((a.cagrDecline||0.1)*0.5)} type="number" step="0.1" w="0.22fr" onChange={v=>update(d=>{d.fixedAssets[i].cagrDecline2=+v||0;return d;})} T={T}/>
             <MF label="Yr 21+ ↓%" cls="mf-xs" value={a.cagrDecline3!==undefined?a.cagrDecline3:((a.cagrDecline||0.1)*0.2)} type="number" step="0.1" w="0.22fr" onChange={v=>update(d=>{d.fixedAssets[i].cagrDecline3=+v||0;return d;})} T={T}/>
             <CurrencyTag currency={a.currency||baseCurrency} base={baseCurrency} onChange={v=>update(d=>{d.fixedAssets[i].currency=v;return d;})} T={T}/>
             <div style={{display:"flex",flexDirection:"column",gap:2,alignSelf:"end",paddingBottom:4}}>
-              <button onClick={()=>setShowPresets(showPresets===i?null:i)} style={{fontSize:10,color:T.accent,background:"none",border:"none",cursor:"pointer",fontFamily:FONT_LABEL}}>CAGR % Preset</button>
+              <button onClick={()=>setShowPresets(showPresets===i?null:i)} style={{fontSize:9,color:T.accent,background:"none",border:"none",cursor:"pointer",fontFamily:FONT_LABEL}}>CAGR % Preset</button>
             </div>
             <TaxToggleBtn open={showTax[tk]} applyTax={a.applyTax} onToggle={()=>toggleTax(tk)} T={T}/>
           </ItemRow>
@@ -1680,8 +967,8 @@ function FixedAssetsTab({plan, update, T, baseCurrency="USD"}) {
           {showPresets===i&&<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(170px,1fr))",gap:6,padding:"6px 28px 10px",background:T.bg,borderRadius:8,margin:"-2px 0 6px"}}>
             {Object.entries(CAGR_PRESETS).map(([k,p])=><button key={k} onClick={()=>applyPreset(i,k)} style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:8,padding:"8px 10px",cursor:"pointer",textAlign:"left"}}>
               <div style={{fontSize:11,fontWeight:600,color:T.text,fontFamily:FONT_LABEL}}>{p.label}</div>
-              <div style={{fontSize:10,color:T.textMid,fontFamily:FONT_LABEL}}>{p.desc}</div>
-              <div style={{fontSize:10,color:T.accent,fontFamily:FONT_MONO}}>{p.cagr}% | {p.d1}/{p.d2}/{p.d3}</div>
+              <div style={{fontSize:9,color:T.textMid,fontFamily:FONT_LABEL}}>{p.desc}</div>
+              <div style={{fontSize:9,color:T.accent,fontFamily:FONT_MONO}}>{p.cagr}% | {p.d1}/{p.d2}/{p.d3}</div>
             </button>)}
           </div>}
         </div>;
@@ -1704,19 +991,19 @@ function NetIncomeSummary({results, T, bc}) {
         <h2 style={{fontFamily:FONT_DISPLAY,fontSize:17,color:T.text,margin:0,flexShrink:0}}>Lifetime Income Summary</h2>
         <div style={{display:"flex",gap:24,flexWrap:"wrap",alignItems:"center"}}>
           <div style={{textAlign:"center"}}>
-            <div style={{fontSize:10,color:T.textDim,fontWeight:600,textTransform:"uppercase",letterSpacing:0.8,fontFamily:FONT_LABEL}}>Lifetime Gross</div>
+            <div style={{fontSize:9,color:T.textDim,fontWeight:600,textTransform:"uppercase",letterSpacing:0.8,fontFamily:FONT_LABEL}}>Lifetime Gross</div>
             <div style={{fontSize:16,fontWeight:700,color:T.gold,fontFamily:FONT_DISPLAY}}>{fmtK(totGross,bc)}</div>
           </div>
           <div style={{textAlign:"center"}}>
-            <div style={{fontSize:10,color:T.textDim,fontWeight:600,textTransform:"uppercase",letterSpacing:0.8,fontFamily:FONT_LABEL}}>Lifetime Tax</div>
+            <div style={{fontSize:9,color:T.textDim,fontWeight:600,textTransform:"uppercase",letterSpacing:0.8,fontFamily:FONT_LABEL}}>Lifetime Tax</div>
             <div style={{fontSize:16,fontWeight:700,color:T.amber,fontFamily:FONT_DISPLAY}}>{fmtK(totTax,bc)}</div>
           </div>
           <div style={{textAlign:"center"}}>
-            <div style={{fontSize:10,color:T.textDim,fontWeight:600,textTransform:"uppercase",letterSpacing:0.8,fontFamily:FONT_LABEL}}>Lifetime Net</div>
+            <div style={{fontSize:9,color:T.textDim,fontWeight:600,textTransform:"uppercase",letterSpacing:0.8,fontFamily:FONT_LABEL}}>Lifetime Net</div>
             <div style={{fontSize:16,fontWeight:700,color:T.green,fontFamily:FONT_DISPLAY}}>{fmtK(totNet,bc)}</div>
           </div>
           <div style={{textAlign:"center"}}>
-            <div style={{fontSize:10,color:T.textDim,fontWeight:600,textTransform:"uppercase",letterSpacing:0.8,fontFamily:FONT_LABEL}}>Avg Tax Rate</div>
+            <div style={{fontSize:9,color:T.textDim,fontWeight:600,textTransform:"uppercase",letterSpacing:0.8,fontFamily:FONT_LABEL}}>Avg Tax Rate</div>
             <div style={{fontSize:16,fontWeight:700,color:T.amber,fontFamily:FONT_DISPLAY}}>{totGross>0?((totTax/totGross)*100).toFixed(1):0}%</div>
           </div>
         </div>
@@ -1740,8 +1027,8 @@ function ProjectionsTab({plan, results, T, baseCurrency="USD"}) {
     <div style={{overflowX:"auto",overflowY:"auto",maxHeight:"75vh",width:"100%"}}>
       <table style={{width:"100%",borderCollapse:"collapse",minWidth:600}}>
         <thead style={{position:"sticky",top:0,zIndex:2}}>
-          <tr style={{background:"#0e1929"}}>
-            <th style={{...th,position:"sticky",left:0,zIndex:3,background:"#0e1929",textAlign:"left"}}>Year</th>
+          <tr style={{background:"#1a1a3a"}}>
+            <th style={{...th,position:"sticky",left:0,zIndex:3,background:"#1a1a3a",textAlign:"left"}}>Year</th>
             <th style={th}>Age</th>
             <th style={{...th,color:T.gold}}>Gross Income</th>
             <th style={{...th,color:T.green}}>Net Income</th>
@@ -1749,7 +1036,7 @@ function ProjectionsTab({plan, results, T, baseCurrency="USD"}) {
             <th style={{...th,color:T.green}}>Portfolio</th>
             <th style={th}>Fixed</th><th style={th}>Inv.Inc</th><th style={th}>Div</th><th style={th}>Other Inc</th>
             <th style={{...th,color:T.purple}}>Fixed+Other Assets</th>
-            {ea.map(a=><th key={a.id} colSpan={3} style={{...th,background:"#162035"}}>{a.name}</th>)}
+            {ea.map(a=><th key={a.id} colSpan={3} style={{...th,background:"#222244"}}>{a.name}</th>)}
             {ei.map(s=><th key={s.id} colSpan={2} style={{...th,background:"#1a2a3a"}}>{s.name}</th>)}
           </tr>
           {(ea.length>0||ei.length>0)&&<tr style={{background:T.card}}>
@@ -1783,61 +1070,36 @@ function ProjectionsTab({plan, results, T, baseCurrency="USD"}) {
 // ============================================================
 // TAB: WITHDRAWAL PLAN
 // ============================================================
-function WithdrawalTab({plan, update, results, T, baseCurrency="USD"}) {
+function WithdrawalTab({plan, results, T, baseCurrency="USD"}) {
   const bc=baseCurrency||"USD";
-  const buf=plan.params.withdrawalBuffer||0;
   const ea=plan.divestAssets.filter(a=>a.enabled&&a.shares>0&&a.pricePerShare>0);
   const ei=plan.investmentIncome.filter(s=>s.enabled&&s.shares>0&&s.pricePerShare>0);
   if(!results.length||(!ea.length&&!ei.length)) return <div style={{width:"100%"}}><Card title="Withdrawal Plan" T={T}><Empty T={T} msg="Enable divest assets or registered investment income to see withdrawal schedule."/></Card></div>;
   const th={padding:"8px 8px",textAlign:"right",fontSize:11,fontWeight:600,color:"#ccc",whiteSpace:"nowrap",fontFamily:FONT_MONO};
-  const td={padding:"6px 8px",textAlign:"right",fontSize:11,whiteSpace:"nowrap",fontFamily:FONT_MONO,color:T.text};
+  const td={padding:"6px 8px",textAlign:"right",fontSize:12,whiteSpace:"nowrap",fontFamily:FONT_MONO,color:T.text};
   const hasTax=results.some(r=>(r.totalTax||0)>0);
-  return <div style={{display:"flex",flexDirection:"column",gap:12,width:"100%"}}>
-
-    {/* Withdrawal Buffer Slider */}
-    <Card title="Withdrawal Buffer" T={T}>
-      <div style={{display:"flex",gap:20,alignItems:"center",flexWrap:"wrap",marginTop:4}}>
-        <div style={{minWidth:280,flex:"0 0 auto"}}>
-          <label style={{fontSize:12,color:buf>0?T.amber:T.label,fontWeight:700,display:"block",marginBottom:3,fontFamily:FONT_LABEL}}>
-            {buf>0?`● Conservative Mode — ${buf}% Buffer`:"○ Full Extraction — 0% Buffer"}
-          </label>
-          <input type="range" min={0} max={30} step={5} value={buf}
-            onChange={e=>{if(update)update(d=>{d.params.withdrawalBuffer=+e.target.value;return d;});}}
-            style={{width:"100%",accentColor:buf>0?T.amber:T.accent,cursor:"pointer"}}/>
-          <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:T.textDim,fontFamily:FONT_MONO,marginTop:2}}>
-            {[0,5,10,15,20,25,30].map(v=><span key={v} style={{color:v===buf?T.amber:T.textDim,fontWeight:v===buf?700:400}}>{v}%</span>)}
-          </div>
-        </div>
-        <div style={{flex:1,minWidth:220,fontSize:12,color:buf>0?T.amber:T.textMid,fontFamily:FONT_LABEL,lineHeight:1.5}}>
-          {buf>0
-            ?<><strong style={{color:T.amber}}>Conservative Mode — {buf}% buffer applied.</strong> Withdrawals reduced by {buf}%. All projections and charts reflect this. Go to Tab 9 to compare with your Monte Carlo median.</>
-            :<span>Full extraction — plan amortizes all assets to zero by end of projection. Adjust buffer to preserve a residual portfolio. See Tab 9 for probability analysis.</span>}
-        </div>
-      </div>
-    </Card>
-
-    <Card title="Annual Withdrawal Plan" T={T}>
+  return <div style={{width:"100%"}}><Card title="Annual Withdrawal Plan" T={T}>
     <Hint T={T}>Shares to sell each year and income generated from each asset and registered investment account.</Hint>
     <div style={{overflowX:"auto",overflowY:"auto",maxHeight:"75vh",width:"100%"}}>
       <table style={{width:"100%",borderCollapse:"collapse"}}>
         <thead style={{position:"sticky",top:0,zIndex:2}}>
-          <tr style={{background:"#0e1929"}}>
-            <th style={{...th,position:"sticky",left:0,zIndex:3,background:"#0e1929",textAlign:"left"}}>Year</th>
+          <tr style={{background:"#1a1a3a"}}>
+            <th style={{...th,position:"sticky",left:0,zIndex:3,background:"#1a1a3a",textAlign:"left"}}>Year</th>
             <th style={th}>Age</th>
             <th style={{...th,color:T.gold}}>Total W/D</th>
             {hasTax&&<th style={{...th,color:T.amber}}>Tax Paid</th>}
             {hasTax&&<th style={{...th,color:T.green}}>After-Tax</th>}
             {ea.map(a=><React.Fragment key={a.id}>
-              <th style={{...th,background:"#162035"}}>{a.name} Sell</th>
-              <th style={{...th,background:"#162035"}}>{a.name} Gross</th>
-              {a.applyTax&&<th style={{...th,background:"#162035",color:T.green}}>{a.name} Net</th>}
-              <th style={{...th,background:"#0e1929"}}>{a.name} Left</th>
+              <th style={{...th,background:"#222244"}}>{a.name} Sell</th>
+              <th style={{...th,background:"#222244"}}>{a.name} Gross</th>
+              {a.applyTax&&<th style={{...th,background:"#222244",color:T.green}}>{a.name} Net</th>}
+              <th style={{...th,background:"#1a1a3a"}}>{a.name} Left</th>
             </React.Fragment>)}
             {ei.map(s=><React.Fragment key={s.id}>
-              <th style={{...th,background:"#0f1e35"}}>{s.name} Sell</th>
-              <th style={{...th,background:"#0f1e35"}}>{s.name} Div</th>
-              {s.applyTax&&<th style={{...th,background:"#0f1e35",color:T.green}}>{s.name} Net</th>}
-              <th style={{...th,background:"#0f1e35"}}>{s.name} Left</th>
+              <th style={{...th,background:"#1a2a3a"}}>{s.name} Sell</th>
+              <th style={{...th,background:"#1a2a3a"}}>{s.name} Div</th>
+              {s.applyTax&&<th style={{...th,background:"#1a2a3a",color:T.green}}>{s.name} Net</th>}
+              <th style={{...th,background:"#1a2a3a"}}>{s.name} Left</th>
             </React.Fragment>)}
           </tr>
         </thead>
@@ -1871,8 +1133,7 @@ function WithdrawalTab({plan, update, results, T, baseCurrency="USD"}) {
         })}</tbody>
       </table>
     </div>
-  </Card>
-  </div>;
+  </Card></div>;
 }
 
 // ============================================================
@@ -1908,7 +1169,7 @@ function ChartsTab({plan, results, T, baseCurrency="USD"}) {
     fixedAssets:"Fixed asset and other income source appreciation over the projection.",
   };
   const hasTaxData=results.some(r=>(r.totalTax||0)>0);
-  const CTooltip=({active,payload,label})=>{if(!active||!payload?.length)return null;return<div style={{background:T.card,border:`1px solid ${T.border2}`,borderRadius:8,padding:"10px 14px",fontSize:11,fontFamily:FONT_MONO}}><div style={{color:T.textDim,marginBottom:4}}>{label}</div>{payload.map((p,i)=><div key={i} style={{color:p.color,marginBottom:2}}>{p.name}: {typeof p.value==="number"&&p.value>100?fmtK(p.value):fmtN(p.value,2)}</div>)}</div>;};
+  const CTooltip=({active,payload,label})=>{if(!active||!payload?.length)return null;return<div style={{background:"#0d0d1f",border:"1px solid #2a2a4a",borderRadius:8,padding:"10px 14px",fontSize:11,fontFamily:FONT_MONO}}><div style={{color:"#888",marginBottom:4}}>{label}</div>{payload.map((p,i)=><div key={i} style={{color:p.color,marginBottom:2}}>{p.name}: {typeof p.value==="number"&&p.value>100?fmtK(p.value):fmtN(p.value,2)}</div>)}</div>;};
 
   const renderChart=()=>{
     if(view==="portfolio"){
@@ -1993,7 +1254,7 @@ function ChartsTab({plan, results, T, baseCurrency="USD"}) {
     <div style={{padding:"16px 20px 12px",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
       <div><h2 style={{fontFamily:FONT_DISPLAY,fontSize:18,color:T.text,margin:0}}>Portfolio Projections</h2><p style={{fontSize:11,color:T.textDim,margin:"4px 0 0",fontFamily:FONT_LABEL}}>{desc[view]||""}</p></div>
       <div>
-        <label style={{fontSize:10,color:T.label,fontFamily:FONT_LABEL,fontWeight:600,letterSpacing:0.5,textTransform:"uppercase",display:"block",marginBottom:3}}>Chart View</label>
+        <label style={{fontSize:9,color:T.label,fontFamily:FONT_LABEL,fontWeight:600,letterSpacing:0.5,textTransform:"uppercase",display:"block",marginBottom:3}}>Chart View</label>
         <select value={view} onChange={e=>setView(e.target.value)} style={{
           background:T.inputBg,border:`1px solid ${T.border2}`,borderRadius:8,padding:"8px 30px 8px 12px",
           color:T.text,fontSize:13,fontFamily:FONT_LABEL,cursor:"pointer",appearance:"none",minWidth:220,
@@ -2028,8 +1289,8 @@ function AdditionalTab({plan, update, T, baseCurrency="USD", fxRate={}}) {
 
   return<div style={{display:"flex",flexDirection:"column",gap:12,width:"100%"}}>
     <Card title="Notes & Plans" T={T}>
-      <textarea value={plan.notes||""} onChange={e=>update(d=>{d.notes=e.target.value;return d;})} placeholder="Emergency fund, healthcare, estate planning, tax strategies..."
-        style={{width:"100%",minHeight:140,padding:14,background:T.inputBg,border:`1px solid ${T.border}`,borderRadius:8,fontFamily:FONT_LABEL,fontSize:13,color:T.text,resize:"vertical",outline:"none"}}/>
+      <textarea value={plan.notes||""} onChange={e=>{e.target.style.height="auto";e.target.style.height=e.target.scrollHeight+"px";update(d=>{d.notes=e.target.value;return d;});}} placeholder="Emergency fund, healthcare, estate planning, tax strategies..."
+        style={{width:"100%",minHeight:70,padding:14,background:T.inputBg,border:`1px solid ${T.border}`,borderRadius:8,fontFamily:FONT_LABEL,fontSize:13,color:T.text,resize:"none",outline:"none",overflow:"hidden"}}/>
     </Card>
     <Card title="Big Ticket Calculator" T={T} action={plan.bigTicketStocks.length<10?()=>update(d=>{d.bigTicketStocks.push({id:mkId(),ticker:"",shares:0,price:0,enabled:false,taxRate:0,applyTax:false,costBasis:0});return d;}):null} actionLabel="+ Add">
       <Field label="Saving for?" value={plan.bigTicketItem||""} onChange={v=>update(d=>{d.bigTicketItem=v;return d;})} T={T} placeholder="e.g., Bucket list item"/>
@@ -2055,19 +1316,19 @@ function AdditionalTab({plan, update, T, baseCurrency="USD", fxRate={}}) {
           {s.enabled&&s.shares>0&&s.price>0&&<div style={{textAlign:"right",fontSize:11,color:T.gold,fontWeight:600,fontFamily:FONT_MONO,paddingRight:10,marginTop:2,marginBottom:4}}>{fmt(s.shares*s.price,s.currency||baseCurrency)}</div>}
         </React.Fragment>;
       })}</div>
-      {totalInBase>0&&<div style={{background:T.summaryBg,border:`1px solid ${T.gold}20`,borderRadius:10,padding:"16px 24px",marginTop:10}}>
-        <div style={{display:"flex",gap:32,alignItems:"center",justifyContent:"center",flexWrap:"wrap"}}>
+      {totalInBase>0&&<div style={{background:T.summaryBg,border:`1px solid ${T.gold}20`,borderRadius:10,padding:"14px 20px",marginTop:10}}>
+        <div style={{display:"flex",alignItems:"center",gap:32,flexWrap:"wrap",justifyContent:"center"}}>
           <div style={{textAlign:"center"}}>
-            <div style={{fontSize:10,color:T.gold,fontWeight:600,textTransform:"uppercase",letterSpacing:0.8,marginBottom:4,fontFamily:FONT_LABEL}}>Total Available {hasTax?"(Pre-Tax)":""}</div>
+            <div style={{fontSize:9,color:T.gold,fontWeight:600,textTransform:"uppercase",letterSpacing:1,marginBottom:3,fontFamily:FONT_LABEL}}>Total Available {hasTax?"(Pre-Tax)":""}</div>
             <div style={{fontFamily:FONT_DISPLAY,fontSize:22,fontWeight:700,color:T.gold}}>{fmt(totalInBase,base)}</div>
           </div>
           {hasTax&&<>
             <div style={{textAlign:"center"}}>
-              <div style={{fontSize:10,color:T.amber,fontWeight:600,textTransform:"uppercase",letterSpacing:0.8,marginBottom:4,fontFamily:FONT_LABEL}}>Est. Cap Gains Tax</div>
-              <div style={{fontSize:22,fontWeight:700,color:T.amber,fontFamily:FONT_DISPLAY}}>{fmt(totalTaxBT,base)}</div>
+              <div style={{fontSize:9,color:T.amber,fontWeight:600,textTransform:"uppercase",letterSpacing:0.8,marginBottom:3,fontFamily:FONT_LABEL}}>Est. Cap Gains Tax</div>
+              <div style={{fontSize:18,fontWeight:700,color:T.amber,fontFamily:FONT_DISPLAY}}>{fmt(totalTaxBT,base)}</div>
             </div>
             <div style={{textAlign:"center"}}>
-              <div style={{fontSize:10,color:T.green,fontWeight:600,textTransform:"uppercase",letterSpacing:0.8,marginBottom:4,fontFamily:FONT_LABEL}}>After-Tax Proceeds</div>
+              <div style={{fontSize:9,color:T.green,fontWeight:600,textTransform:"uppercase",letterSpacing:0.8,marginBottom:3,fontFamily:FONT_LABEL}}>After-Tax Proceeds</div>
               <div style={{fontSize:22,fontWeight:700,color:T.green,fontFamily:FONT_DISPLAY}}>{fmt(afterTaxInBase,base)}</div>
             </div>
           </>}
@@ -2093,11 +1354,11 @@ function AdditionalTab({plan, update, T, baseCurrency="USD", fxRate={}}) {
 function Card({title,badge,children,action,actionLabel,T,noPad}){return<div style={{background:T.card,borderRadius:12,border:`1px solid ${T.border}`,padding:noPad?0:"16px 20px",overflow:"hidden",width:"100%"}}>
   {title&&<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10,flexWrap:"wrap",gap:6}}>
     <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}><h2 style={{fontFamily:FONT_DISPLAY,fontSize:17,color:T.text,margin:0}}>{title}</h2>
-    {badge&&<span style={{fontSize:11,color:T.text,background:`${T.accent}15`,padding:"2px 8px",borderRadius:10,fontFamily:FONT_LABEL,whiteSpace:"normal"}}>{badge}</span>}</div>
+    {badge&&<span style={{fontSize:9,color:T.textMid,background:`${T.accent}10`,padding:"2px 8px",borderRadius:10,fontFamily:FONT_LABEL,whiteSpace:"normal"}}>{badge}</span>}</div>
     {action&&<button onClick={action} style={{padding:"5px 12px",background:T.accent,color:"#fff",border:"none",borderRadius:6,fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:FONT_LABEL}}>{actionLabel}</button>}
   </div>}{children}</div>;}
 
-function ItemRow({children,enabled,onToggle,onRemove,T}){return<div className="np-itemrow" style={{display:"flex",gap:6,alignItems:"flex-start",padding:"8px 10px",marginBottom:4,borderRadius:8,border:`1px solid ${enabled?T.accent+"20":T.border}`,background:enabled?T.inputBg+"80":"transparent",opacity:enabled?1:0.5,transition:"all 0.15s",flexWrap:"wrap"}}>
+function ItemRow({children,enabled,onToggle,onRemove,T}){return<div style={{display:"flex",gap:6,alignItems:"flex-start",padding:"8px 10px",marginBottom:4,borderRadius:8,border:`1px solid ${enabled?T.accent+"20":T.border}`,background:enabled?T.inputBg+"80":"transparent",opacity:enabled?1:0.5,transition:"all 0.15s",flexWrap:"wrap"}}>
   <button onClick={onToggle} style={{width:18,height:18,borderRadius:3,border:`2px solid ${enabled?T.green:T.border2}`,background:enabled?T.green:"transparent",color:"#fff",fontSize:11,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:16,padding:0}}>{enabled?"\u2713":""}</button>
   <div style={{display:"flex",gap:6,flex:1,flexWrap:"wrap",alignItems:"flex-start"}}>{children}</div>
   <button onClick={onRemove} style={{background:"none",border:"none",color:T.textDim,cursor:"pointer",fontSize:14,padding:2,marginTop:14,flexShrink:0}}>{"\u00D7"}</button></div>;}
@@ -2105,34 +1366,16 @@ function ItemRow({children,enabled,onToggle,onRemove,T}){return<div className="n
 function Field({label,value,onChange,type="text",step,placeholder,T}){return<div><label style={{fontSize:10,color:T.label,fontWeight:600,textTransform:"uppercase",letterSpacing:0.5,display:"block",marginBottom:3,fontFamily:FONT_LABEL}}>{label}</label>
   <input type={type} value={value} step={step} placeholder={placeholder} onChange={e=>onChange(e.target.value)} onFocus={e=>e.target.select()} style={{width:"100%",padding:"7px 10px",background:T.inputBg,border:`1px solid ${T.border2}`,borderRadius:6,fontSize:13,color:T.text,fontFamily:FONT_LABEL}}/></div>;}
 
-function MF({label,value,onChange,type="text",step,w="1fr",lock=false,px,cls,T}){return<div className={cls||""} style={{minWidth:30,flex:px?`0 0 ${px}px`:lock?"0 0 auto":w,width:px?px:undefined}}><label style={{fontSize:10,color:T.label,fontWeight:600,textTransform:"uppercase",letterSpacing:0.3,display:"block",marginBottom:2,fontFamily:FONT_LABEL}}>{label}</label>
+function MF({label,value,onChange,type="text",step,w="1fr",lock=false,px,cls,T}){return<div className={cls||""} style={{minWidth:30,flex:px?`0 0 ${px}px`:lock?"0 0 auto":w,width:px?px:undefined}}><label style={{fontSize:9,color:T.label,fontWeight:600,textTransform:"uppercase",letterSpacing:0.3,display:"block",marginBottom:2,fontFamily:FONT_LABEL}}>{label}</label>
   <input type={type} value={value} step={step} onChange={e=>onChange(e.target.value)} onFocus={e=>e.target.select()} style={{width:"100%",padding:"4px 6px",background:T.inputBg,border:`1px solid ${T.border2}`,borderRadius:4,fontSize:12,color:T.text,fontFamily:FONT_LABEL}}/></div>;}
 
-function Chk({label,checked,onChange,T}){return<div style={{display:"flex",flexDirection:"column",alignItems:"center",minWidth:32}}><label style={{fontSize:10,color:T.label,fontWeight:600,letterSpacing:0.3,marginBottom:2,fontFamily:FONT_LABEL}}>{label}</label>
+function Chk({label,checked,onChange,T}){return<div style={{display:"flex",flexDirection:"column",alignItems:"center",minWidth:32}}><label style={{fontSize:9,color:T.label,fontWeight:600,letterSpacing:0.3,marginBottom:2,fontFamily:FONT_LABEL}}>{label}</label>
   <input type="checkbox" checked={checked} onChange={onChange} style={{width:14,height:14,cursor:"pointer",accentColor:T.accent}}/></div>;}
 
-// Auto-shrink font size — dynamic, 1.8px per char beyond 7, no hard floor
-const autoSize = (text, base=20) => {
-  const len = (text||"").length;
-  if (len <= 7) return base;
-  return base - (len - 7) * 1.8;
-};
-
-// Format value — full number under $1M, M/B above. No K.
-const fmtCard = (v, cur="USD") => {
-  const c = CURRENCY_CODES.includes(cur)?cur:"USD";
-  try {
-    const sym = new Intl.NumberFormat("en-US",{style:"currency",currency:c,minimumFractionDigits:0,maximumFractionDigits:0}).formatToParts(1).find(p=>p.type==="currency")?.value||"$";
-    if(Math.abs(v)>=1e9) return `${sym}${(v/1e9).toFixed(1)}B`;
-    if(Math.abs(v)>=1e6) return `${sym}${(v/1e6).toFixed(1)}M`;
-    return fmt(v,c);
-  } catch { return fmt(v,cur); }
-};
-
-function SumCard({label,value,color,note,T,fontSize}){return<div style={{background:T.card,borderRadius:10,padding:"12px 8px",textAlign:"center",border:`1px solid ${T.border}`,borderTop:`3px solid ${color}`,minHeight:80,overflow:"hidden"}}>
-  <div style={{fontSize:10,color:T.textMid,fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:5,fontFamily:FONT_LABEL}}>{label}</div>
-  <div style={{fontSize:fontSize||20,fontWeight:800,color,fontFamily:FONT_DISPLAY,lineHeight:1.2,whiteSpace:"nowrap"}}>{value}</div>
-  {note&&<div style={{fontSize:10,color:T.textDim,fontFamily:FONT_LABEL,marginTop:4,letterSpacing:0.3}}>{note}</div>}
+function SumCard({label,value,color,note,T}){return<div style={{background:T.card,borderRadius:10,padding:"14px 16px",textAlign:"center",border:`1px solid ${T.border}`,borderLeft:`3px solid ${color}`,minHeight:72}}>
+  <div style={{fontSize:10,color:T.textDim,fontWeight:600,textTransform:"uppercase",letterSpacing:0.8,marginBottom:5,fontFamily:FONT_LABEL}}>{label}</div>
+  <div style={{fontSize:20,fontWeight:700,color,fontFamily:FONT_DISPLAY,lineHeight:1.2}}>{value}</div>
+  {note&&<div style={{fontSize:9,color:T.textDim,fontFamily:FONT_LABEL,marginTop:4,letterSpacing:0.3}}>{note}</div>}
 </div>;}
 
 function CurrencyTag({currency,onChange,base,T}){
@@ -2154,12 +1397,12 @@ function CurrencyTag({currency,onChange,base,T}){
     return()=>{document.removeEventListener("click",close);document.removeEventListener("touchstart",close);};
   },[tip]);
   return<div style={{display:"flex",flexDirection:"column",alignItems:"center",minWidth:54}}>
-    <label style={{fontSize:10,color:T.label,fontWeight:600,letterSpacing:0.3,marginBottom:2,fontFamily:FONT_LABEL,display:"flex",alignItems:"center",gap:2}}>
-      CCY<span ref={btnRef} onClick={handleInfo} onTouchEnd={e=>{e.preventDefault();handleInfo(e);}} style={{cursor:"pointer",color:T.accent,fontSize:10,WebkitUserSelect:"none",userSelect:"none"}}>ⓘ</span>
+    <label style={{fontSize:9,color:T.label,fontWeight:600,letterSpacing:0.3,marginBottom:2,fontFamily:FONT_LABEL,display:"flex",alignItems:"center",gap:2}}>
+      CCY<span ref={btnRef} onClick={handleInfo} onTouchEnd={e=>{e.preventDefault();handleInfo(e);}} style={{cursor:"pointer",color:T.accent,fontSize:9,WebkitUserSelect:"none",userSelect:"none"}}>ⓘ</span>
     </label>
     {tip&&<div className="np-infobubble" style={{top:tip.top,left:tip.left,background:T.card,color:T.text,border:`1px solid ${T.border2}`,boxShadow:"0 4px 20px rgba(0,0,0,0.5)"}}>Select the currency this asset is priced in. If different from your base currency, values will be converted automatically using the live exchange rate.</div>}
     <select value={cur} onChange={e=>onChange(e.target.value)} style={{
-      padding:"2px 4px",fontSize:10,fontWeight:600,
+      padding:"2px 4px",fontSize:9,fontWeight:600,
       background:isForeign?`${T.accent}18`:T.inputBg,
       color:isForeign?T.accent:T.text,
       border:`1px solid ${isForeign?T.accent+"50":T.border2}`,
@@ -2189,8 +1432,8 @@ function BigTicketSummary({bt, bigTicketItem, bc, fxRate, T, Row, Section}) {
   const btHasTax = bt.some(s=>s.applyTax&&(s.taxRate||0)>0);
   return (
     <Section title="Big Ticket">
-      <Row label={`${bigTicketItem||"Big Ticket"} — Pre-Tax`} value={fmt(btTotal,bc)} color={T.gold}/>
-      {btHasTax&&<Row label={`${bigTicketItem||"Big Ticket"} — After-Tax`} value={fmt(btAfterTax,bc)} color={T.green}/>}
+      <Row label={`${bigTicketItem} — Pre-Tax`} value={fmt(btTotal,bc)} color={T.gold}/>
+      {btHasTax&&<Row label={`${bigTicketItem} — After-Tax`} value={fmt(btAfterTax,bc)} color={T.green}/>}
     </Section>
   );
 }
@@ -2198,7 +1441,7 @@ function BigTicketSummary({bt, bigTicketItem, bc, fxRate, T, Row, Section}) {
 // ============================================================
 // TAB: SUMMARY
 // ============================================================
-function SummaryTab({plan, results, T, baseCurrency="USD", fxRate={}, mcResult=null, mcStale=false}) {
+function SummaryTab({plan, results, T, baseCurrency="USD", fxRate={}}) {
   const p = plan.params;
   const bc = baseCurrency||"USD";
   const y1 = results[0]||{};
@@ -2222,27 +1465,23 @@ function SummaryTab({plan, results, T, baseCurrency="USD", fxRate={}, mcResult=n
       {children}
     </div>
   );
+
   const Row = ({label, value, color}) => (
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",padding:"4px 0",borderBottom:`1px solid ${T.border}20`}}>
       <span style={{fontSize:12,color:T.textMid,fontFamily:FONT_LABEL}}>{label}</span>
       <span style={{fontSize:13,fontWeight:600,color:color||T.text,fontFamily:FONT_MONO}}>{value}</span>
     </div>
   );
+
   const Tag = ({label, color}) => (
     <span style={{fontSize:10,color:color||T.textMid,background:`${color||T.accent}15`,padding:"2px 8px",borderRadius:10,fontFamily:FONT_LABEL,fontWeight:600,marginRight:4,marginBottom:4,display:"inline-block"}}>{label}</span>
   );
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:12,width:"100%"}}>
-      <div className="np-print-hide" style={{display:"flex",justifyContent:"flex-end",marginBottom:8}}>
-        <button onClick={()=>{document.body.classList.add("np-printing");window.print();setTimeout(()=>document.body.classList.remove("np-printing"),500);}} style={{padding:"7px 16px",background:"transparent",color:T.textMid,border:`1px solid ${T.border2}`,borderRadius:6,fontSize:12,cursor:"pointer",fontWeight:500,fontFamily:FONT_LABEL}}>Print / Save as PDF</button>
-      </div>
-      <div className="np-print-only np-print-header" style={{display:"none"}}>
-        <div><div style={{fontSize:16,fontWeight:700}}>North Prosperity — Retirement Planner</div><div style={{fontSize:12,color:"#666"}}>{p.personName||"Retirement Plan"} — {p.startYear}, {p.projectionYears}yr projection</div></div>
-        <div style={{fontSize:11,color:"#666"}}>Printed {new Date().toLocaleDateString()}</div>
-      </div>
       <Card title="Summary" badge="Read-only overview of your retirement plan" T={T}>
 
+        {/* PLAN IDENTITY */}
         <Section title="Plan Details">
           <Row label="Name / Couple" value={p.personName||"—"}/>
           <Row label="Age at Start" value={p.ageAtStart}/>
@@ -2252,6 +1491,7 @@ function SummaryTab({plan, results, T, baseCurrency="USD", fxRate={}, mcResult=n
           <Row label="Inflation Rate" value={`${p.inflationRate}%`}/>
         </Section>
 
+        {/* INCOME SOURCES */}
         {(fi.length>0||ii.length>0||oi.length>0)&&<Section title="Income Sources">
           {fi.map(s=>(
             <div key={s.id} style={{padding:"5px 0",borderBottom:`1px solid ${T.border}20`}}>
@@ -2292,6 +1532,7 @@ function SummaryTab({plan, results, T, baseCurrency="USD", fxRate={}, mcResult=n
           ))}
         </Section>}
 
+        {/* ASSETS */}
         {(da.length>0||fa.length>0)&&<Section title="Assets">
           {da.map(a=>(
             <div key={a.id} style={{padding:"5px 0",borderBottom:`1px solid ${T.border}20`}}>
@@ -2318,8 +1559,10 @@ function SummaryTab({plan, results, T, baseCurrency="USD", fxRate={}, mcResult=n
           ))}
         </Section>}
 
-        {bt.length>0&&<BigTicketSummary bt={bt} bigTicketItem={plan.bigTicketItem||"Big Ticket"} bc={bc} fxRate={fxRate} T={T} Row={Row} Section={Section}/>}
+        {/* BIG TICKET */}
+        {bt.length>0&&plan.bigTicketItem&&<BigTicketSummary bt={bt} bigTicketItem={plan.bigTicketItem} bc={bc} fxRate={fxRate} T={T} Row={Row} Section={Section}/>}
 
+        {/* KEY OUTCOMES */}
         {results.length>0&&<Section title="Key Outcomes">
           <Row label="Year 1 Gross Income" value={fmt(y1.totalIncome,bc)} color={T.gold}/>
           {anyTax&&<Row label="Year 1 Net Income" value={fmt(y1.netIncome??y1.totalIncome,bc)} color={T.green}/>}
@@ -2335,32 +1578,16 @@ function SummaryTab({plan, results, T, baseCurrency="USD", fxRate={}, mcResult=n
           </>}
         </Section>}
 
+        {/* NOTES */}
         {plan.notes&&<Section title="Notes & Plans">
-          <p style={{fontSize:12,color:T.textMid,fontFamily:FONT_LABEL,lineHeight:1.6,whiteSpace:"pre-wrap"}}>{plan.notes}</p>
+          <p style={{fontSize:12,color:T.textMid,fontFamily:FONT_LABEL,lineHeight:1.7,whiteSpace:"pre-wrap"}}>{plan.notes}</p>
         </Section>}
 
-        {mcResult&&<Section title="Monte Carlo Snapshot">
-          <div style={{background:T.inputBg,borderRadius:8,padding:"12px 14px",marginBottom:8,border:`1px solid ${T.border}`}}>
-          {mcStale&&<div style={{background:`${T.amber}15`,border:`1px solid ${T.amber}40`,borderRadius:6,padding:"6px 10px",marginBottom:8,fontSize:11,color:T.amber,fontFamily:FONT_LABEL}}>Parameters changed — re-run simulation on Tab 4 to refresh these numbers.</div>}
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8,marginBottom:8}}>
-              <span style={{fontSize:12,color:T.textMid,fontFamily:FONT_LABEL}}>Probability of hitting income target</span>
-              <span style={{fontSize:20,fontWeight:700,color:mcResult.probExceedBuffered>=35?T.green:T.amber,fontFamily:FONT_MONO}}>{mcResult.probExceedBuffered}%</span>
-            </div>
-            <Row label="Guaranteed floor (certain)" value={fmtK(mcResult.fixedIncomeFloor,bc)} color={T.green}/>
-            <Row label="Median lifetime income" value={fmtK(mcResult.medianLifetime,bc)} color={T.accent}/>
-            <Row label="Worst case lifetime" value={fmtK(mcResult.worstLifetime,bc)} color={T.red}/>
-            <Row label="Withdrawal buffer" value={mcResult.withdrawalBuffer>0?`${mcResult.withdrawalBuffer}% — conservative mode`:"0% — full extraction"} color={mcResult.withdrawalBuffer>0?T.amber:T.textMid}/>
-            <div style={{marginTop:10,padding:"8px 10px",background:T.card,borderRadius:6,border:`1px solid ${T.border2}`}}>
-              <span style={{fontSize:11,color:T.textMid,fontFamily:FONT_LABEL,lineHeight:1.6}}>
-                {mcResult.probExceedBuffered}% probability of hitting income target — guaranteed floor covers {mcResult.fixedIncomeFloor>0&&(results[0]?.totalIncome>0)?Math.round(mcResult.fixedIncomeFloor/(results[0].totalIncome)*100):0}% of Year 1 income. Go to Tab 4 to run or update the simulation.
-              </span>
-            </div>
-          </div>
-        </Section>}
+        {!results.length&&<Empty T={T} msg="Enable at least one income source or asset to see outcomes."/>}
 
       </Card>
     </div>
   );
 }
 
-// v2.4 — Pre-retirement price compounding: priceEnteredYear stamp, calcStartPrice engine, Est. @ retirement UI label
+// v2.3 Phase 3 — Numbered tabs, Summary tab, notes height, big ticket one-line totals
