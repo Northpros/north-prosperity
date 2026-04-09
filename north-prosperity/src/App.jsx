@@ -73,13 +73,12 @@ const themes = {
     amber:"#f59e0b",
   },
   light: {
-    bg:"#f1f5fb", card:"#ffffff", border:"#d1dce8", border2:"#b8ccde",
-    inputBg:"#f8fafd", text:"#0d1f35", textMid:"#3a567a", textDim:"#6a8aaa",
+    bg:"#eef1f7", card:"#fafbfd", border:"#d1dce8", border2:"#b8ccde",
+    inputBg:"#f0f4f9", text:"#0d1f35", textMid:"#3a567a", textDim:"#5a7898",
     accent:"#d97706", gold:"#b45309", green:"#059669", red:"#dc2626",
     purple:"#6366f1", cyan:"#0891b2", label:"#6a8aaa",
-    rowAlt:"#f4f8fc", rowHover:"#eaf2fb",
-    headerBg:"#ffffff", summaryBg:"#f0f7ff",
-    amber:"#d97706",
+    rowAlt:"#f0f5fb", rowHover:"#eaf2fb",
+    headerBg:"#fafbfd", summaryBg:"#eef3fa",
   }
 };
 const CHART_COLORS = ["#f59e0b","#38bdf8","#34d399","#818cf8","#fb923c","#f472b6","#fbbf24","#ef4444","#a3e635","#67e8f9"];
