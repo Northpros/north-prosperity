@@ -800,7 +800,7 @@ function runMonteCarlo(plan, fxRates={}, numSims=2000) {
 // ============================================================
 // TAB 9: SIMULATION
 // ============================================================
-function SimulationTab({plan, results, T, baseCurrency="USD", fxRate={}, onMcResult, mcResult, mcStale=false}) {
+function SimulationTab({plan, results, T, baseCurrency="USD", fxRate={}, onMcResult, mcResult, mcStale=false, update}) {
   const bc = baseCurrency||"USD";
   const [numSims, setNumSims] = useState(2000);
   const [running, setRunning] = useState(false);
@@ -850,7 +850,27 @@ function SimulationTab({plan, results, T, baseCurrency="USD", fxRate={}, onMcRes
           }}>{running?`Running ${numSims.toLocaleString()} simulations...`:"Run Simulation"}</button>
           {ran&&!running&&<span style={{fontSize:11,color:T.green,fontFamily:FONT_MONO,alignSelf:"flex-end",paddingBottom:4}}>Complete</span>}
         </div>
-        <div style={{background:T.inputBg,border:`1px solid ${T.border}`,borderRadius:8,padding:"12px 16px",fontSize:11,color:T.textMid,fontFamily:FONT_LABEL,lineHeight:1.7}}>
+        <div style={{borderTop:`1px solid ${T.border}`,marginTop:12,paddingTop:12}}>
+          <div style={{display:"flex",gap:20,alignItems:"center",flexWrap:"wrap"}}>
+            <div style={{minWidth:280,flex:"0 0 auto"}}>
+              <label style={{fontSize:12,color:(plan.params.withdrawalBuffer||0)>0?T.amber:T.label,fontWeight:700,display:"block",marginBottom:3,fontFamily:FONT_LABEL}}>
+                {(plan.params.withdrawalBuffer||0)>0?`● Conservative Mode — ${plan.params.withdrawalBuffer}% Buffer`:"○ Full Extraction — 0% Buffer"}
+              </label>
+              <input type="range" min={0} max={30} step={5} value={plan.params.withdrawalBuffer||0}
+                onChange={e=>{if(update)update(d=>{d.params.withdrawalBuffer=+e.target.value;return d;});}}
+                style={{width:"100%",accentColor:(plan.params.withdrawalBuffer||0)>0?T.amber:T.accent,cursor:"pointer"}}/>
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:T.textDim,fontFamily:FONT_MONO,marginTop:2}}>
+                {[0,5,10,15,20,25,30].map(v=><span key={v} style={{color:v===(plan.params.withdrawalBuffer||0)?T.amber:T.textDim,fontWeight:v===(plan.params.withdrawalBuffer||0)?700:400}}>{v}%</span>)}
+              </div>
+            </div>
+            <div style={{flex:1,minWidth:220,fontSize:12,color:(plan.params.withdrawalBuffer||0)>0?T.amber:T.textMid,fontFamily:FONT_LABEL,lineHeight:1.5}}>
+              {(plan.params.withdrawalBuffer||0)>0
+                ?<><strong style={{color:T.amber}}>Conservative Mode — {plan.params.withdrawalBuffer}% buffer applied.</strong> Withdrawals reduced by {plan.params.withdrawalBuffer}%. Re-run simulation to see updated probability.</>
+                :<span>Full extraction — plan amortizes all assets to zero. Adjust buffer then re-run to see how accepting less income raises your probability.</span>}
+            </div>
+          </div>
+        </div>
+        <div style={{background:T.inputBg,border:`1px solid ${T.border}`,borderRadius:8,padding:"12px 16px",fontSize:11,color:T.textMid,fontFamily:FONT_LABEL,lineHeight:1.7,marginTop:12}}>
           <strong style={{color:T.text}}>What is being simulated:</strong> Divest assets, tax deferred accounts, and other income sources are run through randomized annual return scenarios. Volatility declines as each asset matures. Fixed income sources are excluded from the simulation — they are certain and form your guaranteed income floor.
         </div>
       </Card>
@@ -956,7 +976,7 @@ function SimulationTab({plan, results, T, baseCurrency="USD", fxRate={}, onMcRes
             </div>
             <div style={{fontSize:11,color:T.textMid,fontFamily:FONT_LABEL,marginTop:4}}>
               {mcResult.withdrawalBuffer===0
-                ? "Use the Withdrawal Buffer slider on Tab 5 to see how accepting less income raises your probability of success."
+                ? "Adjust the Withdrawal Buffer slider above and re-run to see how accepting less income raises your probability of success."
                 : `At ${mcResult.withdrawalBuffer}% buffer your income target drops from ${fmtK(mcResult.fullDetLifetime,bc)} to ${fmtK(mcResult.bufferedDetLifetime,bc)} lifetime — lower income, higher certainty.`}
             </div>
           </div>
@@ -1319,7 +1339,7 @@ export default function RetirementPlanner() {
           {tab==="charts" && <ChartsTab plan={plan} results={results} T={T} baseCurrency={plan.params.baseCurrency||"USD"}/>}
           {tab==="additional" && <AdditionalTab plan={plan} update={update} T={T} baseCurrency={plan.params.baseCurrency||"USD"} fxRate={fxRate||{}}/>}
           {tab==="summary" && <SummaryTab plan={plan} results={results} T={T} baseCurrency={plan.params.baseCurrency||"USD"} fxRate={fxRate||{}} mcResult={mcResult} mcStale={mcStale}/>}
-          {tab==="simulation" && <SimulationTab plan={plan} results={results} T={T} baseCurrency={plan.params.baseCurrency||"USD"} fxRate={fxRate||{}} onMcResult={(r)=>{setMcResult(r);setMcStale(false);}} mcResult={mcResult} mcStale={mcStale}/>}
+          {tab==="simulation" && <SimulationTab plan={plan} results={results} T={T} baseCurrency={plan.params.baseCurrency||"USD"} fxRate={fxRate||{}} onMcResult={(r)=>{setMcResult(r);setMcStale(false);}} mcResult={mcResult} mcStale={mcStale} update={update}/>}
         </div>
       </div>
     </div>
@@ -1792,28 +1812,6 @@ function WithdrawalTab({plan, update, results, T, baseCurrency="USD"}) {
   const td={padding:"6px 8px",textAlign:"right",fontSize:11,whiteSpace:"nowrap",fontFamily:FONT_MONO,color:T.text};
   const hasTax=results.some(r=>(r.totalTax||0)>0);
   return <div style={{display:"flex",flexDirection:"column",gap:12,width:"100%"}}>
-
-    {/* Withdrawal Buffer Slider */}
-    <Card title="Withdrawal Buffer" T={T}>
-      <div style={{display:"flex",gap:20,alignItems:"center",flexWrap:"wrap",marginTop:4}}>
-        <div style={{minWidth:280,flex:"0 0 auto"}}>
-          <label style={{fontSize:12,color:buf>0?T.amber:T.label,fontWeight:700,display:"block",marginBottom:3,fontFamily:FONT_LABEL}}>
-            {buf>0?`● Conservative Mode — ${buf}% Buffer`:"○ Full Extraction — 0% Buffer"}
-          </label>
-          <input type="range" min={0} max={30} step={5} value={buf}
-            onChange={e=>{if(update)update(d=>{d.params.withdrawalBuffer=+e.target.value;return d;});}}
-            style={{width:"100%",accentColor:buf>0?T.amber:T.accent,cursor:"pointer"}}/>
-          <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:T.textDim,fontFamily:FONT_MONO,marginTop:2}}>
-            {[0,5,10,15,20,25,30].map(v=><span key={v} style={{color:v===buf?T.amber:T.textDim,fontWeight:v===buf?700:400}}>{v}%</span>)}
-          </div>
-        </div>
-        <div style={{flex:1,minWidth:220,fontSize:12,color:buf>0?T.amber:T.textMid,fontFamily:FONT_LABEL,lineHeight:1.5}}>
-          {buf>0
-            ?<><strong style={{color:T.amber}}>Conservative Mode — {buf}% buffer applied.</strong> Withdrawals reduced by {buf}%. All projections and charts reflect this. Go to Tab 9 to compare with your Monte Carlo median.</>
-            :<span>Full extraction — plan amortizes all assets to zero by end of projection. Adjust buffer to preserve a residual portfolio. See Tab 9 for probability analysis.</span>}
-        </div>
-      </div>
-    </Card>
 
     <Card title="Annual Withdrawal Plan" T={T}>
     <Hint T={T}>Shares to sell each year and income generated from each asset and registered investment account.</Hint>
