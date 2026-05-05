@@ -2032,12 +2032,13 @@ function ChartsTab({plan, results, T, baseCurrency="USD", fxRate={}}) {
       return<div style={{height:"100%",position:"relative"}}>
         <ResponsiveContainer width="100%" height="85%">
           <LineChart data={combined} margin={{top:10,right:20,left:10,bottom:0}}>
-            <XAxis dataKey="year" tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={{stroke:T.border}}/>
+            <XAxis dataKey="year" type="number" domain={['dataMin','dataMax']} allowDecimals={false} tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={{stroke:T.border}}/>
             <YAxis tickFormatter={fmtK} tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={false}/>
             <Tooltip content={<CTooltip/>}/>
             <ReferenceLine x={sy} stroke={T.amber} strokeDasharray="4 3" strokeWidth={1.5} label={{value:"Retirement",position:"insideTopRight",fontSize:10,fill:T.amber,fontFamily:FONT_MONO}}/>
             <ReferenceLine x={CURRENT_YEAR} stroke={T.accent} strokeDasharray="3 3" strokeWidth={1} label={{value:"Today",position:"insideTopLeft",fontSize:10,fill:T.accent,fontFamily:FONT_MONO}}/>
             <Line type="monotone" dataKey="projected" name="Projected Portfolio" stroke={T.accent} strokeWidth={2} dot={false}/>
+            <ReferenceDot x={CURRENT_YEAR} y={nowVal} r={12} fill={T.accent} fillOpacity={0.2} stroke="none"/>
             <ReferenceDot x={CURRENT_YEAR} y={nowVal} r={6} fill={T.accent} stroke={T.card} strokeWidth={2} label={{value:"You are here",position:"top",fontSize:10,fill:T.accent,fontFamily:FONT_MONO}}/>
           </LineChart>
         </ResponsiveContainer>
