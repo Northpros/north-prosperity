@@ -2021,10 +2021,10 @@ function ChartsTab({plan, results, T, baseCurrency="USD", fxRate={}}) {
       }
       // Post-retirement data from results
       const postData=results.map(r=>({year:r.year,projected:r.totalValue,isPreRetirement:false}));
-      // Combine — avoid duplicating startYear
-      const combined=[...preData,...postData.filter(r=>r.year>sy)];
+      // Combine — include retirement year in both pre and post to ensure line continuity
+      const combined=[...preData,...postData.filter(r=>r.year>=sy)];
       // "You are here" dot — current year value
-      const nowPoint=preData.find(d=>d.year===CURRENT_YEAR);
+      const nowPoint=combined.find(d=>d.year===CURRENT_YEAR);
       const nowVal=nowPoint?nowPoint.projected:0;
       // Retirement start value
       const retPoint=combined.find(d=>d.year===sy);
