@@ -1336,7 +1336,7 @@ export default function RetirementPlanner() {
           {tab==="fixed" && <FixedAssetsTab plan={plan} update={update} T={T} baseCurrency={plan.params.baseCurrency||"USD"}/>}
           {tab==="projections" && <ProjectionsTab plan={plan} results={results} T={T} baseCurrency={plan.params.baseCurrency||"USD"}/>}
           {tab==="withdrawals" && <WithdrawalTab plan={plan} update={update} results={results} T={T} baseCurrency={plan.params.baseCurrency||"USD"}/>}
-          {tab==="charts" && <ChartsTab plan={plan} results={results} T={T} baseCurrency={plan.params.baseCurrency||"USD"}/>}
+          {tab==="charts" && <ChartsTab plan={plan} results={results} T={T} baseCurrency={plan.params.baseCurrency||"USD"} fxRate={fxRate||{}}/>}
           {tab==="additional" && <AdditionalTab plan={plan} update={update} T={T} baseCurrency={plan.params.baseCurrency||"USD"} fxRate={fxRate||{}}/>}
           {tab==="summary" && <SummaryTab plan={plan} results={results} T={T} baseCurrency={plan.params.baseCurrency||"USD"} fxRate={fxRate||{}} mcResult={mcResult} mcStale={mcStale}/>}
           {tab==="simulation" && <SimulationTab plan={plan} results={results} T={T} baseCurrency={plan.params.baseCurrency||"USD"} fxRate={fxRate||{}} onMcResult={(r)=>{setMcResult(r);setMcStale(false);}} mcResult={mcResult} mcStale={mcStale} update={update}/>}
@@ -1888,7 +1888,7 @@ const CHART_VIEWS=[
   {id:"trajectory",label:"Portfolio Trajectory — Are You on Track?"},
 ];
 
-function ChartsTab({plan, results, T, baseCurrency="USD"}) {
+function ChartsTab({plan, results, T, baseCurrency="USD", fxRate={}}) {
   const [view,setView]=useState("portfolio");
   const ea=plan.divestAssets.filter(a=>a.enabled&&a.shares>0&&a.pricePerShare>0);
   const ei=plan.investmentIncome.filter(s=>s.enabled&&s.shares>0&&s.pricePerShare>0);
