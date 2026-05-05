@@ -1885,7 +1885,7 @@ const CHART_VIEWS=[
   {id:"shares",label:"Remaining Shares (Divest)"},
   {id:"investmentShares",label:"Tax Deferred Account Value"},
   {id:"fixedAssets",label:"Fixed & Other Assets Value"},
-  {id:"trajectory",label:"Portfolio Trajectory — Are You on Track?"},
+  {id:"trajectory",label:"Projected Portfolio Path"},
 ];
 
 function ChartsTab({plan, results, T, baseCurrency="USD", fxRate={}}) {
@@ -1904,7 +1904,7 @@ function ChartsTab({plan, results, T, baseCurrency="USD", fxRate={}}) {
     shares:"Remaining share count as divest assets are sold down.",
     investmentShares:"Registered investment account values over time.",
     fixedAssets:"Fixed asset and other income source appreciation over the projection.",
-    trajectory:"Your projected portfolio trajectory from today through retirement. The dot shows where you are now — the line shows where the plan expects you to be.",
+    trajectory:"Your projected portfolio trajectory from today through the end of the plan.",
   };
   const hasTaxData=results.some(r=>(r.totalTax||0)>0);
   const CTooltip=({active,payload,label})=>{if(!active||!payload?.length)return null;return<div style={{background:T.card,border:`1px solid ${T.border2}`,borderRadius:8,padding:"10px 14px",fontSize:11,fontFamily:FONT_MONO}}><div style={{color:T.textDim,marginBottom:4}}>{label}</div>{payload.map((p,i)=><div key={i} style={{color:p.color,marginBottom:2}}>{p.name}: {typeof p.value==="number"&&p.value>100?fmtK(p.value):fmtN(p.value,2)}</div>)}</div>;};
@@ -2032,18 +2032,16 @@ function ChartsTab({plan, results, T, baseCurrency="USD", fxRate={}}) {
       return<div style={{height:"100%",position:"relative"}}>
         <ResponsiveContainer width="100%" height="85%">
           <LineChart data={combined} margin={{top:10,right:20,left:10,bottom:0}}>
-            <XAxis dataKey="year" type="number" domain={['dataMin','dataMax']} allowDecimals={false} tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={{stroke:T.border}}/>
+            <XAxis dataKey="year" type="number" domain={['dataMin','dataMax']} allowDecimals={false} ticks={combined.map(d=>d.year)} interval={0} tick={{fontSize:9,fill:T.textDim}} tickLine={false} axisLine={{stroke:T.border}}/>
             <YAxis tickFormatter={fmtK} tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={false}/>
             <Tooltip content={<CTooltip/>}/>
             <ReferenceLine x={sy} stroke={T.amber} strokeDasharray="4 3" strokeWidth={1.5} label={{value:"Retirement",position:"insideTopRight",fontSize:10,fill:T.amber,fontFamily:FONT_MONO}}/>
-            <ReferenceLine x={CURRENT_YEAR} stroke={T.accent} strokeDasharray="3 3" strokeWidth={1} label={{value:"Today",position:"insideTopLeft",fontSize:10,fill:T.accent,fontFamily:FONT_MONO}}/>
+            <ReferenceLine x={CURRENT_YEAR} stroke={T.accent} strokeDasharray="3 3" strokeWidth={1} label={{value:"Start",position:"insideTopLeft",fontSize:10,fill:T.accent,fontFamily:FONT_MONO}}/>
             <Line type="monotone" dataKey="projected" name="Projected Portfolio" stroke={T.accent} strokeWidth={2} dot={false}/>
-            <ReferenceDot x={CURRENT_YEAR} y={nowVal} r={12} fill={T.accent} fillOpacity={0.2} stroke="none"/>
-            <ReferenceDot x={CURRENT_YEAR} y={nowVal} r={6} fill={T.accent} stroke={T.card} strokeWidth={2} label={{value:"You are here",position:"top",fontSize:10,fill:T.accent,fontFamily:FONT_MONO}}/>
           </LineChart>
         </ResponsiveContainer>
         <div style={{display:"flex",gap:24,padding:"8px 20px",flexWrap:"wrap"}}>
-          <div style={{fontSize:11,fontFamily:FONT_MONO}}><span style={{color:T.textDim}}>Today ({CURRENT_YEAR}): </span><strong style={{color:T.accent}}>{fmtK(nowVal,bc)}</strong></div>
+          <div style={{fontSize:11,fontFamily:FONT_MONO}}><span style={{color:T.textDim}}>Start ({CURRENT_YEAR}): </span><strong style={{color:T.accent}}>{fmtK(nowVal,bc)}</strong></div>
           <div style={{fontSize:11,fontFamily:FONT_MONO}}><span style={{color:T.textDim}}>At retirement ({sy}): </span><strong style={{color:T.amber}}>{fmtK(retVal,bc)}</strong></div>
           {results.length>0&&<div style={{fontSize:11,fontFamily:FONT_MONO}}><span style={{color:T.textDim}}>Final ({results[results.length-1]?.year}): </span><strong style={{color:T.gold}}>{fmtK(results[results.length-1]?.totalValue||0,bc)}</strong></div>}
         </div>
