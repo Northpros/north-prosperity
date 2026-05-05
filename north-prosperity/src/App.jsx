@@ -2020,7 +2020,7 @@ function ChartsTab({plan, results, T, baseCurrency="USD", fxRate={}}) {
         preData.push({year:yr,projected:Math.round(val),isPreRetirement:true});
       }
       // Post-retirement data from results
-      const postData=results.map(r=>({year:r.year,projected:r.portfolio,isPreRetirement:false}));
+      const postData=results.map(r=>({year:r.year,projected:r.totalValue,isPreRetirement:false}));
       // Combine — avoid duplicating startYear
       const combined=[...preData,...postData.filter(r=>r.year>sy)];
       // "You are here" dot — current year value
@@ -2044,7 +2044,7 @@ function ChartsTab({plan, results, T, baseCurrency="USD", fxRate={}}) {
         <div style={{display:"flex",gap:24,padding:"8px 20px",flexWrap:"wrap"}}>
           <div style={{fontSize:11,fontFamily:FONT_MONO}}><span style={{color:T.textDim}}>Today ({CURRENT_YEAR}): </span><strong style={{color:T.accent}}>{fmtK(nowVal,bc)}</strong></div>
           <div style={{fontSize:11,fontFamily:FONT_MONO}}><span style={{color:T.textDim}}>At retirement ({sy}): </span><strong style={{color:T.amber}}>{fmtK(retVal,bc)}</strong></div>
-          {results.length>0&&<div style={{fontSize:11,fontFamily:FONT_MONO}}><span style={{color:T.textDim}}>Final ({results[results.length-1]?.year}): </span><strong style={{color:T.gold}}>{fmtK(results[results.length-1]?.portfolio||0,bc)}</strong></div>}
+          {results.length>0&&<div style={{fontSize:11,fontFamily:FONT_MONO}}><span style={{color:T.textDim}}>Final ({results[results.length-1]?.year}): </span><strong style={{color:T.gold}}>{fmtK(results[results.length-1]?.totalValue||0,bc)}</strong></div>}
         </div>
       </div>;
     }
