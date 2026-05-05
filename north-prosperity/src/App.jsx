@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import {
   ComposedChart, LineChart, Line, AreaChart, Area, BarChart, Bar,
-  XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, ReferenceLine
+  XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, ReferenceLine, ReferenceDot
 } from "recharts";
 
 // ============================================================
@@ -1885,6 +1885,7 @@ const CHART_VIEWS=[
   {id:"shares",label:"Remaining Shares (Divest)"},
   {id:"investmentShares",label:"Tax Deferred Account Value"},
   {id:"fixedAssets",label:"Fixed & Other Assets Value"},
+  {id:"trajectory",label:"Portfolio Trajectory — Are You on Track?"},
 ];
 
 function ChartsTab({plan, results, T, baseCurrency="USD"}) {
@@ -1903,6 +1904,7 @@ function ChartsTab({plan, results, T, baseCurrency="USD"}) {
     shares:"Remaining share count as divest assets are sold down.",
     investmentShares:"Registered investment account values over time.",
     fixedAssets:"Fixed asset and other income source appreciation over the projection.",
+    trajectory:"Your projected portfolio trajectory from today through retirement. The dot shows where you are now — the line shows where the plan expects you to be.",
   };
   const hasTaxData=results.some(r=>(r.totalTax||0)>0);
   const CTooltip=({active,payload,label})=>{if(!active||!payload?.length)return null;return<div style={{background:T.card,border:`1px solid ${T.border2}`,borderRadius:8,padding:"10px 14px",fontSize:11,fontFamily:FONT_MONO}}><div style={{color:T.textDim,marginBottom:4}}>{label}</div>{payload.map((p,i)=><div key={i} style={{color:p.color,marginBottom:2}}>{p.name}: {typeof p.value==="number"&&p.value>100?fmtK(p.value):fmtN(p.value,2)}</div>)}</div>;};
@@ -1983,6 +1985,68 @@ function ChartsTab({plan, results, T, baseCurrency="USD"}) {
       return<ResponsiveContainer width="100%" height="100%"><LineChart data={data}><XAxis dataKey="year" tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={{stroke:T.border}}/><YAxis tickFormatter={fmtK} tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={false}/>
         <Tooltip content={<CTooltip/>}/><Legend wrapperStyle={{fontSize:11,fontFamily:FONT_MONO}}/>
         {allLines.map((a,i)=><Line key={a.id} type="monotone" dataKey={a.name} stroke={CHART_COLORS[i%CHART_COLORS.length]} strokeWidth={2} dot={false}/>)}</LineChart></ResponsiveContainer>;
+    }
+
+    if(view==="trajectory"){
+      const p=plan.params;
+      const sy=(p.startYear&&isFinite(p.startYear))?p.startYear:CURRENT_YEAR;
+      const bc=baseCurrency||"USD";
+      // Build pre-retirement data: CURRENT_YEAR -> startYear
+      const preData=[];
+      const allAssets=[
+        ...plan.divestAssets.filter(a=>a.enabled&&a.shares>0&&a.pricePerShare>0),
+        ...plan.investmentIncome.filter(a=>a.enabled&&a.shares>0&&a.pricePerShare>0),
+        ...plan.fixedAssets.filter(a=>a.enabled&&a.shares>0&&a.pricePerShare>0),
+      ];
+      for(let yr=CURRENT_YEAR;yr<=sy;yr++){
+        let val=0;
+        allAssets.forEach(a=>{
+          const yearsFromEntry=yr-(a.priceEnteredYear||CURRENT_YEAR);
+          const sc=(a.cagr||0)/100;
+          const dd1=(a.cagrDecline1||0)/100,dd2=(a.cagrDecline2||0)/100,dd3=(a.cagrDecline3||0)/100;
+          const floorRate=(a.cagrFloor||0)/100;
+          const p2s=sc-5*dd1,p3s=p2s-15*dd2;
+          let price=a.pricePerShare;
+          for(let y=1;y<=Math.max(0,yearsFromEntry);y++){
+            let yc;
+            if(y<=5)yc=sc-y*dd1;
+            else if(y<=20)yc=p2s-(y-5)*dd2;
+            else yc=p3s-(y-20)*dd3;
+            yc=Math.max(yc,floorRate);
+            price=price*(1+yc);
+          }
+          val+=toBase(a.shares*price,a.currency||bc,bc,fxRate);
+        });
+        preData.push({year:yr,projected:Math.round(val),isPreRetirement:true});
+      }
+      // Post-retirement data from results
+      const postData=results.map(r=>({year:r.year,projected:r.portfolio,isPreRetirement:false}));
+      // Combine — avoid duplicating startYear
+      const combined=[...preData,...postData.filter(r=>r.year>sy)];
+      // "You are here" dot — current year value
+      const nowPoint=preData.find(d=>d.year===CURRENT_YEAR);
+      const nowVal=nowPoint?nowPoint.projected:0;
+      // Retirement start value
+      const retPoint=combined.find(d=>d.year===sy);
+      const retVal=retPoint?retPoint.projected:0;
+      return<div style={{height:"100%",position:"relative"}}>
+        <ResponsiveContainer width="100%" height="85%">
+          <LineChart data={combined} margin={{top:10,right:20,left:10,bottom:0}}>
+            <XAxis dataKey="year" tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={{stroke:T.border}}/>
+            <YAxis tickFormatter={fmtK} tick={{fontSize:10,fill:T.textDim}} tickLine={false} axisLine={false}/>
+            <Tooltip content={<CTooltip/>}/>
+            <ReferenceLine x={sy} stroke={T.amber} strokeDasharray="4 3" strokeWidth={1.5} label={{value:"Retirement",position:"insideTopRight",fontSize:10,fill:T.amber,fontFamily:FONT_MONO}}/>
+            <ReferenceLine x={CURRENT_YEAR} stroke={T.accent} strokeDasharray="3 3" strokeWidth={1} label={{value:"Today",position:"insideTopLeft",fontSize:10,fill:T.accent,fontFamily:FONT_MONO}}/>
+            <Line type="monotone" dataKey="projected" name="Projected Portfolio" stroke={T.accent} strokeWidth={2} dot={false}/>
+            <ReferenceDot x={CURRENT_YEAR} y={nowVal} r={6} fill={T.accent} stroke={T.card} strokeWidth={2} label={{value:"You are here",position:"top",fontSize:10,fill:T.accent,fontFamily:FONT_MONO}}/>
+          </LineChart>
+        </ResponsiveContainer>
+        <div style={{display:"flex",gap:24,padding:"8px 20px",flexWrap:"wrap"}}>
+          <div style={{fontSize:11,fontFamily:FONT_MONO}}><span style={{color:T.textDim}}>Today ({CURRENT_YEAR}): </span><strong style={{color:T.accent}}>{fmtK(nowVal,bc)}</strong></div>
+          <div style={{fontSize:11,fontFamily:FONT_MONO}}><span style={{color:T.textDim}}>At retirement ({sy}): </span><strong style={{color:T.amber}}>{fmtK(retVal,bc)}</strong></div>
+          {results.length>0&&<div style={{fontSize:11,fontFamily:FONT_MONO}}><span style={{color:T.textDim}}>Final ({results[results.length-1]?.year}): </span><strong style={{color:T.gold}}>{fmtK(results[results.length-1]?.portfolio||0,bc)}</strong></div>}
+        </div>
+      </div>;
     }
   };
 
